@@ -45,7 +45,8 @@ export const isOver = (item: CalendarItem, now: Date): boolean =>
  * Whether a location line is even on the table for this item.
  *
  * Reminders never get one — a to-do has a place in a list, not a place on a map — so
- * the budget must not reserve a row for one either.
+ * the budget must not reserve a row for one either. Nor does an all-day entry: it is a
+ * single line by definition, and there is no expanded form of it to print one on.
  */
 export const hasLocation = (item: CalendarItem): boolean =>
-  item.kind === 'event' && Boolean(item.location)
+  item.kind === 'event' && !item.allDay && Boolean(item.location)

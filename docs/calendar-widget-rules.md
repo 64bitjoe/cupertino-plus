@@ -32,6 +32,12 @@ the time in the same colour, weaker.
 **Reminder** — a neutral grey background, an empty circle in the list's colour, muted
 text. Reminders never show a location.
 
+**All-day event** — the tint of an event, but the bar gives way to a filled rounded
+square with a calendar knocked out of it, in the calendar colour, and then the title on
+one line with an ellipsis. Nothing else: no time, no location, no expanded form. The
+badge has to carry the meaning on its own, because there is no second line left to say
+"all day" on.
+
 **`2 more events`** — the tail indicator, and the one row the flow can end on that is
 not an item: a thin bar in the calendar colour, grey text at a normal weight, and
 **no tinted background**, unlike an event. A tint would read as one more event, when the
@@ -92,6 +98,7 @@ The unit is one line of text inside the card.
 | -------------------------------------- | ---- |
 | compact row (title + time)             | 2    |
 | expanded row (title + location + time) | 3    |
+| all-day row (title alone)              | 1    |
 | section heading                        | 1    |
 | `2 more events`                        | 1    |
 
@@ -103,7 +110,10 @@ The unit is one line of text inside the card.
 
 A node goes in the current column if it fits there whole; otherwise the next column
 takes it. A heading never ends up alone at the bottom of a column: if its first row will
-not follow it there, the whole section moves on.
+not follow it there, the whole section moves on. What that reservation costs depends on
+what the first row is — two rows for a timed event, one for an all-day entry — so a
+heading and an all-day entry can move into a gap that a heading and a timed event could
+not.
 
 ### The tail
 
@@ -146,9 +156,14 @@ two sizes disagree on purpose:
   and three rows fit in what is left of the column, draw it expanded, even though the
   next event will be pushed into the other column or off the card entirely.
 - **Small — count wins.** Pack everything compactly first, then spend whatever budget
-  is left over on locations, top down. One event → 3 rows, location shown. Two events
-  → `2 + 2`, no slack, so neither shows a location even though the first one would
-  have fitted. The tail indicator draws from the same slack and is served first (§5).
+  is left over on locations, top down. One event → 3 rows, location shown. Two timed
+  events → `2 + 2`, no slack, so neither shows a location even though the first one
+  would have fitted. The rule is about the slack and not about the count, though: an
+  all-day entry and a timed event come to `1 + 2`, and the row that leaves over does buy
+  the location. The tail indicator draws from the same slack and is served first (§5).
+
+Neither size ever expands an all-day entry: it has no expanded form, so both the greedy
+medium pass and the small slack pass step over it.
 
 Location and title are each one line, truncated with an ellipsis.
 
@@ -162,7 +177,8 @@ Location and title are each one line, truncated with an ellipsis.
   `11AM – 1PM`.
 - The separator is a spaced en dash.
 - No duration — a reminder, a zero-length event — prints one time: `10:30AM`.
-- All-day prints no time at all. It is still one line of content, and still costs 2.
+- All-day prints no time at all, and no location either — one line of content, costing
+  the one row (§5).
 
 ## 8. Worked examples
 
@@ -176,10 +192,16 @@ row in it, in order. Tomorrow is three more rows in every case.
 | 1 event with a location           | `3`   | `1+2+2+2` | — everything fitted                        |
 | 2 events, a location on the first | `3`   | `2+1+2+2` | one event gone in silence — column is full |
 | 2 events, a location on both      | `3`   | `3+1+2+1` | that last `1` is `2 more events`           |
+| all-day + 1 event with a location | `1+3` | `1+2+2+2` | — everything fitted                        |
 
-The last row is the seventh screenshot, and it is worth reading twice: the location
+The fifth row is the seventh screenshot, and it is worth reading twice: the location
 `Dworzec PKP` on the second event is what cost tomorrow two of its three rows. Greedy
 locations are paid for in events (§6), and the indicator is how the widget admits it.
+
+The sixth is the eighth screenshot, and it is the same trade read the other way: the
+all-day entry costs one row instead of two, and that saved row is exactly what pays for
+`Bydgoszcz Główna` underneath the event below it. The same day in **small** comes to
+`1 + 3` — two items _and_ a location inside four rows.
 
 ## 9. Still open
 

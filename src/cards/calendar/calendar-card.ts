@@ -29,6 +29,29 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
 const NO_EVENTS_TODAY = 'No Events Today'
 
 /**
+ * The all-day badge: a filled rounded square with a calendar knocked out of it.
+ *
+ * It replaces the colour bar, and it has to, because an all-day row has nothing else
+ * left to identify it by — no time under the title, no location. Drawn inline rather
+ * than as an `<ha-icon>`: the row is priced in pixels by `layout.ts`, and an icon that
+ * arrives a frame late out of Home Assistant's icon registry would be measured at the
+ * wrong height. The dev harness has no registry at all.
+ */
+const ALL_DAY_BADGE = html`
+  <svg class="badge" viewBox="0 0 16 16" aria-hidden="true">
+    <rect width="16" height="16" rx="4.5" fill="var(--item-color)" />
+    <g fill="#fff">
+      <rect x="4.35" y="2.2" width="1.3" height="2.4" rx="0.65" />
+      <rect x="10.35" y="2.2" width="1.3" height="2.4" rx="0.65" />
+      <rect x="3" y="6.3" width="10" height="1.3" rx="0.65" />
+      <circle cx="4.9" cy="10.5" r="0.95" />
+      <circle cx="8" cy="10.5" r="0.95" />
+      <circle cx="11.1" cy="10.5" r="0.95" />
+    </g>
+  </svg>
+`
+
+/**
  * The calendar widget.
  *
  * The interesting part is not in here — it is in `flow.ts` (what to show, in what
@@ -151,6 +174,22 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
       .row.reminder {
         background: var(--cw-fill);
+      }
+
+      /* An all-day entry keeps the tint of an event and loses everything else: no time
+         under the title, so the chip closes up around the one line it has. 22px of title
+         inside 1px of padding is the 24px that layout.ts prices a single budget row at
+         (its ROW, less the gap) — this is the tallest one-row node there is, so it must
+         not grow. */
+      .row.allday {
+        align-items: center;
+        padding: 1px 10px;
+      }
+
+      .badge {
+        flex: none;
+        width: 16px;
+        height: 16px;
       }
 
       /* The colour bar that says which calendar an event belongs to. */
@@ -303,6 +342,16 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     }
 
     const item = row.node.item
+
+    if (item.allDay) {
+      return html`
+        <div class="row ${item.kind} allday" style="--item-color: ${item.color}">
+          ${ALL_DAY_BADGE}
+          <div class="title cw-truncate">${item.title}</div>
+        </div>
+      `
+    }
+
     const time = itemTime(item, ctx)
 
     return html`

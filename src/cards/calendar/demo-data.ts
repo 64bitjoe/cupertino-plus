@@ -193,8 +193,38 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
     ]
   },
 
-  /** All-day entries sort first and print no time. */
+  /**
+   * All-day entries: first in the day, one row, no time — and the reference screenshot
+   * for what that one row buys. Medium fits the whole flow, `1 + 3` beside `1 + 2+2+2`.
+   * Small gets `1 + 2` with a row left over, which goes on the location: two items and a
+   * location, which two timed events could never have managed.
+   */
   'all-day': now => {
+    const base = soon(now)
+    return [
+      { kind: 'event', title: 'All day test', allDay: true, start: midnight(now, 0), color: WORK },
+      {
+        kind: 'event',
+        title: 'Test',
+        location: 'Bydgoszcz Główna',
+        start: base,
+        end: after(base, 1),
+        color: WORK,
+      },
+      { kind: 'reminder', title: 'Weigh in', start: on(now, 1, 10, 30), color: LIST },
+      { kind: 'event', title: 'Lessons', start: on(now, 1, 12), end: on(now, 1, 13), color: WORK },
+      {
+        kind: 'event',
+        title: 'Training',
+        start: on(now, 1, 18, 15),
+        end: on(now, 1, 19, 15),
+        color: SPORT,
+      },
+    ]
+  },
+
+  /** An all-day entry sharing a busy day, so the tail indicator has to work around it. */
+  'all-day-busy': now => {
     const base = soon(now)
     return [
       { kind: 'event', title: 'Kraków trip', allDay: true, start: midnight(now, 0), color: HOME },

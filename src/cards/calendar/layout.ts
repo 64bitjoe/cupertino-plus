@@ -6,6 +6,7 @@
  *
  *   compact event   title + time              2 rows
  *   expanded event  title + location + time   3 rows
+ *   all-day event   title                     1 row
  *   section heading                           1 row
  *   "2 more events"                           1 row
  *
@@ -31,9 +32,22 @@
 import type { FlowNode } from './flow'
 import { hasLocation } from './model'
 
-export const COST = { header: 1, compact: 2, expanded: 3, more: 1 } as const
+export const COST = { header: 1, compact: 2, expanded: 3, more: 1, allday: 1 } as const
 
 export type LayoutMode = 'small' | 'medium'
+
+/**
+ * What an item costs with no location line on it — the least it can be drawn for.
+ *
+ * An all-day entry is one line and only ever one line: no time to print under the
+ * title, and no expanded form to print a location on. Anything else is two.
+ *
+ * Called for the node after a heading too, where a missing or unexpected node falls
+ * back to the dearer answer: reserving too much only moves a section on, while
+ * reserving too little would strand the heading.
+ */
+const plainCost = (node: FlowNode | undefined): number =>
+  node?.type === 'item' && node.item.allDay ? COST.allday : COST.compact
 
 /**
  * The tail indicator, `2 more events`.
@@ -98,27 +112,31 @@ export function packFlow(
     if (index >= columns.length) break
 
     if (node.type === 'header') {
-      // A heading is only worth its row if an event can follow it in the same column.
-      if (room() < COST.header + COST.compact) {
+      // A heading is only worth its row if its first row can follow it in the same
+      // column — and how much that costs depends on what it is: an all-day entry needs
+      // one row where a timed event needs two.
+      const need = COST.header + plainCost(flow[cursor + 1])
+      if (room() < need) {
         index += 1
-        if (index >= columns.length || room() < COST.header + COST.compact) break
+        if (index >= columns.length || room() < need) break
       }
       place(node, COST.header, false)
       continue
     }
 
     const wantsLocation = mode === 'medium' && hasLocation(node.item)
-    let cost = wantsLocation ? COST.expanded : COST.compact
+    const plain = plainCost(node)
+    let cost = wantsLocation ? COST.expanded : plain
 
     if (room() < cost) {
-      if (wantsLocation && room() >= COST.compact) {
+      if (wantsLocation && room() >= plain) {
         // It is the location that does not fit, not the event. Drop the line, keep
         // the event where it is: moving it would leave a hole behind it.
-        cost = COST.compact
+        cost = plain
       } else {
         index += 1
-        if (index >= columns.length || room() < COST.compact) break
-        cost = wantsLocation && room() >= COST.expanded ? COST.expanded : COST.compact
+        if (index >= columns.length || room() < plain) break
+        cost = wantsLocation && room() >= COST.expanded ? COST.expanded : plain
       }
     }
 
@@ -204,10 +222,10 @@ const COMPACT_PX = 56
 /**
  * What one row of the budget is allowed to cost in pixels, gap included.
  *
- * The four kinds of row are not equally dear per row — a heading is 26px for its one, a
- * `2 more events` 28px, an expanded item 82px for its three — so the budget is priced at
- * the most expensive of them, half of a compact row. Charging at that rate means no mix
- * of rows can overflow the column it was packed into.
+ * The kinds of row are not equally dear per row — a heading is 26px for its one, a
+ * `2 more events` 28px, an all-day chip 30px, an expanded item 82px for its three — so
+ * the budget is priced at the most expensive of them, half of a compact row. Charging at
+ * that rate means no mix of rows can overflow the column it was packed into.
  */
 const ROW = (COMPACT_PX + GAP) / COST.compact
 

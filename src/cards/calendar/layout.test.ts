@@ -20,6 +20,13 @@ const row = (title: string, location?: string): FlowNode => ({
   item: item(title, location),
 })
 
+/** A location is allowed in here on purpose: an all-day row must never draw one. */
+const allDay = (title: string, location?: string): FlowNode => ({
+  type: 'item',
+  key: title,
+  item: { ...item(title, location), allDay: true },
+})
+
 const heading = (text: string): FlowNode => ({ type: 'header', key: text, text })
 
 /** The shape a column ended up with, as the spec writes it: a list of row costs. */
@@ -40,11 +47,11 @@ const TOMORROW = heading('TOMORROW')
 const REST_OF_TOMORROW = [row('T1'), row('T2'), row('T3')]
 
 /**
- * The five cases the rules were reconstructed from, transcribed straight out of
+ * The six cases the rules were reconstructed from, transcribed straight out of
  * `docs/calendar-widget-rules.md`. If one of these changes, the widget stopped
  * matching the thing it is copying.
  */
-describe('medium — the reference screenshots', () => {
+describe('the reference screenshots', () => {
   it('three plain events today: the third flows into the right column', () => {
     const flow = [row('A'), row('B'), row('C'), TOMORROW, ...REST_OF_TOMORROW]
     expect(costs(flow, [4, 7], 'medium')).toEqual([
@@ -57,6 +64,31 @@ describe('medium — the reference screenshots', () => {
       ['A', 'B'],
       ['C', 'TOMORROW', 'T1', 'T2'],
     ])
+  })
+
+  it('an all-day entry costs one row, and that row pays for a location', () => {
+    // The eighth screenshot. In medium the whole flow fits: the day's one row leaves
+    // exactly enough for the location beneath `Test`.
+    const flow = [
+      allDay('All day test'),
+      row('Test', 'Bydgoszcz Główna'),
+      TOMORROW,
+      ...REST_OF_TOMORROW,
+    ]
+    expect(costs(flow, [4, 7], 'medium')).toEqual([
+      [1, 3],
+      [1, 2, 2, 2],
+    ])
+
+    // And in small, where today is all there is: two items *and* a location, which two
+    // timed events could never have managed.
+    const columns = packFlow(
+      [allDay('All day test'), row('Test', 'Bydgoszcz Główna')],
+      [4],
+      'small',
+    )
+    expect(columns[0]!.rows.map(r => r.cost)).toEqual([1, 3])
+    expect(columns[0]!.rows.map(r => r.expanded)).toEqual([false, true])
   })
 
   it('a spare row at the bottom becomes the count of what is missing', () => {
@@ -118,6 +150,39 @@ describe('medium — packing rules', () => {
     // spent on the fifteen that did not make it.
     expect(columns.flatMap(column => column.rows)).toHaveLength(6)
     expect(titles(flow, [4, 7], 'medium')[1]).toEqual(['E2', 'E3', 'E4', '15 more'])
+  })
+
+  it('never expands an all-day entry, however much room and location it has', () => {
+    // Greedy medium would take a third row for any other event carrying a location.
+    const columns = packFlow([allDay('A', 'Bydgoszcz Główna')], [4, 7], 'medium')
+    expect(columns[0]!.rows.map(r => r.cost)).toEqual([COST.allday])
+    expect(columns[0]!.rows[0]!.expanded).toBe(false)
+  })
+
+  it('never spends a small column’s slack on an all-day entry either', () => {
+    const columns = packFlow([allDay('A', 'here'), row('B', 'there')], [5], 'small')
+    // The slack goes past the all-day row to the one that can use it.
+    expect(columns[0]!.rows.map(r => r.expanded)).toEqual([false, true])
+    expect(columns[0]!.used).toBe(4)
+  })
+
+  it('packs four all-day entries where two timed events would have fitted', () => {
+    const flow = Array.from({ length: 7 }, (_, index) => allDay(`A${index}`))
+    expect(costs(flow, [4, 7], 'medium')).toEqual([
+      [1, 1, 1, 1],
+      [1, 1, 1],
+    ])
+  })
+
+  it('holds back only one row for a heading whose first entry is all-day', () => {
+    const flow = [row('A'), row('B'), TOMORROW, allDay('T1')]
+    // Two rows left over: a heading and its all-day entry need exactly those two.
+    expect(titles(flow, [6, 7], 'medium')).toEqual([['A', 'B', 'TOMORROW', 'T1'], []])
+    // A timed entry would have needed three, and taken its heading across with it.
+    expect(titles([row('A'), row('B'), TOMORROW, row('T1')], [6, 7], 'medium')).toEqual([
+      ['A', 'B'],
+      ['TOMORROW', 'T1'],
+    ])
   })
 
   it('never reserves a location row for a reminder', () => {
@@ -282,7 +347,12 @@ describe('invariants, over twenty thousand random flows', () => {
       // Headings only ever arrive before an item, and never two in a row — that is
       // all `buildFlow` can produce.
       const heads = random(4) === 0 && (flow.length === 0 || flow[flow.length - 1]!.type === 'item')
-      flow.push(heads ? heading(`H${i}`) : row(`I${i}`, random(2) ? 'somewhere' : undefined))
+      if (heads) {
+        flow.push(heading(`H${i}`))
+        continue
+      }
+      const location = random(2) ? 'somewhere' : undefined
+      flow.push(random(4) === 0 ? allDay(`A${i}`, location) : row(`I${i}`, location))
     }
     while (flow.length && flow[flow.length - 1]!.type === 'header') flow.pop()
     return flow
@@ -385,8 +455,11 @@ describe('geometry', () => {
     const DATE_BLOCK = 84
     const GAP = 6
     const COMPACT = 56
-    /** `2 more events`: 2px of padding over a 20px line. A heading is 20px in all. */
-    const ONE_ROW = 22
+    /**
+     * The tallest node that costs a single row: an all-day chip, 22px of title inside
+     * 1px of padding. A `2 more events` is 22px, a heading 20px.
+     */
+    const ONE_ROW = 24
 
     const tallestRendering = (budget: number): number => {
       if (budget <= 0) return 0

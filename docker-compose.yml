@@ -1,0 +1,32 @@
+# Throwaway Home Assistant instance used only for developing these cards.
+# Never point this at a real HA config directory.
+#
+#   docker compose up -d      start the dev instance   -> http://localhost:8123
+#   docker compose down       stop it
+#   docker compose down -v    stop it and wipe onboarding/state
+#
+# ./dist is mounted straight into the HA www folder, so `pnpm watch` output is
+# served at /local/cupertino-widgets/cupertino-widgets.js with no copy step.
+#
+# Caveat of that trick: the mount is bound to the *inode* of ./dist. Delete the
+# directory (rather than its contents) and the container keeps pointing at the
+# orphan, serving 404 for a bundle that is plainly there on the host. Vite is
+# configured with `emptyOutDir: false` so it never does that, and `pnpm ha:up`
+# recreates the container so a manual `rm -rf dist` heals on the next start.
+
+name: cupertino-widgets-dev
+
+services:
+  homeassistant:
+    # `stable` is always the newest Home Assistant release, which is what this
+    # library targets. Run `docker compose pull` to move to a new one.
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: cupertino-widgets-ha
+    restart: unless-stopped
+    ports:
+      - '8123:8123'
+    environment:
+      TZ: ${TZ:-Europe/Warsaw}
+    volumes:
+      - ./dev/ha-config:/config
+      - ./dist:/config/www/cupertino-widgets:ro

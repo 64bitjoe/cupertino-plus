@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+.eslintcache
+*.tsbuildinfo
+tmp/
+CLAUDE.md
+
+# Editors
+.idea/
+.vscode/
+
+# Dev Home Assistant instance: keep the config we seed, ignore everything the
+# container generates (state, db, logs, secrets).
+dev/ha-config/*
+!dev/ha-config/configuration.yaml

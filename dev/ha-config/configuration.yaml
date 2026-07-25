@@ -1,0 +1,30 @@
+# Home Assistant config for the throwaway DEV instance only (docker-compose.yml).
+# Not shipped to users, not related to anyone's real setup.
+
+default_config:
+
+homeassistant:
+  # A card reads `hass.config.time_zone`, not the container clock, so pin it here.
+  # Follows the TZ that docker-compose passes in, which keeps the two in sync.
+  time_zone: !env_var TZ Europe/Warsaw
+  country: PL
+
+# Gives us entities to develop against without configuring any real integration:
+# calendar.calendar_1 / calendar.calendar_2, plus assorted sensors.
+# For richer calendar work add the "Local Calendar" integration in the UI --
+# it is writable, so events can be created from the card.
+demo:
+
+lovelace:
+  # Dashboards stay in storage mode (the default), so the UI card picker and
+  # visual editors work. But resources are pinned here declaratively, so the
+  # dev bundle is registered on boot with no manual clicking.
+  #
+  # `resource_mode` is a separate knob from the dashboard `mode`; setting it
+  # explicitly also survives 2026.8, which drops the fallback to `mode`.
+  resource_mode: yaml
+  resources:
+    # ./dist is bind-mounted to /config/www/cupertino-widgets by docker-compose,
+    # so `pnpm watch` output is served straight from here.
+    - url: /local/cupertino-widgets/cupertino-widgets.js
+      type: module

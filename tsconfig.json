@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client", "node"],
+
+    // Lit 3 works with either decorator flavour, but its standard-decorator mode
+    // requires `accessor` on every @property/@state field. Verified against
+    // TypeScript 7.0.2: the experimental form type-checks clean, the standard form
+    // errors with TS1240/TS1270. `useDefineForClassFields` must stay false or class
+    // fields shadow the accessors the decorators install.
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "dev", "vite.config.ts"]
+}

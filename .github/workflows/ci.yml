@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run format:check
+      - run: pnpm run typecheck
+      - run: pnpm run build
+
+      - name: Check the bundle is self-contained
+        # Home Assistant loads the file directly, so a leftover bare import would
+        # 404 at runtime rather than at build time.
+        run: |
+          if grep -qE "(^|[;[:space:]])import[^;]*from[\"'][^./]" dist/cupertino-widgets.js; then
+            echo "::error::dist bundle contains an unresolved external import"
+            exit 1
+          fi
+          echo "bundle is self-contained"

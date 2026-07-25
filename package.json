@@ -1,0 +1,39 @@
+{
+  "name": "cupertino-widgets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "iOS-flavoured widget cards for Home Assistant dashboards",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sabbaken/cupertino-widgets.git"
+  },
+  "homepage": "https://github.com/sabbaken/cupertino-widgets",
+  "bugs": "https://github.com/sabbaken/cupertino-widgets/issues",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm run typecheck && vite build",
+    "watch": "vite build --watch --mode development",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "ha:up": "mkdir -p dist && docker compose up -d --force-recreate",
+    "ha:down": "docker compose down",
+    "ha:logs": "docker compose logs -f homeassistant",
+    "ha:reset": "docker compose down -v"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}

@@ -1,0 +1,121 @@
+/* Home Assistant's default light and dark themes, so the harness shows what the
+   dashboard shows. Values taken from the shipped frontend. */
+.theme-light {
+  --primary-background-color: #fafafa;
+  --secondary-background-color: #e5e5e5;
+  --card-background-color: #fff;
+  --primary-text-color: #212121;
+  --secondary-text-color: #727272;
+  --divider-color: #e0e0e0;
+  --primary-color: #03a9f4;
+}
+
+.theme-dark {
+  --primary-background-color: #111;
+  --secondary-background-color: #282828;
+  --card-background-color: #1c1c1c;
+  --primary-text-color: #e1e1e1;
+  --secondary-text-color: #9b9b9b;
+  --divider-color: #e1e1e11f;
+  --primary-color: #03a9f4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--primary-background-color);
+  color: var(--primary-text-color);
+  font:
+    400 14px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 24px;
+  background: var(--secondary-background-color);
+  border-bottom: 1px solid var(--divider-color);
+}
+
+header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  margin-right: auto;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--secondary-text-color);
+}
+
+output {
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text-color);
+}
+
+main {
+  padding: 32px 24px 64px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+h2 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text-color);
+  margin: 0 0 12px;
+}
+
+/* Mimics one dashboard section: same 8px gaps as the real sections grid. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slot-label {
+  font-size: 11px;
+  color: var(--secondary-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The free-resize box, for checking that layout follows the real box and not the
+   configured size. */
+.resizable {
+  resize: both;
+  overflow: auto;
+  width: 300px;
+  height: 260px;
+  min-width: 120px;
+  min-height: 80px;
+  padding: 0;
+  /* The resize handle needs a visible frame to grab. */
+  outline: 1px dashed var(--divider-color);
+}
+
+.readout {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--secondary-text-color);
+  font-variant-numeric: tabular-nums;
+}

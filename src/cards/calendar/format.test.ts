@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { timePreferences } from './datetime'
-import { TIME_DASH, itemTime, widgetDate, type FormatContext } from './format'
+import { TIME_DASH, itemTime, moreLabel, widgetDate, type FormatContext } from './format'
 
 const ctx: FormatContext = { locale: 'en-GB', timeZone: 'Europe/Warsaw', hour12: true }
 const ctx24: FormatContext = { ...ctx, hour12: false }
@@ -95,6 +95,14 @@ describe('the timezone is the display one', () => {
     expect(render('23:00', '23:30', { ...ctx, timeZone: 'Asia/Tokyo' })).toBe(
       `6 ${TIME_DASH} 6:30AM`,
     )
+  })
+})
+
+describe('the tail indicator', () => {
+  it('agrees with itself about the number', () => {
+    expect(moreLabel(1)).toBe('1 more event')
+    expect(moreLabel(2)).toBe('2 more events')
+    expect(moreLabel(11)).toBe('11 more events')
   })
 })
 

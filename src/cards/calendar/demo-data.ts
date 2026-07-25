@@ -3,7 +3,7 @@
  *
  * Hand-built days that exercise every branch of the layout: an empty today, a skipped
  * empty tomorrow, locations that fit and locations that do not, reminders mixed into
- * the same stream as events, and an all-day entry.
+ * the same stream as events, an all-day entry, and a tail that runs out of column.
  *
  * Times for *today* are anchored to the current clock rather than written out, so the
  * card still has something to show at four in the afternoon. Later days use plain
@@ -143,6 +143,42 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
       { kind: 'event', title: 'Test 1', start: after(base, 2), end: after(base, 3), color: WORK },
       { kind: 'event', title: 'Test 2', start: after(base, 4), end: after(base, 5), color: WORK },
       ...laterDays(now),
+    ]
+  },
+
+  /**
+   * `2 more events`, laid out exactly as the reference screenshot has it: two greedy
+   * locations today spend the left column and most of the right one, so tomorrow gets a
+   * heading, its reminder, and one row left over to admit what is missing.
+   */
+  'more-events': now => {
+    const base = soon(now)
+    return [
+      {
+        kind: 'event',
+        title: 'Test',
+        location: 'Długa 36, Poznań',
+        start: base,
+        end: after(base, 1),
+        color: WORK,
+      },
+      {
+        kind: 'event',
+        title: 'Test 1',
+        location: 'Dworzec PKP',
+        start: after(base, 2),
+        end: after(base, 3),
+        color: WORK,
+      },
+      { kind: 'reminder', title: 'Weigh in', start: on(now, 1, 10, 30), color: LIST },
+      { kind: 'event', title: 'Lessons', start: on(now, 1, 12), end: on(now, 1, 13), color: WORK },
+      {
+        kind: 'event',
+        title: 'Training',
+        start: on(now, 1, 18, 15),
+        end: on(now, 1, 19, 15),
+        color: SPORT,
+      },
     ]
   },
 

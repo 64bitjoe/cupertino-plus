@@ -160,6 +160,18 @@ export const sectionHeading = (date: Date, today: Date, ctx: FormatContext): str
   return upper(`${weekday}, ${dayMonth}`)
 }
 
+/**
+ * The tail indicator: `1 more event`, `2 more events`.
+ *
+ * English-only, like `No Events Today` — Home Assistant has no string for either and the
+ * widget being copied says exactly this. Kept in one place because two open questions
+ * end here: whether a tail of nothing but reminders should read `2 more items`, and
+ * whether the count should be the whole loaded fortnight or only the days already on
+ * screen. Today it is every item that did not fit, and it is always `events`.
+ */
+export const moreLabel = (count: number): string =>
+  `${count} more ${count === 1 ? 'event' : 'events'}`
+
 /** The always-present date block in the widget's top-left corner. */
 export const widgetDate = (today: Date, ctx: FormatContext): { weekday: string; day: string } => {
   const { locale, timeZone } = ctx

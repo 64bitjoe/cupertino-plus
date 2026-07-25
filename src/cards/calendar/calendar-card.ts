@@ -6,7 +6,7 @@ import { registerCard } from '../../core/register'
 import { timePreferences } from './datetime'
 import { DEFAULT_DEMO_SCENARIO, demoItems } from './demo-data'
 import { buildFlow } from './flow'
-import { TIME_DASH, itemTime, widgetDate } from './format'
+import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
 import type { FormatContext, ItemTime, TimeToken } from './format'
 import { geometryFor, packFlow, type LayoutColumn, type LayoutRow } from './layout'
 
@@ -105,6 +105,25 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         padding-top: 4px;
         font: 600 13px/16px var(--cw-font);
         letter-spacing: 0.04em;
+        color: var(--cw-label-secondary);
+      }
+
+      /* What did not fit: "2 more events".
+
+         A caption, not a card. It borrows the event rail to say which calendar you are
+         missing, and pointedly not the tint behind it — a tinted row would read as one
+         more event, when the whole point of the line is that those did not fit. The
+         10px of padding lines its bar up with the bars of the rows above; the 22px it
+         comes to is the second of the two one-row heights layout.ts prices ROW against
+         (a heading is 20px), so this must stay short. */
+      .more {
+        flex: none;
+        min-width: 0;
+        display: flex;
+        align-items: stretch;
+        gap: var(--cw-space-2);
+        padding: 2px 10px 0;
+        font: var(--cw-text-subheadline);
         color: var(--cw-label-secondary);
       }
 
@@ -272,6 +291,15 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
   private _renderRow(row: LayoutRow, ctx: FormatContext): TemplateResult {
     if (row.node.type === 'header') {
       return html`<div class="heading cw-truncate">${row.node.text}</div>`
+    }
+
+    if (row.node.type === 'more') {
+      return html`
+        <div class="more" style="--item-color: ${row.node.color}">
+          <div class="rail"></div>
+          <div class="cw-truncate">${moreLabel(row.node.count)}</div>
+        </div>
+      `
     }
 
     const item = row.node.item

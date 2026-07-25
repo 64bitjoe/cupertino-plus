@@ -1,18 +1,23 @@
 /**
  * Step two: pour the flow into columns.
  *
- * Apple's widget does not scroll and does not say "+2 more" — it fits what fits and
- * drops the rest. The whole thing is therefore a budget in *rows*, where a row is one
- * line of text:
+ * Apple's widget does not scroll, so the whole thing is a budget in *rows*, where a row
+ * is one line of text:
  *
  *   compact event   title + time              2 rows
  *   expanded event  title + location + time   3 rows
  *   section heading                           1 row
+ *   "2 more events"                           1 row
  *
  * A node goes in the current column if it fits whole, otherwise the next column takes
- * it; whatever is left over when the columns run out is dropped. A heading never ends
- * up alone at the bottom of a column — if its first event will not follow it there,
- * the entire section moves on.
+ * it. A heading never ends up alone at the bottom of a column — if its first event will
+ * not follow it there, the entire section moves on.
+ *
+ * What is left over when the columns run out is summarised as `2 more events`, but only
+ * if a row is spare to say it in: the indicator costs a row like everything else, and it
+ * does not get to evict the event above it. A column that came out exactly full loses
+ * its tail in silence — which is not a bug in the widget being copied, it is the reason
+ * an event can simply vanish off the bottom of a full column.
  *
  * The two sizes disagree about locations, and the disagreement is deliberate:
  *
@@ -26,12 +31,29 @@
 import type { FlowNode } from './flow'
 import { hasLocation } from './model'
 
-export const COST = { header: 1, compact: 2, expanded: 3 } as const
+export const COST = { header: 1, compact: 2, expanded: 3, more: 1 } as const
 
 export type LayoutMode = 'small' | 'medium'
 
+/**
+ * The tail indicator, `2 more events`.
+ *
+ * Not something `buildFlow` can produce: it is packing that discovers there was more
+ * than would fit, so packing is what invents the row. It carries a colour because the
+ * bar down its left says which calendar you are missing — the first one you cannot see.
+ */
+export interface MoreNode {
+  type: 'more'
+  key: string
+  /** Items left undrawn. Never zero: with nothing hidden there is nothing to say. */
+  count: number
+  color: string
+}
+
+export type LayoutNode = FlowNode | MoreNode
+
 export interface LayoutRow {
-  node: FlowNode
+  node: LayoutNode
   /** Item rows only: whether the location line is drawn. */
   expanded: boolean
   cost: number
@@ -56,20 +78,23 @@ export function packFlow(
 ): LayoutColumn[] {
   const columns: LayoutColumn[] = budgets.map(budget => ({ budget, used: 0, rows: [] }))
   let index = 0
+  /** The first node that has not been placed — where the tail begins. */
+  let cursor = 0
 
   const room = (): number => {
     const column = columns[index]
     return column ? column.budget - column.used : 0
   }
 
-  const place = (node: FlowNode, cost: number, expanded: boolean): void => {
+  const place = (node: LayoutNode, cost: number, expanded: boolean): void => {
     const column = columns[index]
     if (!column) return
     column.used += cost
     column.rows.push({ node, cost, expanded })
   }
 
-  for (const node of flow) {
+  for (; cursor < flow.length; cursor += 1) {
+    const node = flow[cursor]
     if (index >= columns.length) break
 
     if (node.type === 'header') {
@@ -100,9 +125,46 @@ export function packFlow(
     place(node, cost, cost === COST.expanded)
   }
 
+  // The indicator before the slack, and in that order for a reason: in the small size a
+  // spare row spent admitting that an event is missing beats one spent on a location.
+  // "Count wins" is about how much of the day you know about, not how much is drawn.
+  addMoreRow(columns, flow.slice(cursor), Math.min(index, columns.length - 1))
   if (mode === 'small') expandFromSlack(columns[0])
 
   return columns
+}
+
+/**
+ * Summarise what did not fit, if there is a row left to summarise it in.
+ *
+ * The row goes at the end of the flow, which means the last column the flow reached
+ * rather than whichever column happens to have space: a `2 more events` sitting under
+ * the left column while the right one continues past it would be nonsense.
+ *
+ * Headings are not counted. A heading is not a thing you can miss — a section that got
+ * cut takes its heading with it — and `2 more events` that meant "one event and one
+ * Thursday" would be a lie.
+ */
+function addMoreRow(columns: LayoutColumn[], tail: readonly FlowNode[], index: number): void {
+  const column = columns[index]
+  if (!column || column.budget - column.used < COST.more) return
+
+  let count = 0
+  let color: string | undefined
+  for (const node of tail) {
+    if (node.type !== 'item') continue
+    count += 1
+    // The first thing you cannot see lends the row its colour.
+    color ??= node.item.color
+  }
+
+  if (color === undefined) return
+  column.used += COST.more
+  column.rows.push({
+    node: { type: 'more', key: 'more', count, color },
+    cost: COST.more,
+    expanded: false,
+  })
 }
 
 /**
@@ -142,10 +204,10 @@ const COMPACT_PX = 56
 /**
  * What one row of the budget is allowed to cost in pixels, gap included.
  *
- * The three kinds of row are not equally dear per row — a heading is 26px for its one,
- * an expanded item 82px for its three — so the budget is priced at the most expensive
- * of them, half of a compact row. Charging at that rate means no mix of rows can
- * overflow the column it was packed into.
+ * The four kinds of row are not equally dear per row — a heading is 26px for its one, a
+ * `2 more events` 28px, an expanded item 82px for its three — so the budget is priced at
+ * the most expensive of them, half of a compact row. Charging at that rate means no mix
+ * of rows can overflow the column it was packed into.
  */
 const ROW = (COMPACT_PX + GAP) / COST.compact
 

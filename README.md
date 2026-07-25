@@ -34,7 +34,8 @@ taller fills the extra height with more rows rather than leaving it blank.
 What the calendar card decides to show, and in what order, is written down in
 [`docs/calendar-widget-rules.md`](docs/calendar-widget-rules.md) — empty days
 disappearing, `TOMORROW` meaning literally tomorrow, when a location earns its line,
-why `5 – 6PM` prints only one `PM`.
+when the rest becomes `2 more events` and when it just goes, why `5 – 6PM` prints only
+one `PM`.
 
 ## Install
 
@@ -76,7 +77,8 @@ pnpm test         # the layout rules, as unit tests
 The harness renders every card against a mock `hass` object, at both preset sizes plus
 a drag-resizable box. Its controls exist to make the layout rules visible: **Data**
 switches between fixtures built to hit every branch (an empty today, a skipped empty
-tomorrow, locations that fit and locations that do not, reminders, all-day), **Clock**
+tomorrow, locations that fit and locations that do not, reminders, all-day, a tail that
+turns into `2 more events`), **Clock**
 flips between 12- and 24-hour formatting, and there is a dark-theme toggle and a
 slider that emulates different dashboard section widths. This is the fast loop: full
 HMR.

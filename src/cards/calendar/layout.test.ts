@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FlowNode } from './flow'
-import { COST, geometryFor, packFlow } from './layout'
+import { COST, geometryFor, packFlow, type MoreNode } from './layout'
 import type { CalendarItem } from './model'
 
 const item = (title: string, location?: string): CalendarItem => ({
@@ -26,16 +26,21 @@ const heading = (text: string): FlowNode => ({ type: 'header', key: text, text }
 const costs = (flow: FlowNode[], budgets: number[], mode: 'small' | 'medium'): number[][] =>
   packFlow(flow, budgets, mode).map(column => column.rows.map(r => r.cost))
 
+/** What a reader would see, row by row: a title, a heading, or `2 more events`. */
 const titles = (flow: FlowNode[], budgets: number[], mode: 'small' | 'medium'): string[][] =>
   packFlow(flow, budgets, mode).map(column =>
-    column.rows.map(r => (r.node.type === 'header' ? r.node.text : r.node.item.title)),
+    column.rows.map(r => {
+      if (r.node.type === 'header') return r.node.text
+      if (r.node.type === 'more') return `${r.node.count} more`
+      return r.node.item.title
+    }),
   )
 
 const TOMORROW = heading('TOMORROW')
 const REST_OF_TOMORROW = [row('T1'), row('T2'), row('T3')]
 
 /**
- * The four cases the rules were reconstructed from, transcribed straight out of
+ * The five cases the rules were reconstructed from, transcribed straight out of
  * `docs/calendar-widget-rules.md`. If one of these changes, the widget stopped
  * matching the thing it is copying.
  */
@@ -46,11 +51,20 @@ describe('medium — the reference screenshots', () => {
       [2, 2],
       [2, 1, 2, 2],
     ])
-    // The fourth item of tomorrow does not fit and is dropped, not summarised.
+    // The third item of tomorrow is dropped in silence: the column came out exactly
+    // full, so there is not even the one row `2 more events` would have cost.
     expect(titles(flow, [4, 7], 'medium')).toEqual([
       ['A', 'B'],
       ['C', 'TOMORROW', 'T1', 'T2'],
     ])
+  })
+
+  it('a spare row at the bottom becomes the count of what is missing', () => {
+    // Two greedy locations today: the left column takes one, the right takes the other
+    // and has a row over at the end of tomorrow's first event.
+    const flow = [row('A', 'Długa 36'), row('B', 'Dworzec PKP'), TOMORROW, ...REST_OF_TOMORROW]
+    expect(costs(flow, [4, 7], 'medium')).toEqual([[3], [3, 1, 2, 1]])
+    expect(titles(flow, [4, 7], 'medium')).toEqual([['A'], ['B', 'TOMORROW', 'T1', '2 more']])
   })
 
   it('two events today: tomorrow starts at the top of the right column', () => {
@@ -100,7 +114,10 @@ describe('medium — packing rules', () => {
     const flow = Array.from({ length: 20 }, (_, index) => row(`E${index}`))
     const columns = packFlow(flow, [4, 7], 'medium')
     expect(columns.every(column => column.used <= column.budget)).toBe(true)
-    expect(columns.flatMap(column => column.rows)).toHaveLength(5)
+    // Two events left, three drawn, and the odd row at the foot of the right column
+    // spent on the fifteen that did not make it.
+    expect(columns.flatMap(column => column.rows)).toHaveLength(6)
+    expect(titles(flow, [4, 7], 'medium')[1]).toEqual(['E2', 'E3', 'E4', '15 more'])
   })
 
   it('never reserves a location row for a reminder', () => {
@@ -110,6 +127,125 @@ describe('medium — packing rules', () => {
       item: { ...item('Weigh in', 'Bathroom'), kind: 'reminder' },
     }
     expect(costs([reminder], [4, 7], 'medium')).toEqual([[2], []])
+  })
+})
+
+describe('the tail indicator', () => {
+  const reminder = (title: string): FlowNode => ({
+    type: 'item',
+    key: title,
+    item: { ...item(title), kind: 'reminder' },
+  })
+
+  const more = (columns: ReturnType<typeof packFlow>): MoreNode | undefined =>
+    columns
+      .flatMap(column => column.rows)
+      .map(r => r.node)
+      .find((node): node is MoreNode => node.type === 'more')
+
+  it('says nothing when everything fitted', () => {
+    expect(more(packFlow([row('A'), row('B')], [4, 7], 'medium'))).toBeUndefined()
+  })
+
+  it('says nothing when the last column came out exactly full', () => {
+    const flow = [row('A'), row('B'), row('C'), TOMORROW, ...REST_OF_TOMORROW]
+    expect(more(packFlow(flow, [4, 7], 'medium'))).toBeUndefined()
+  })
+
+  it('counts the items that did not fit and not the headings over them', () => {
+    // The Sunday heading needs three rows to arrive with its first event and has one, so
+    // the whole section is cut — and it is the one event in it that gets counted.
+    const flow = [
+      row('A'),
+      row('B'),
+      row('C'),
+      TOMORROW,
+      row('T1'),
+      row('T2'),
+      heading('SUNDAY, 26 JUL'),
+      row('S1'),
+    ]
+    expect(titles(flow, [4, 8], 'medium')[1]).toEqual(['C', 'TOMORROW', 'T1', 'T2', '1 more'])
+  })
+
+  it('goes at the end of the flow, not in the column that had room to spare', () => {
+    // The left column keeps its spare row: an indicator there would sit above rows that
+    // the right column carries on drawing past it.
+    const flow = [row('A', 'here'), row('B'), row('C'), row('D'), row('E')]
+    expect(titles(flow, [4, 5], 'medium')).toEqual([['A'], ['B', 'C', '2 more']])
+  })
+
+  it('counts reminders too, and still calls them events for now', () => {
+    const flow = [row('A'), row('B'), row('C'), reminder('R1'), reminder('R2'), reminder('R3')]
+    expect(titles(flow, [4, 5], 'medium')[1]).toEqual(['C', 'R1', '2 more'])
+    expect(more(packFlow(flow, [4, 5], 'medium'))?.count).toBe(2)
+  })
+
+  it('takes the colour of the first thing you cannot see', () => {
+    const purple: FlowNode = { type: 'item', key: 'P', item: { ...item('P'), color: 'purple' } }
+    // Four events fit, so the purple fifth is the first one missing.
+    const flow = [row('A'), row('B'), row('C'), row('D'), purple, row('F')]
+    expect(titles(flow, [4, 5], 'medium')[1]).toEqual(['C', 'D', '2 more'])
+    expect(more(packFlow(flow, [4, 5], 'medium'))?.color).toBe('purple')
+  })
+
+  it('is the only one of its kind, and always the last row drawn', () => {
+    const flow = Array.from({ length: 12 }, (_, index) => row(`E${index}`))
+    const rows = packFlow(flow, [5, 9], 'medium').flatMap(column => column.rows)
+    expect(rows.filter(r => r.node.type === 'more')).toHaveLength(1)
+    expect(rows[rows.length - 1]?.node.type).toBe('more')
+  })
+
+  /**
+   * The appearance rule itself, rather than one case of it: over every budget pair the
+   * card can actually produce, a spare row at the foot plus something undrawn means the
+   * indicator — and nothing undrawn means no indicator, whatever room is going spare.
+   */
+  it('appears exactly when there is something to say and a row to say it in', () => {
+    const flows: FlowNode[][] = [
+      Array.from({ length: 9 }, (_, index) => row(`E${index}`)),
+      [row('A', 'here'), row('B'), row('C', 'there'), TOMORROW, ...REST_OF_TOMORROW],
+      [row('A'), TOMORROW, row('T1'), heading('SUNDAY, 26 JUL'), row('S1'), row('S2')],
+      [row('A', 'here'), ...REST_OF_TOMORROW],
+    ]
+
+    const broken: string[] = []
+    for (const flow of flows) {
+      const items = flow.filter(node => node.type === 'item').length
+      for (let height = 100; height <= 800; height += 2) {
+        for (const mode of ['small', 'medium'] as const) {
+          for (const todayEmpty of [false, true]) {
+            const { budgets } = geometryFor(mode, height, todayEmpty)
+            const columns = packFlow(flow, budgets, mode)
+            const rows = columns.flatMap(column => column.rows)
+            const drawn = rows.filter(r => r.node.type === 'item').length
+            const indicator = rows.some(r => r.node.type === 'more')
+            // After packing, so this is the room the indicator really had going spare.
+            const last = columns.filter(column => column.rows.length).pop()
+            const spare = last ? last.budget - last.used : 0
+            const where = `${mode} ${JSON.stringify(budgets)}, ${items} items`
+
+            if (drawn === items && indicator) {
+              broken.push(`nothing hidden and it said so anyway: ${where}`)
+            }
+            if (drawn < items && !indicator && spare >= COST.more) {
+              broken.push(`${items - drawn} hidden, ${spare} rows spare, said nothing: ${where}`)
+            }
+          }
+        }
+      }
+    }
+
+    expect(broken).toEqual([])
+  })
+
+  it('spends a small column’s last row on the count rather than on a location', () => {
+    // "Count wins" all the way down: knowing an event is missing beats knowing where
+    // the first one is.
+    const columns = packFlow([row('A', 'here'), row('B'), row('C')], [5], 'small')
+    expect(columns[0]!.rows.map(r => r.cost)).toEqual([2, 2, 1])
+    expect(columns[0]!.rows.some(r => r.expanded)).toBe(false)
+    expect(more(columns)?.count).toBe(1)
   })
 })
 
@@ -154,6 +290,7 @@ describe('invariants, over twenty thousand random flows', () => {
 
   it('holds its budget, keeps headings company, and never reorders', () => {
     const broken: string[] = []
+    let indicators = 0
 
     for (let trial = 0; trial < 20_000 && broken.length === 0; trial += 1) {
       const flow = randomFlow()
@@ -172,9 +309,32 @@ describe('invariants, over twenty thousand random flows', () => {
         }
       }
 
+      const rows = columns.flatMap(column => column.rows)
+      const tail = rows.filter(r => r.node.type === 'more')
+      indicators += tail.length
+      if (tail.length > 1) broken.push(`more than one indicator: ${where}`)
+      if (tail.length === 1) {
+        // It summarises the end of the flow, so nothing may come after it — and a
+        // heading directly above it would be a section announcing its own absence.
+        if (rows[rows.length - 1] !== tail[0]) broken.push(`indicator is not last: ${where}`)
+        if (rows[rows.length - 2]?.node.type === 'header') {
+          broken.push(`indicator left standing in for a whole section: ${where}`)
+        }
+      }
+
+      // The count is exactly what is missing: every item of the flow is either drawn
+      // or counted, and nothing is both.
+      const drawn = rows.filter(r => r.node.type === 'item').length
+      const items = flow.filter(node => node.type === 'item').length
+      const counted = tail[0]?.node.type === 'more' ? tail[0].node.count : 0
+      if (counted > 0 && drawn + counted !== items) {
+        broken.push(`counted ${counted} on top of ${drawn} of ${items}: ${where}`)
+      }
+      if (counted === 0 && tail.length === 1) broken.push(`says "0 more": ${where}`)
+
       // What is drawn is always a prefix of the flow: rows are dropped off the end,
       // never skipped over in the middle.
-      const placed = columns.flatMap(column => column.rows.map(r => r.node.key))
+      const placed = rows.filter(r => r.node.type !== 'more').map(r => r.node.key)
       if (
         placed.join() !==
         flow
@@ -187,6 +347,8 @@ describe('invariants, over twenty thousand random flows', () => {
     }
 
     expect(broken).toEqual([])
+    // Everything above is vacuous on a sample that never overflowed.
+    expect(indicators).toBeGreaterThan(1_000)
   })
 })
 
@@ -215,21 +377,23 @@ describe('geometry', () => {
   /**
    * The budget is only worth anything if a full column actually fits in the box. The
    * rendered heights below are what the card's CSS produces; the tallest way to spend
-   * N rows is on compact rows, which are the dearest per row.
+   * N rows is on compact rows, which are the dearest per row, and — for an odd budget —
+   * on the taller of the two nodes that cost one row.
    */
   it('never budgets more rows than the column can draw, at any height', () => {
     const INSET = 16
     const DATE_BLOCK = 84
     const GAP = 6
     const COMPACT = 56
-    const HEADING = 20
+    /** `2 more events`: 2px of padding over a 20px line. A heading is 20px in all. */
+    const ONE_ROW = 22
 
     const tallestRendering = (budget: number): number => {
       if (budget <= 0) return 0
       const compacts = Math.floor(budget / 2)
-      const heading = budget % 2
-      const nodes = compacts + heading
-      return compacts * COMPACT + heading * HEADING + (nodes - 1) * GAP
+      const single = budget % 2
+      const nodes = compacts + single
+      return compacts * COMPACT + single * ONE_ROW + (nodes - 1) * GAP
     }
 
     for (let height = 100; height <= 800; height += 2) {

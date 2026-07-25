@@ -1,6 +1,6 @@
 # Calendar widget: the layout rules
 
-Reconstructed from Apple's own Calendar widget and checked against six screenshots of
+Reconstructed from Apple's own Calendar widget and checked against seven screenshots of
 it. This is the specification the card implements; the code follows it section by
 section, and `src/cards/calendar/*.test.ts` pins the worked examples at the bottom.
 
@@ -31,6 +31,11 @@ the time in the same colour, weaker.
 
 **Reminder** — a neutral grey background, an empty circle in the list's colour, muted
 text. Reminders never show a location.
+
+**`2 more events`** — the tail indicator, and the one row the flow can end on that is
+not an item: a thin bar in the calendar colour, grey text at a normal weight, and
+**no tinted background**, unlike an event. A tint would read as one more event, when the
+point of the line is that those did not fit.
 
 ## 2. Selection and order
 
@@ -88,6 +93,7 @@ The unit is one line of text inside the card.
 | compact row (title + time)             | 2    |
 | expanded row (title + location + time) | 3    |
 | section heading                        | 1    |
+| `2 more events`                        | 1    |
 
 | Column               | Budget |
 | -------------------- | ------ |
@@ -96,16 +102,36 @@ The unit is one line of text inside the card.
 | medium, right column | 7      |
 
 A node goes in the current column if it fits there whole; otherwise the next column
-takes it. Whatever is left when the columns run out is dropped — no "+2 more". A
-heading never ends up alone at the bottom of a column: if its first row will not
-follow it there, the whole section moves on.
+takes it. A heading never ends up alone at the bottom of a column: if its first row will
+not follow it there, the whole section moves on.
+
+### The tail
+
+What is left over when the columns run out is summarised as `2 more events`, at the end
+of the flow — meaning the last column the flow actually reached, not whichever column
+happens to have space left in it.
+
+The indicator costs a row like everything else, and it is added **after** the packing, out
+of what is left: it never evicts the row above it. So a column that came out exactly full
+loses its tail in silence, with nothing at all to mark it. That is not an oversight in the
+widget being copied — it is why `Training` simply vanished in the third and fifth
+screenshots: the right column was occupied to exactly seven rows.
+
+`N` counts the items that were not drawn. Headings do not count: a section that got cut
+takes its heading with it, and `2 more events` that meant "one event and one Thursday"
+would be a lie. Singular is `1 more event`.
+
+In the small size the indicator competes with §6's locations for the same leftover rows,
+and wins: at four rows it is moot — two events fill the column exactly — but a card
+dragged taller can spare a row, and "count wins" is about how much of the day you know
+about, not how much of it is drawn.
 
 ### Where those numbers come from here
 
 Apple can hardcode 4 and 7 because an iPhone widget is always the same number of
 points tall. A Home Assistant card is whatever the user dragged it to, so `layout.ts`
 measures instead. A row is priced at 31px — half of a compact row's 56px plus the 6px
-gap beneath it, which is the dearest the three kinds of row get per row, so no mix of
+gap beneath it, which is the dearest the four kinds of row get per row, so no mix of
 them can overflow. The right column fits `floor((content + 6) / 31)` of those; the left
 one is short by the 84px date block above it. At the default card height of 248px that
 works out to exactly 4 and 7, and a card dragged taller shows more rows rather than
@@ -122,7 +148,7 @@ two sizes disagree on purpose:
 - **Small — count wins.** Pack everything compactly first, then spend whatever budget
   is left over on locations, top down. One event → 3 rows, location shown. Two events
   → `2 + 2`, no slack, so neither shows a location even though the first one would
-  have fitted.
+  have fitted. The tail indicator draws from the same slack and is served first (§5).
 
 Location and title are each one line, truncated with an ellipsis.
 
@@ -141,11 +167,31 @@ Location and title are each one line, truncated with an ellipsis.
 ## 8. Worked examples
 
 Each of these is a test in `layout.test.ts`. A column is written as the cost of each
-row in it, in order.
+row in it, in order. Tomorrow is three more rows in every case.
 
-| Today                             | Left  | Right     | Dropped                   |
-| --------------------------------- | ----- | --------- | ------------------------- |
-| 3 events, no locations            | `2+2` | `2+1+2+2` | tomorrow's remaining rows |
-| 2 events                          | `2+2` | `1+2+2+2` | —                         |
-| 1 event with a location           | `3`   | `1+2+2+2` | —                         |
-| 2 events, a location on the first | `3`   | `2+1+2+2` | tomorrow's remaining rows |
+| Today                             | Left  | Right     | The tail                                   |
+| --------------------------------- | ----- | --------- | ------------------------------------------ |
+| 3 events, no locations            | `2+2` | `2+1+2+2` | one event gone in silence — column is full |
+| 2 events                          | `2+2` | `1+2+2+2` | — everything fitted                        |
+| 1 event with a location           | `3`   | `1+2+2+2` | — everything fitted                        |
+| 2 events, a location on the first | `3`   | `2+1+2+2` | one event gone in silence — column is full |
+| 2 events, a location on both      | `3`   | `3+1+2+1` | that last `1` is `2 more events`           |
+
+The last row is the seventh screenshot, and it is worth reading twice: the location
+`Dworzec PKP` on the second event is what cost tomorrow two of its three rows. Greedy
+locations are paid for in events (§6), and the indicator is how the widget admits it.
+
+## 9. Still open
+
+No screenshot settles these, so they are decided rather than known. Each is one edit —
+the count in `addMoreRow`, the wording in `moreLabel` — and the current answer is
+whichever keeps the rule simplest to state.
+
+- **How far `N` reaches.** Today it counts every item that did not fit anywhere in the
+  loaded window, which is a fortnight (`LOOKAHEAD_DAYS`), so a busy calendar can read
+  `19 more events`. The alternative is to count only the days already on screen — the
+  sections the flow had started — and say nothing about the rest.
+- **What to call them.** Always `events`, even when everything hidden is a reminder.
+  `2 more items` would be truthful and is uglier.
+- **Whether the small size gets one at all.** It does; see §5. At the default four rows
+  it can practically never happen.

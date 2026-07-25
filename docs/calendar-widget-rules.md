@@ -1,0 +1,151 @@
+# Calendar widget: the layout rules
+
+Reconstructed from Apple's own Calendar widget and checked against six screenshots of
+it. This is the specification the card implements; the code follows it section by
+section, and `src/cards/calendar/*.test.ts` pins the worked examples at the bottom.
+
+Two sizes, matching the two Apple offers on a home screen:
+
+- **small** — today, and nothing else, ever
+- **medium** — two columns of one continuous flow: today plus what comes after it
+
+---
+
+## 1. What a row is
+
+```ts
+{
+  kind: 'event' | 'reminder',
+  title: string,
+  location?: string,
+  start: Date,
+  end?: Date,          // reminders have none
+  allDay?: boolean,
+  color: string        // the calendar's colour
+}
+```
+
+**Event** — a thin coloured bar down the left, a background of the calendar colour at
+low alpha, the title in the calendar colour (lifted towards white on a dark theme),
+the time in the same colour, weaker.
+
+**Reminder** — a neutral grey background, an empty circle in the list's colour, muted
+text. Reminders never show a location.
+
+## 2. Selection and order
+
+1. Today and forwards only — a fortnight is more than enough.
+2. Anything that has finished is dropped; anything running now stays. Only a real end
+   time can retire a row, so an overdue reminder stays up for the rest of its day.
+3. Inside a day: all-day first, then by start time. Reminders and events share one
+   stream — `Weigh in 10:30` comes before `Lessons 12:00`, and it is not shunted into
+   a section of its own.
+4. Sections are calendar days. **A day with nothing in it disappears entirely**,
+   heading and all: if today is Friday and Saturday is empty, the next heading is
+   `SUNDAY, 26 JUL`, not an empty Saturday.
+
+Everything above is answered in the _display_ timezone — Home Assistant lets a profile
+follow the server's zone rather than the browser's, and "is that tomorrow" has a
+different answer in each.
+
+## 3. Headings
+
+**The widget's own date**, top left, always: the weekday in capitals in the accent
+red, and the day number, large. Always today, whether or not today has anything in it.
+
+**Section headings**, in the flow, medium only:
+
+| Section                     | Heading                            |
+| --------------------------- | ---------------------------------- |
+| today                       | none — the date block already said |
+| exactly one day after today | `TOMORROW`                         |
+| anything later              | `SUNDAY, 26 JUL`                   |
+
+`TOMORROW` means literally tomorrow. If tomorrow is empty and the next section is the
+day after, that section gets a date. Headings are small and grey, never a calendar
+colour, and follow the locale's own day/month order (`JUL 26` in en-US).
+
+## 4. What each size shows
+
+**Small** — today. If today is empty: `No Events Today`. Other days never appear, not
+even when today is empty and tomorrow is full.
+
+**Medium** — two columns holding one vertical flow that spills from the left column
+into the right:
+
+- left: the date block, and the start of the flow beneath it;
+- right: the same flow continuing — the rest of today first, **with no heading**, then
+  the next day's heading and its rows;
+- if today is empty, the left column reads `No Events Today` under the date and the
+  flow starts at the top of the right column.
+
+## 5. The height budget
+
+The unit is one line of text inside the card.
+
+| Element                                | Cost |
+| -------------------------------------- | ---- |
+| compact row (title + time)             | 2    |
+| expanded row (title + location + time) | 3    |
+| section heading                        | 1    |
+
+| Column               | Budget |
+| -------------------- | ------ |
+| small                | 4      |
+| medium, left column  | 4      |
+| medium, right column | 7      |
+
+A node goes in the current column if it fits there whole; otherwise the next column
+takes it. Whatever is left when the columns run out is dropped — no "+2 more". A
+heading never ends up alone at the bottom of a column: if its first row will not
+follow it there, the whole section moves on.
+
+### Where those numbers come from here
+
+Apple can hardcode 4 and 7 because an iPhone widget is always the same number of
+points tall. A Home Assistant card is whatever the user dragged it to, so `layout.ts`
+measures instead. A row is priced at 31px — half of a compact row's 56px plus the 6px
+gap beneath it, which is the dearest the three kinds of row get per row, so no mix of
+them can overflow. The right column fits `floor((content + 6) / 31)` of those; the left
+one is short by the 84px date block above it. At the default card height of 248px that
+works out to exactly 4 and 7, and a card dragged taller shows more rows rather than
+leaving a blank strip at the bottom.
+
+## 6. When a location shows
+
+The location is a third line, drawn only when the item has one and there is room. The
+two sizes disagree on purpose:
+
+- **Medium — greedy, location wins.** Going top to bottom: if an event has a location
+  and three rows fit in what is left of the column, draw it expanded, even though the
+  next event will be pushed into the other column or off the card entirely.
+- **Small — count wins.** Pack everything compactly first, then spend whatever budget
+  is left over on locations, top down. One event → 3 rows, location shown. Two events
+  → `2 + 2`, no slack, so neither shows a location even though the first one would
+  have fitted.
+
+Location and title are each one line, truncated with an ellipsis.
+
+## 7. Time
+
+- 12-hour or 24-hour per the locale, AM/PM a size down.
+- `:00` is not printed on a 12-hour clock: `5 – 6PM`, `3 – 4:30PM`. A 24-hour clock
+  keeps its minutes — `17 – 18` would read as a range of numbers.
+- The meridiem prints **only on the end of a range** while both ends are in the same
+  half of the day: `12 – 1PM`, `6:15 – 7:15PM`. Different halves, and both get one:
+  `11AM – 1PM`.
+- The separator is a spaced en dash.
+- No duration — a reminder, a zero-length event — prints one time: `10:30AM`.
+- All-day prints no time at all. It is still one line of content, and still costs 2.
+
+## 8. Worked examples
+
+Each of these is a test in `layout.test.ts`. A column is written as the cost of each
+row in it, in order.
+
+| Today                             | Left  | Right     | Dropped                   |
+| --------------------------------- | ----- | --------- | ------------------------- |
+| 3 events, no locations            | `2+2` | `2+1+2+2` | tomorrow's remaining rows |
+| 2 events                          | `2+2` | `1+2+2+2` | —                         |
+| 1 event with a location           | `3`   | `1+2+2+2` | —                         |
+| 2 events, a location on the first | `3`   | `2+1+2+2` | tomorrow's remaining rows |

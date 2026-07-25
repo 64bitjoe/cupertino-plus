@@ -1,4 +1,4 @@
-import type { HassEntity, HomeAssistant } from '../src/core/types/ha'
+import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
 
 /**
  * A `hass` object good enough to develop cards against.
@@ -50,9 +50,11 @@ const STATES: Record<string, HassEntity> = {
 
 export interface MockHassOptions {
   dark: boolean
+  /** Drives the 12/24-hour switch the calendar card formats against. */
+  timeFormat: FrontendLocaleData['time_format']
 }
 
-export function createMockHass({ dark }: MockHassOptions): HomeAssistant {
+export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssistant {
   return {
     states: { ...STATES },
     entities: Object.fromEntries(
@@ -60,7 +62,12 @@ export function createMockHass({ dark }: MockHassOptions): HomeAssistant {
     ),
     config: { time_zone: 'Europe/Warsaw', country: 'PL', version: '2026.7.4' },
     themes: { darkMode: dark, theme: 'default' },
-    locale: { language: 'en', time_format: '24', first_weekday: 'monday' },
+    locale: {
+      language: 'en',
+      time_format: timeFormat,
+      first_weekday: 'monday',
+      time_zone: 'local',
+    },
     language: 'en',
     connection: {
       async subscribeMessage(_callback, message) {

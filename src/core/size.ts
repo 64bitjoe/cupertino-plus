@@ -1,6 +1,6 @@
 import type { LovelaceGridOptions } from './types/ha'
 
-export const WIDGET_SIZES = ['small', 'medium', 'large'] as const
+export const WIDGET_SIZES = ['small', 'medium'] as const
 export type WidgetSize = (typeof WIDGET_SIZES)[number]
 
 /** Zero-config default: the 2:1 shape reads well in every dashboard width. */
@@ -29,7 +29,9 @@ export const columnsToPx = (columns: number, sectionWidth: number): number => {
  *
  *   small   6 x 4  -> ~246 x 248  square
  *   medium 12 x 4  -> ~500 x 248  2:1
- *   large  12 x 8  -> ~500 x 504  square
+ *
+ * The two sizes Apple's own home screen offers, and the two the calendar layout is
+ * designed around: small is today, medium is today plus what comes after it.
  *
  * These are only defaults. Home Assistant spreads the user's `grid_options` *after*
  * whatever we return, so a card dragged to another size keeps the user's dimensions —
@@ -39,7 +41,6 @@ export const columnsToPx = (columns: number, sectionWidth: number): number => {
 const GRID_OPTIONS: Record<WidgetSize, LovelaceGridOptions> = {
   small: { columns: 6, rows: 4, min_columns: 4, min_rows: 3 },
   medium: { columns: 12, rows: 4, min_columns: 6, min_rows: 3 },
-  large: { columns: 12, rows: 8, min_columns: 6, min_rows: 5 },
 }
 
 export const gridOptionsFor = (size: WidgetSize): LovelaceGridOptions => ({ ...GRID_OPTIONS[size] })
@@ -54,13 +55,15 @@ export const isWidgetSize = (value: unknown): value is WidgetSize =>
 export const resolveSize = (value: unknown): WidgetSize =>
   isWidgetSize(value) ? value : DEFAULT_SIZE
 
+/** Default rendered height of a size, used until the card has been measured. */
+export const heightFor = (size: WidgetSize): number => rowsToPx(GRID_OPTIONS[size].rows as number)
+
 /**
  * Which layout to actually render, given the box the card ended up with.
  *
- * Thresholds sit halfway between the presets above, so a card resized by hand still
- * picks the layout that fits rather than the one it was configured with.
+ * Only width decides: the two layouts differ in how many columns of content they
+ * hold, not in how tall they are. Height feeds the row budgets instead, so a card
+ * dragged taller shows more rows rather than switching layout. The threshold sits
+ * halfway between the two presets.
  */
-export const layoutFromBox = (width: number, height: number): WidgetSize => {
-  if (width < 340) return 'small'
-  return height >= 380 ? 'large' : 'medium'
-}
+export const layoutFromBox = (width: number): WidgetSize => (width < 340 ? 'small' : 'medium')

@@ -31,14 +31,26 @@ export interface HassEntityRegistryDisplayEntry {
   translation_key?: string
 }
 
-export type TimeFormat = 'language' | 'system' | 'am_pm' | '24'
+/**
+ * Note the wire values. The frontend's enum reads
+ * `am_pm="12", twenty_four="24"` — the member names never travel, and a card
+ * comparing against `"am_pm"` silently never matches.
+ */
+export type TimeFormat = 'language' | 'system' | '12' | '24'
 export type FirstWeekday =
   'language' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+/**
+ * Whether the frontend shows times in the browser's zone or the server's. Verified in
+ * the 2026.7.4 bundle: `local="local", server="server"`, and `local` is the default.
+ */
+export type TimeZoneSetting = 'local' | 'server'
 
 export interface FrontendLocaleData {
   language: string
   time_format: TimeFormat
   first_weekday: FirstWeekday
+  /** Absent on older cores, which had no such setting — treat that as `local`. */
+  time_zone?: TimeZoneSetting
 }
 
 export interface HassConfig {

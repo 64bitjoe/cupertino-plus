@@ -22,6 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run format:check
       - run: pnpm run typecheck
+      - run: pnpm run test
       - run: pnpm run build
 
       - name: Check the bundle is self-contained

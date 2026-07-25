@@ -7,9 +7,9 @@ import {
   DEFAULT_SIZE,
   cardSizeFor,
   gridOptionsFor,
+  heightFor,
   layoutFromBox,
   resolveSize,
-  rowsToPx,
   type WidgetSize,
 } from './size'
 import type {
@@ -72,6 +72,10 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   /** Reflected from `hass.themes.darkMode`; drives the dark token set. */
   @property({ type: Boolean, reflect: true }) protected dark = false
 
+  /** Measured box of the card, or 0 before the first measurement. */
+  @state() private _measuredHeight = 0
+  private _measuredWidth = 0
+
   private _resizeObserver?: ResizeObserver
 
   /** The configured size, before measurement talks us out of it. */
@@ -79,12 +83,36 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
     return resolveSize(this._config?.size)
   }
 
+  /**
+   * How tall the card actually is, in px.
+   *
+   * Cards that fit content to their box (the calendar's row budgets) read this rather
+   * than assuming the preset height, because the user's `grid_options` win. Until the
+   * first measurement lands it answers with the configured size's height, so the very
+   * first paint is already right in the common case.
+   */
+  protected get boxHeight(): number {
+    return this._measuredHeight || heightFor(this.configuredSize)
+  }
+
   public setConfig(config: C): void {
     if (!config) {
       throw new Error('Invalid configuration')
     }
     this._config = config
-    this.cwLayout = this.configuredSize
+    this._applyLayout()
+  }
+
+  /**
+   * Measurement beats configuration, and the measurement outlives a config change.
+   *
+   * `setConfig` runs again whenever the card is edited — and a config edit does not
+   * resize anything, so the ResizeObserver will not fire to put things right. Reading
+   * back the last measured width instead of resetting to the configured size is what
+   * stops an edit from leaving a narrow card rendering the two-column layout.
+   */
+  private _applyLayout(): void {
+    this.cwLayout = this._measuredWidth ? layoutFromBox(this._measuredWidth) : this.configuredSize
   }
 
   // ---- Sizing -------------------------------------------------------------
@@ -106,7 +134,11 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
       // Width 0 means we are not laid out yet; measuring then would flip the card to
       // the smallest layout for a frame.
       if (!box || box.width === 0) return
-      this.cwLayout = layoutFromBox(box.width, box.height)
+      // Rounded so that a sub-pixel box does not repaint the card on every frame of a
+      // dashboard resize.
+      this._measuredWidth = Math.round(box.width)
+      this._measuredHeight = Math.round(box.height)
+      this._applyLayout()
     })
     this._resizeObserver.observe(this)
   }
@@ -123,10 +155,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
     if (changed.has('_config')) {
       // Gives the card a height in the masonry layout, where the cell does not
       // impose one. Derived from the *configured* size, so it is stable.
-      const rows = gridOptionsFor(this.configuredSize).rows
-      if (typeof rows === 'number') {
-        this.style.setProperty('--cw-min-height', `${rowsToPx(rows)}px`)
-      }
+      this.style.setProperty('--cw-min-height', `${heightFor(this.configuredSize)}px`)
     }
   }
 

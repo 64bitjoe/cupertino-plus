@@ -1,209 +1,345 @@
 import { css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
+import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
-import { VERSION, registerCard } from '../../core/register'
+import { registerCard } from '../../core/register'
+import { timePreferences } from './datetime'
+import { DEFAULT_DEMO_SCENARIO, demoItems } from './demo-data'
+import { buildFlow } from './flow'
+import { TIME_DASH, itemTime, widgetDate } from './format'
+import type { FormatContext, ItemTime, TimeToken } from './format'
+import { geometryFor, packFlow, type LayoutColumn, type LayoutRow } from './layout'
 
 export const CALENDAR_CARD_TAG = 'cupertino-widgets-calendar'
 
 export interface CalendarCardConfig extends CupertinoCardConfig {
   /** Calendar entities to show. Empty/absent means "every calendar", decided at render. */
   entities?: string[]
+  /**
+   * TEMPORARY — which fixture from `demo-data.ts` to draw while the card has no data
+   * source. Goes away with the websocket subscription.
+   */
+  demo_scenario?: string
 }
 
 /**
- * SCAFFOLDING STAGE — the content below is hardcoded on purpose.
- * Real data lands via the `calendar/event/subscribe` websocket subscription; this
- * version exists to prove the toolchain, the sizing and the token layer.
+ * Not localised yet: Home Assistant has no string for this and the widget it is
+ * copying says exactly this. One place to change when a translation layer exists.
  */
-interface StubEvent {
-  title: string
-  time: string
-  color: string
-  calendar: string
-}
+const NO_EVENTS_TODAY = 'No Events Today'
 
-const STUB_DATE = { weekday: 'Friday', day: '25', month: 'July' }
-
-const STUB_EVENTS: StubEvent[] = [
-  { title: 'Design review', time: '09:30', color: 'var(--cw-red)', calendar: 'Work' },
-  { title: 'Lunch with Anna', time: '12:00', color: 'var(--cw-orange)', calendar: 'Personal' },
-  { title: 'Dentist', time: '15:15', color: 'var(--cw-blue)', calendar: 'Personal' },
-  { title: 'Standup notes', time: '17:00', color: 'var(--cw-green)', calendar: 'Work' },
-  { title: 'Flight to Berlin', time: '20:40', color: 'var(--cw-indigo)', calendar: 'Travel' },
-]
-
-/** How many events each layout has room for without crowding. */
-const EVENT_BUDGET = { small: 2, medium: 3, large: 5 } as const
-
+/**
+ * The calendar widget.
+ *
+ * The interesting part is not in here — it is in `flow.ts` (what to show, in what
+ * order) and `layout.ts` (how much of it fits). This class measures the card, asks
+ * those two, and draws the answer. See `docs/calendar-widget-rules.md`.
+ */
 class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
   static override styles: CSSResultGroup = [
     CupertinoCard.styles,
     css`
       .widget {
+        /* layout.ts prices its row budget in pixels off this and off the height of a
+           compact row (its GAP and COMPACT_PX). Change either here and the budget
+           stops describing what actually gets drawn. */
+        --cw-flow-gap: 6px;
+
         flex: 1;
-        display: flex;
         min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--cw-space-4);
         padding: var(--cw-inset);
-        gap: var(--cw-space-3);
       }
 
-      /* Small and large stack the date above the list; medium puts them side by side. */
-      :host([cw-layout='small']) .widget,
-      :host([cw-layout='large']) .widget {
-        flex-direction: column;
-      }
-
+      /* Medium is one flow of content poured through two columns, not two lists. */
       :host([cw-layout='medium']) .widget {
-        flex-direction: row;
-        align-items: flex-start;
+        grid-template-columns: 1fr 1fr;
       }
+
+      .column {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        /* The budget keeps content inside the box; this catches the rounding. */
+        overflow: hidden;
+      }
+
+      /* ---- The date, always today, always top left ------------------------- */
 
       .date {
         flex: none;
-      }
-
-      :host([cw-layout='medium']) .date {
-        /* Fixed gutter so event titles line up regardless of the numeral's width. */
-        width: 68px;
+        /* Part of layout.ts's DATE_BLOCK. */
+        margin-bottom: var(--cw-space-3);
       }
 
       .weekday {
-        font: var(--cw-text-caption-2);
-        font-weight: 600;
-        letter-spacing: 0.06em;
+        font: 600 13px/16px var(--cw-font);
+        letter-spacing: 0.05em;
         text-transform: uppercase;
         color: var(--cw-red);
       }
 
       .day {
-        font: var(--cw-text-large-title);
+        font: 700 52px/56px var(--cw-font);
         /* Tabular figures keep the numeral from shifting between the 1st and the 30th. */
         font-variant-numeric: tabular-nums;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.03em;
         color: var(--cw-label);
-        margin-top: -2px;
       }
 
-      :host([cw-layout='small']) .day {
-        font: var(--cw-text-title-1);
-      }
+      /* ---- The flow -------------------------------------------------------- */
 
-      .month {
-        font: var(--cw-text-caption-1);
-        color: var(--cw-label-secondary);
-      }
-
-      .events {
-        flex: 1;
-        min-width: 0;
+      .flow {
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: var(--cw-space-2);
+        gap: var(--cw-flow-gap);
         overflow: hidden;
       }
 
-      .event {
-        display: flex;
-        gap: var(--cw-space-2);
-        min-width: 0;
-        align-items: stretch;
+      .heading {
+        flex: none;
+        padding-top: 4px;
+        font: 600 13px/16px var(--cw-font);
+        letter-spacing: 0.04em;
+        color: var(--cw-label-secondary);
       }
 
-      /* The coloured rail that identifies the calendar, as in Apple's widget. */
+      /* Title line (22px) + time line (20px) + this padding = the 56px that layout.ts
+         calls COMPACT_PX and prices two budget rows at. */
+      .row {
+        flex: none;
+        min-width: 0;
+        display: flex;
+        align-items: stretch;
+        gap: var(--cw-space-2);
+        padding: 7px 10px;
+        border-radius: var(--cw-radius-inner);
+      }
+
+      .row.event {
+        --item-text: var(--item-color);
+        background: color-mix(in srgb, var(--item-color) 14%, transparent);
+      }
+
+      /* A saturated calendar colour goes muddy on a dark surface; lift it instead. */
+      :host([dark]) .row.event {
+        --item-text: color-mix(in srgb, var(--item-color) 74%, white);
+      }
+
+      .row.reminder {
+        background: var(--cw-fill);
+      }
+
+      /* The colour bar that says which calendar an event belongs to. */
       .rail {
         flex: none;
         width: 3px;
         border-radius: var(--cw-radius-pill);
-        background: var(--event-color);
+        background: var(--item-color);
       }
 
-      .event-body {
+      /* A reminder is a thing you tick off, so it gets a tickable-looking circle. */
+      .bullet {
+        flex: none;
+        align-self: center;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        border: 1.5px solid var(--item-color);
+      }
+
+      .body {
         min-width: 0;
         display: flex;
         flex-direction: column;
         justify-content: center;
       }
 
-      .event-title {
-        font: var(--cw-text-footnote);
-        font-weight: 600;
+      .title {
+        font: var(--cw-text-headline);
+      }
+
+      .location,
+      .time {
+        font: var(--cw-text-subheadline);
+      }
+
+      .row.event .title {
+        color: var(--item-text);
+      }
+
+      .row.event .location,
+      .row.event .time {
+        color: color-mix(in srgb, var(--item-text) 72%, transparent);
+      }
+
+      .row.reminder .title {
         color: var(--cw-label);
       }
 
-      .event-meta {
-        font: var(--cw-text-caption-2);
+      .row.reminder .location,
+      .row.reminder .time {
         color: var(--cw-label-secondary);
       }
 
-      :host([cw-layout='large']) .event-title {
-        font: var(--cw-text-subheadline);
+      /* AM/PM rides smaller than the digits, the way iOS sets it. */
+      .meridiem {
+        font-size: 0.82em;
         font-weight: 600;
+        letter-spacing: 0.01em;
       }
 
-      :host([cw-layout='large']) .event-meta {
-        font: var(--cw-text-caption-1);
-      }
-
+      /* Secondary, not tertiary: this line is the card's entire message on a quiet
+         day, so it has to be as readable as the section headings beside it. */
       .empty {
-        font: var(--cw-text-footnote);
-        color: var(--cw-label-tertiary);
-        margin: auto 0;
-      }
-
-      /* Temporary: makes it obvious at a glance that this build is the stub.
-         Delete together with STUB_EVENTS once real data is wired. */
-      .stub-badge {
-        margin-top: auto;
-        padding-top: var(--cw-space-1);
-        font: var(--cw-text-caption-2);
-        color: var(--cw-label-tertiary);
+        font: var(--cw-text-subheadline);
+        color: var(--cw-label-secondary);
       }
     `,
   ]
 
+  /**
+   * The `custom:` prefix is load-bearing. The card picker builds `{ type: 'custom:…' }`
+   * and then spreads this on top of it, so returning the bare tag here overwrites the
+   * type with something Lovelace cannot resolve and the picker hands the user a broken
+   * card.
+   */
   public static getStubConfig(): CalendarCardConfig {
-    return { type: CALENDAR_CARD_TAG, size: 'medium' }
+    return { type: `custom:${CALENDAR_CARD_TAG}`, size: 'medium' }
   }
 
-  private _renderEvent(event: StubEvent): TemplateResult {
-    const meta = this.cwLayout === 'small' ? event.time : `${event.time} · ${event.calendar}`
+  /**
+   * The clock the card is drawn against.
+   *
+   * Kept in state and advanced on the minute, because half the rules are about now:
+   * an event that has just finished has to leave, midnight has to turn `TOMORROW`
+   * into today. Nothing else would repaint the card — Home Assistant pushes entity
+   * states, not the passage of time.
+   */
+  @state() private _now = new Date()
+
+  private _tick: ReturnType<typeof setTimeout> | undefined
+
+  public override connectedCallback(): void {
+    super.connectedCallback()
+    this._scheduleTick()
+  }
+
+  public override disconnectedCallback(): void {
+    clearTimeout(this._tick)
+    this._tick = undefined
+    super.disconnectedCallback()
+  }
+
+  /** Wakes on the minute rather than every 60s, so the card and the clock agree. */
+  private _scheduleTick(): void {
+    // Moving a card in the DOM reconnects it; without this that would leave two
+    // timers running.
+    clearTimeout(this._tick)
+    const untilNextMinute = 60_000 - (Date.now() % 60_000)
+    this._tick = setTimeout(() => {
+      this._now = new Date()
+      this._scheduleTick()
+    }, untilNextMinute + 100)
+  }
+
+  /**
+   * The zone the user reads the dashboard in.
+   *
+   * Home Assistant lets a profile follow the server's timezone instead of the
+   * browser's, and "is that tomorrow" is a different question in each.
+   */
+  private get _timeZone(): string | undefined {
+    return this.hass?.locale?.time_zone === 'server' ? this.hass.config?.time_zone : undefined
+  }
+
+  private _renderToken(token: TimeToken): TemplateResult {
+    if (!token.meridiem) return html`${token.text}`
+    const meridiem = html`<span class="meridiem">${token.meridiem}</span>`
+    return token.meridiemFirst ? html`${meridiem}${token.text}` : html`${token.text}${meridiem}`
+  }
+
+  private _renderTime(time: ItemTime): TemplateResult | typeof nothing {
+    if (time.kind === 'none') return nothing
+    if (time.kind === 'point') return html`${this._renderToken(time.at)}`
+    return html`${this._renderToken(time.from)} ${TIME_DASH} ${this._renderToken(time.to)}`
+  }
+
+  private _renderRow(row: LayoutRow, ctx: FormatContext): TemplateResult {
+    if (row.node.type === 'header') {
+      return html`<div class="heading cw-truncate">${row.node.text}</div>`
+    }
+
+    const item = row.node.item
+    const time = itemTime(item, ctx)
+
     return html`
-      <div class="event" style="--event-color: ${event.color}">
-        <div class="rail"></div>
-        <div class="event-body">
-          <div class="event-title cw-truncate">${event.title}</div>
-          <div class="event-meta cw-truncate">${meta}</div>
+      <div class="row ${item.kind}" style="--item-color: ${item.color}">
+        ${item.kind === 'event' ? html`<div class="rail"></div>` : html`<div class="bullet"></div>`}
+        <div class="body">
+          <div class="title cw-truncate">${item.title}</div>
+          ${
+            row.expanded && item.location
+              ? html`<div class="location cw-truncate">${item.location}</div>`
+              : nothing
+          }
+          ${
+            time.kind === 'none'
+              ? nothing
+              : html`<div class="time cw-truncate">${this._renderTime(time)}</div>`
+          }
         </div>
       </div>
     `
   }
 
+  private _renderColumn(
+    column: LayoutColumn | undefined,
+    ctx: FormatContext,
+  ): TemplateResult | typeof nothing {
+    if (!column?.rows.length) return nothing
+    return html` <div class="flow">${column.rows.map(row => this._renderRow(row, ctx))}</div> `
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing
 
-    const events = STUB_EVENTS.slice(0, EVENT_BUDGET[this.cwLayout])
+    const now = this._now
+    const { locale, hour12 } = timePreferences(this.hass?.locale)
+    const ctx: FormatContext = { locale, timeZone: this._timeZone, hour12 }
+
+    const mode = this.cwLayout
+    const items = demoItems(this._config.demo_scenario ?? DEFAULT_DEMO_SCENARIO, now)
+
+    // Small is today and nothing else, however busy tomorrow looks.
+    const flow = buildFlow(items, { now, ctx, todayOnly: mode === 'small' })
+    const { budgets } = geometryFor(mode, this.boxHeight, flow.todayEmpty)
+    const columns = packFlow(flow.nodes, budgets, mode)
+    const date = widgetDate(now, ctx)
 
     return html`
       <ha-card class="cw-pressable">
         <div class="widget">
-          <div class="date">
-            <div class="weekday">${STUB_DATE.weekday}</div>
-            <div class="day">${STUB_DATE.day}</div>
-            ${this.cwLayout === 'small' ? nothing : html`<div class="month">${STUB_DATE.month}</div>`}
-          </div>
-          <div class="events">
+          <div class="column">
+            <div class="date">
+              <div class="weekday">${date.weekday}</div>
+              <div class="day">${date.day}</div>
+            </div>
             ${
-              events.length
-                ? events.map(event => this._renderEvent(event))
-                : html`<div class="empty">Nothing scheduled</div>`
-            }
-            ${
-              this.cwLayout === 'large'
-                ? html`<div class="stub-badge">hardcoded preview · v${VERSION}</div>`
-                : nothing
+              flow.todayEmpty
+                ? html`<div class="empty">${NO_EVENTS_TODAY}</div>`
+                : this._renderColumn(columns[0], ctx)
             }
           </div>
+          ${
+            mode === 'medium'
+              ? html`<div class="column">${this._renderColumn(columns[1], ctx)}</div>`
+              : nothing
+          }
         </div>
       </ha-card>
     `

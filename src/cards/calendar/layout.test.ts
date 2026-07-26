@@ -433,6 +433,22 @@ describe('small — count first, locations out of the slack', () => {
     expect(titles([row('A'), row('B'), row('C')], [2], 'small')).toEqual([['A']])
     expect(more(columns)).toBeUndefined()
   })
+
+  /**
+   * The same taste one row further down, where there is no event to keep either.
+   *
+   * A single row is a real budget rather than a curiosity — the 3-row footprint at 110% and
+   * up — and it is the one place the count could be had for nothing, since no event fitted
+   * there to be given up for it. Taken, it would make the size non-monotonic in its own
+   * argument: three rows draw the event and the count, two draw the event and go quiet, and
+   * one would drop the event to announce it. So the rule is the column's rather than the
+   * trade's: a count needs a calendar above it.
+   */
+  it('says nothing at all in a column that never fitted an event', () => {
+    const columns = packFlow([row('A'), row('B'), row('C')], [1], 'small')
+    expect(columns[0]!.rows).toEqual([])
+    expect(more(columns)).toBeUndefined()
+  })
 })
 
 describe('invariants, over twenty thousand random flows', () => {

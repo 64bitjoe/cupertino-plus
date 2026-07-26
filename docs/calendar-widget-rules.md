@@ -167,6 +167,13 @@ widget says nothing: `TOMORROW` heading nothing but a count announces its own ab
 column holding a count and no calendar is worse than a quiet one, and in both cases the
 section has nothing on screen for an `N` to be the rest _of_.
 
+That second half is a rule about the column and not only about the trade, so it holds where
+the count would have come free as well: a column too short to have fitted an event — one row,
+which the 3-row footprint reaches at 110% and up — says nothing rather than standing the
+count on its own. Otherwise the size would contradict itself as it shrank, three rows
+drawing the event and the count, two keeping the event quietly, and one dropping the event
+to announce it.
+
 **This is the one place the card knowingly departs from the widget it copies.** Apple adds
 the indicator out of whatever is left over and never takes a row back, which is why
 `Training` simply vanished in the third and fifth screenshots: the right column was

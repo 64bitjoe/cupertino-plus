@@ -192,6 +192,14 @@ function addMoreRow(columns: LayoutColumn[], tail: readonly FlowNode[], index: n
 
   if (color === undefined) return
 
+  // A count wants a calendar above it, and that is a rule about the column rather than
+  // about the trade: `evictLast` below refuses to leave "a column holding a count and no
+  // calendar", and a column too short to have fitted an event in the first place is the
+  // same shape reached without giving anything up. Same answer, and it is what keeps the
+  // small size monotonic — one row more room draws the event and says nothing, so one row
+  // less must not drop the event and announce it instead.
+  if (!column.rows.some(placed => placed.node.type === 'item')) return
+
   if (column.budget - column.used < COST.more) {
     // Nothing was spare, so the row is bought — cheapest first, and a location line is
     // always cheaper than an event. Either way it is exactly the one row that is short,

@@ -153,11 +153,22 @@ export const timePreferences = (
   override?: unknown,
 ): TimePreferences => {
   const wanted = override === undefined || override === null ? undefined : String(override)
+  const profile = locale?.time_format ?? 'language'
   // The card's own key wins over the profile, and only ever to pin the clock down —
   // `system` is the absence of an opinion rather than an opinion about the browser.
-  const format = wanted === '12' || wanted === '24' ? wanted : (locale?.time_format ?? 'language')
-  // `system` deliberately drops the language, so `Intl` falls back to the browser.
-  const language = format === 'system' ? undefined : locale?.language
+  const format = wanted === '12' || wanted === '24' ? wanted : profile
+  /*
+   * Which locale to format in is the PROFILE's question, never the override's.
+   *
+   * Read it off `format` instead and an override stops pinning only the clock: a profile
+   * set to `system` hands `Intl` the browser's locale, so the moment a card says `24` the
+   * language it is drawn in jumps from the browser's to Home Assistant's — and `locale`
+   * reaches `widgetDate` and the section headings, not only the times. On a German browser
+   * with an English Home Assistant that turns "make this card 24-hour" into SONNTAG
+   * becoming SUNDAY and MORGEN becoming TOMORROW, with every printed time identical: a
+   * clock control whose only visible effect is to re-language the card.
+   */
+  const language = profile === 'system' ? undefined : locale?.language
 
   if (format === 'language' || format === 'system') {
     // `hourCycle` is what the locale itself prefers — a far steadier signal than

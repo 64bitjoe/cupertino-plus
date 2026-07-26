@@ -232,30 +232,43 @@ body {
 
 /* ---- Header -------------------------------------------------------------------- */
 
+/* One low row: the widget's name, its tagline beside it, the theme toggle at the end.
+   The content below is the subject, so this bar stays out of the way. */
 .header {
   flex: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
-  padding: 22px 32px;
+  padding: 8px 32px;
   border-bottom: 1px solid var(--ui-border);
 }
 
 .header-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .header h1 {
-  margin: 0 0 2px;
-  font-size: 20px;
-  line-height: 26px;
+  flex: none;
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
+/* Trimmed rather than wrapped: the name must keep the row one line high. */
 .header p {
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--ui-muted-fg);
 }
 
@@ -264,8 +277,8 @@ body {
   flex: none;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--ui-radius-sm);

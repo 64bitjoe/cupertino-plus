@@ -82,11 +82,7 @@ describe('the reference screenshots', () => {
 
     // And in small, where today is all there is: two items *and* a location, which two
     // timed events could never have managed.
-    const columns = packFlow(
-      [allDay('All day test'), row('Test', 'Warsawa Główna')],
-      [4],
-      'small',
-    )
+    const columns = packFlow([allDay('All day test'), row('Test', 'Warsawa Główna')], [4], 'small')
     expect(columns[0]!.rows.map(r => r.cost)).toEqual([1, 3])
     expect(columns[0]!.rows.map(r => r.expanded)).toEqual([false, true])
   })

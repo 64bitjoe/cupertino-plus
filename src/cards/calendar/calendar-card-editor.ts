@@ -61,9 +61,9 @@ const SCHEMA: readonly HaFormSchema[] = [
 /**
  * The calendar card's visual editor.
  *
- * Which calendars feed the card, and nothing else: the footprint belongs to the Layout
- * tab, and everything about how the card is drawn it works out from the box it ends up
- * in — see `docs/calendar-widget-rules.md`.
+ * Which calendars feed the card, and which clock it draws them on. The footprint belongs
+ * to the Layout tab, and everything else about how the card is drawn it works out from the
+ * box it ends up in — see `docs/calendar-widget-rules.md`.
  */
 class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig> {
   protected override schema(): readonly HaFormSchema[] {

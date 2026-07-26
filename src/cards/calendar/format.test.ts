@@ -188,11 +188,24 @@ describe('clock preference', () => {
       expect(timePreferences({ ...profile24, language: 'pl' }, '12').locale).toBe('pl')
     })
 
-    /** A profile set to `system` still drops the language, override or not. */
+    /**
+     * A profile set to `system` still drops the language, override or not — the override
+     * pins the clock and must not also move the card into the Home Assistant language,
+     * which `locale` would do to the date block and the section headings as well.
+     */
     it('leaves the browser in charge of the locale under `system`', () => {
-      expect(
-        timePreferences({ language: 'en', time_format: 'system', first_weekday: 'monday' }).locale,
-      ).toBeUndefined()
+      const profileSystem: FrontendLocaleData = {
+        language: 'en',
+        time_format: 'system',
+        first_weekday: 'monday',
+      }
+      expect(timePreferences(profileSystem).locale).toBeUndefined()
+      expect(timePreferences(profileSystem, 'system').locale).toBeUndefined()
+      expect(timePreferences(profileSystem, '12').locale).toBeUndefined()
+      expect(timePreferences(profileSystem, '24').locale).toBeUndefined()
+      // …and the clock is still pinned, which is the whole point of the override.
+      expect(timePreferences(profileSystem, '12').hour12).toBe(true)
+      expect(timePreferences(profileSystem, '24').hour12).toBe(false)
     })
   })
 })

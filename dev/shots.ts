@@ -7,10 +7,10 @@
  * particular the images are not hand-cropped — a hand-cropped screenshot is a screenshot
  * nobody can reproduce.
  *
- * Deliberately NOT the showcase site. That page exists to be used — sidebar, controls
- * dock, labels under every frame, four footprints of the same card in its Advanced
- * section. This one renders each card once, in a box the sections grid would have given
- * it, with a margin of dashboard around it and no chrome at all.
+ * Deliberately NOT the showcase site. That page exists to be used — navigation, a settings
+ * column, a label over every card, four more footprints in its Advanced section. This one
+ * renders each card once, in a box the sections grid would have given it, with a margin of
+ * dashboard around it and no chrome at all.
  *
  * Three rules for anything added here:
  *

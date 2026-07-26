@@ -3,7 +3,10 @@
 #
 #   docker compose up -d      start the dev instance   -> http://localhost:8123
 #   docker compose down       stop it
-#   docker compose down -v    stop it and wipe onboarding/state
+#   docker compose down -v    stop it -- but NOT a reset: there is no named volume here,
+#                             the instance lives in the ./dev/ha-config bind mount below
+#                             and `down -v` does not touch a bind mount. `pnpm ha:reset`
+#                             is the one that also empties it.
 #
 # ./dist is mounted straight into the HA www folder, so `pnpm watch` output is
 # served at /local/cupertino-widgets/cupertino-widgets.js with no copy step.

@@ -30,7 +30,7 @@
     "verify": "pnpm build && node dev/bump-resource.mjs && pnpm ha:up",
     "ha:down": "docker compose down",
     "ha:logs": "docker compose logs -f homeassistant",
-    "ha:reset": "docker compose down -v"
+    "ha:reset": "docker compose down -v && git clean -xdf dev/ha-config"
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",

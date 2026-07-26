@@ -1,20 +1,31 @@
 # Cupertino Widgets
 
-Widget cards for Home Assistant dashboards, styled like the ones on a phone's home screen.
-Install, drop a card on a dashboard, done — the cards pick sensible defaults instead of
-asking you to fill in a config, and they take their shape from the box you drag them into
-rather than from a size setting you have to think about.
+Widget cards for [Home Assistant](https://www.home-assistant.io/) dashboards, styled like the
+ones on a phone's home screen: sensible defaults instead of a config to fill in, and a shape
+taken from the box you drag them into rather than from a size setting.
 
-**[Try the cards in your browser →](https://sabbaken.github.io/cupertino-widgets/)** Every
-size, live, with sample data and the clock under your control — and the config to paste when
-you like what you see. Nothing to install.
+**[Live demo](https://sabbaken.github.io/cupertino-widgets/)** ·
+**[Install](#install)** ·
+**[The calendar](#the-calendar)** ·
+**[Card rules](docs/calendar-widget-rules.md)**
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/sabbaken)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/sabbaken)
+
+[![CI status](https://github.com/sabbaken/cupertino-widgets/actions/workflows/ci.yml/badge.svg)](https://github.com/sabbaken/cupertino-widgets/actions/workflows/ci.yml)
+[![Release status](https://github.com/sabbaken/cupertino-widgets/actions/workflows/release.yml/badge.svg)](https://github.com/sabbaken/cupertino-widgets/actions/workflows/release.yml)
+[![License: AGPL-3.0](https://img.shields.io/github/license/sabbaken/cupertino-widgets)](./LICENSE)
+[![Home Assistant 2026.7+](https://img.shields.io/badge/Home%20Assistant-2026.7%2B-41BDF5?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
+
+The demo runs every size live, with sample data and the clock under your control, and hands
+you the config to paste when you like what you see — nothing to install to look.
 
 > **Status: early.** The calendar card draws your real calendars and lays itself out exactly
 > like the phone's. It is the only card there is so far, and the grey reminder rows are not
 > wired up yet — those need `todo` entities.
-
-Requires a current Home Assistant, **2026.7 or newer** — the cards track the latest frontend
-APIs rather than carrying compatibility shims.
+>
+> It needs a current Home Assistant, **2026.7 or newer** — the cards track the latest
+> frontend APIs rather than carrying compatibility shims.
 
 ## The calendar
 
@@ -67,17 +78,17 @@ prints only one `PM`.
 
 ## Install
 
-### HACS
+Through [HACS](https://hacs.xyz/), which is where a dashboard card belongs — it registers the
+resource for you and tells you when there is a new version.
 
-Add this repository as a custom repository of type **Dashboard**, then download it.
-HACS registers the dashboard resource for you.
+1. Open **HACS** in the Home Assistant sidebar.
+2. **⋮** in the top right → **Custom repositories**.
+3. Paste `https://github.com/sabbaken/cupertino-widgets` into **Repository**, pick
+   **Dashboard** as the **Type**, and press **Add**.
+4. Search HACS for **Cupertino Widgets**, open it, and press **Download**.
+5. Reload the browser once, so the dashboard picks the new resource up.
 
-### Manually
-
-1. Download `cupertino-widgets.js` from the
-   [latest release](../../releases/latest) into `config/www/`.
-2. Add it under **Settings → Dashboards → ⋮ → Resources** as
-   `/local/cupertino-widgets.js`, type **JavaScript module**.
+Then add a card — the next section.
 
 ## Adding a card
 
@@ -160,14 +171,6 @@ belongs to every card rather than to this one.
 | Reminders, in the calendar card | needs `todo` entities |
 | Battery levels                  | planned               |
 | To-do lists                     | planned               |
-
-## Support the project
-
-The cards are free and will stay that way. If one has earned its place on your dashboard and
-you feel like saying thanks:
-
-**[Buy me a coffee](https://buymeacoffee.com/sabbaken)** ·
-**[Ko-fi](https://ko-fi.com/sabbaken)**
 
 ## Development
 

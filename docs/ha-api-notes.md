@@ -554,8 +554,65 @@ Host `./dist` -> container `/config/www/cupertino-widgets/` -> served at
 
 Caveat found: HA serves `/local/` with `Cache-Control: public, max-age=2678400`
 (31 days). Combined with the fact that `customElements.define` cannot re-register an
-already-defined tag in a live page, iterating inside HA always costs a hard reload.
+already-defined tag in a live page, iterating inside HA always costs a reload.
 => the mock-hass harness with HMR is the primary loop; real HA is the verification loop.
+
+### And a second cache, which is the one that wastes an afternoon
+
+`hass_frontend/service_worker.js` registers eight routes, and the LAST is a catch-all that
+`/local/` reaches because nothing above claims it:
+
+```js
+registerRoute(/\/(static|frontend_latest|frontend_es5)\/.+/, new CacheFirst({ matchOptions: { ignoreSearch: true } }))
+registerRoute(brandsImage,                                    new StaleWhileRevalidate({ cacheName: 'brands', … }))
+registerRoute(cameraProxy && GET,                             …)
+registerRoute(/\/(api|auth)\/.*/,                             new NetworkOnly())
+registerRoute(/\/(?:manifest\.json|onboarding\.html)/,        new NetworkOnly())
+registerRoute(/\/(\?.*)?$/,                                   new StaleWhileRevalidate({ matchOptions: { ignoreSearch: true } }))
+registerRoute(/\/.*/, new StaleWhileRevalidate({               // <-- /local/ lands here
+  cacheName: 'file-cache',
+  plugins: [new ExpirationPlugin({ maxAgeSeconds: 86400 })],
+}))
+```
+
+Identified from the minified `_handle` bodies rather than from strings, since the strategy
+names do not survive the build — `StaleWhileRevalidate` is the one that fires
+`fetchAndCachePut`, `waitUntil`s it, and then prefers `cacheMatch`:
+
+```js
+async _handle(request, handler) {
+  const fetched = handler.fetchAndCachePut(request).catch(() => {})
+  handler.waitUntil(fetched)
+  let response = await handler.cacheMatch(request)      // cache wins
+  if (!response) response = await fetched
+  return response
+}
+```
+
+So the symptom is not "stale", it is **one build behind**: the reload after the one you
+expected is when your code shows up. That reads as flakiness and sends you looking in the
+wrong place.
+
+A hard reload does not fix it, and the reason is worth writing down: HA loads a dashboard
+resource by appending a script element at runtime —
+
+```js
+// deminified: the `module` branch of the panel/resource loader
+loadModule = url => appendScript('script', url, 'module')
+// appendScript builds the element, sets src, and document.body.appendChild()s it
+```
+
+A force-reload sets the service-workers mode to none for the navigation and for the
+subresources the parser found in the HTML. A fetch a script issues afterwards is neither, so
+it goes through the worker as usual, and the revalidation the worker fires behind it is
+answered by the month-old HTTP entry.
+
+Both caches key on the full URL **including the query** — that catch-all sets no
+`ignoreSearch`, unlike the `/static/` route above it — so bumping `?v=` on the resource is
+what misses both. `pnpm verify` does that and force-recreates; `dev/bump-resource.mjs` is
+the bump. The interactive alternative is DevTools -> Application -> Service Workers ->
+"Bypass for network" plus "Disable cache", both of which last only as long as DevTools is
+open.
 
 ## Dev HA instance config — the clean way to pin the resource
 

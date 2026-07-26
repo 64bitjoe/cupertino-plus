@@ -1,0 +1,63 @@
+/* The screenshot page. Loaded on top of harness.css, which brings the two Home
+   Assistant themes and the named colour tokens with it.
+
+   Everything here is either inside the camera frame or outside it, and the line between
+   the two is the whole design of this stylesheet. `.frame` is what Playwright clips to,
+   so it may contain nothing that is not meant to ship in the README — no labels, no
+   borders, no rounded corners that would punch transparent notches into the corners of
+   a PNG. The caption sits outside it, for the human who opens this page in a browser. */
+
+body {
+  margin: 0;
+  padding: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px 24px;
+  align-items: flex-start;
+  /* Neither theme — a mid grey, so a light frame and a dark one are equally visible
+     against the page while the manifest is being eyeballed. */
+  background: #8a8a8e;
+  font:
+    400 12px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+}
+
+.shot {
+  display: flex;
+  flex-direction: column;
+  /* Not `stretch`. The frame is a block, so the default would widen it to whatever the
+     caption beside it happens to measure — and the frame is the crop, so the narrow
+     footprints would silently ship a PNG with a strip of empty dashboard down one side. */
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* THE CAMERA FRAME. A margin of dashboard around the card, so the card's rounded
+   corners land on the background a dashboard would put behind them rather than on
+   whatever the README is being read on. */
+.frame {
+  padding: var(--shot-margin);
+  background: var(--primary-background-color);
+}
+
+/* The box the sections grid would put the card in. The card measures this and picks its
+   layout from it — nothing here tells it which one to draw.
+
+   A plain BLOCK box, and it has to be. `base-styles.ts` gives the card
+   `display: block; height: 100%` and no width at all, because in the sections layout it
+   is "a plain block child" of the cell and a block child stretches to its container for
+   free. Make this a flex container and the card becomes a flex ITEM, which shrinks to
+   fit its content instead: the narrow footprint then photographs a card some 170px wide
+   in a 246px box, and the wide one gets away with it only because its content happens to
+   fill the space. Same trap as the sections grid itself — the cell is a block box. */
+.slot {
+  display: block;
+}
+
+.caption {
+  max-width: 46ch;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}

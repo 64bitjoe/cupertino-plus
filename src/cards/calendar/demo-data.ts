@@ -7,7 +7,8 @@
  * out of column.
  *
  * Times for *today* are anchored to the current clock rather than written out, so the
- * card still has something to show at four in the afternoon. Later days use plain
+ * card still has something to show at four in the afternoon — and, since the spacing
+ * shrinks with what is left of the day, at eleven at night as well. Later days use plain
  * clock times — nothing filters them out.
  */
 
@@ -43,7 +44,33 @@ const soon = (now: Date): Date => {
   return date
 }
 
-const after = (base: Date, hours: number): Date => new Date(base.getTime() + hours * HOUR)
+/**
+ * How many steps of today the widest scenario below lays out.
+ *
+ * `after(base, 5)` is the furthest any of them reaches, plus one step of headroom so that
+ * last event ends before midnight rather than exactly on it.
+ */
+const TODAY_STEPS = 6
+
+/**
+ * One step of today's clock: an hour, or an even share of what is left of the day when
+ * there is not an hour to give.
+ *
+ * A fixed hour is right until about six in the evening and then quietly takes the fixture
+ * apart. `after(base, 4)` at ten at night is a dentist's appointment at half past two in the
+ * MORNING, which the day filter moves to tomorrow — so `a normal day` serves up one event
+ * and `three events` serves up one, in exactly the hours somebody is most likely to be
+ * sitting in front of the harness. Compressed instead: the same shape of day, an evening's
+ * worth of it, and every event still on the day the scenario meant.
+ *
+ * The last half hour before midnight is not rescued and is not worth rescuing — `soon`
+ * rounds up into tomorrow there, and a day with fifteen minutes left in it has an honest
+ * claim to being over.
+ */
+const step = (base: Date): number =>
+  Math.min(HOUR, (midnight(base, 1).getTime() - base.getTime()) / TODAY_STEPS)
+
+const after = (base: Date, hours: number): Date => new Date(base.getTime() + hours * step(base))
 
 /**
  * `hours` before now, floored at this morning's midnight.

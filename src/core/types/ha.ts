@@ -210,7 +210,11 @@ export interface LovelaceCardConstructor {
 
 export interface LovelaceCard extends HTMLElement {
   hass?: HomeAssistant
-  /** Set by Home Assistant when the card is rendered inside the card picker. */
+  /**
+   * Set by Home Assistant while the dashboard is in EDIT mode — `hui-section` assigns
+   * `lovelace.editMode` to it, so it is true for every card at once. Not the same thing
+   * as `CustomCardEntry.preview` below, despite the name.
+   */
   preview?: boolean
   /**
    * The view's layout type (`"grid"`, `"panel"`, …), set by Home Assistant. Wrapper

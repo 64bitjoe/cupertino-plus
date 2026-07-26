@@ -42,7 +42,17 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
 
   @property({ attribute: false }) public hass?: HomeAssistant
 
-  /** Set by Home Assistant while the card is shown in the card picker. */
+  /**
+   * Set by Home Assistant while the user is EDITING, not while the card is a thumbnail.
+   *
+   * The name invites the wrong reading. `hui-section` does
+   * `card.preview = this.lovelace.editMode`, so this goes true for every card on the
+   * dashboard the moment the pencil is pressed, and wrapper cards forward it down. Home
+   * Assistant's own cards use it to keep themselves visible when their condition is false
+   * and to size differently in the editor — never to draw something other than the real
+   * thing. A card that showed sample data on this would replace the whole dashboard's
+   * contents with samples as soon as the user went to edit it.
+   */
   @property({ type: Boolean }) public preview = false
 
   @state() protected _config?: C

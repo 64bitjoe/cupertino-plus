@@ -65,8 +65,40 @@ getGridOptions() {
 }
 ```
 
-Note `this.preview` — **HA sets a `preview` property on the card element** when it is
-rendered inside the card picker. Cards use it to size differently in the picker.
+Note `this.preview` — **HA sets a `preview` property on the card element.** The name is
+misleading and the mistake it invites is expensive, so: it means **the user is editing**,
+not "this card is a thumbnail". From the sections view:
+
+```js
+// hui-view / hui-section
+_createCardElement(config) {
+  const el = document.createElement('hui-card')
+  el.hass = this.hass
+  el.preview = this.lovelace.editMode // <-- edit mode, for EVERY card on the board
+  el.layout = 'grid'
+  el.config = config
+  ...
+}
+// and on the section itself:
+html`<hui-section .config=${s} .hass=${this.hass} .preview=${this.lovelace.editMode} …>`
+```
+
+So it flips to `true` for the whole dashboard the moment the pencil is pressed, and
+wrapper cards forward it down (`this._element.preview = this.preview`). What HA's own
+cards do with it:
+
+- size differently while editing — `rows: this.preview ? "auto" : 1`;
+- stay visible when they would otherwise hide — `hui-conditional-card` does
+  `setVisibility(visible) { const show = this.preview || visible; … }`.
+
+What no card does with it is **draw something other than the real thing**. A card that
+showed sample data on `preview` would swap the entire dashboard's contents for samples as
+soon as the user went to edit it — see `_fixtures` in `calendar-card.ts`, which is where
+this library got it wrong once.
+
+Not to be confused with `window.customCards[].preview`, which is a different flag with a
+similar name: that one really is picker-only, and asks the picker to render a live card
+instead of a grey tile.
 
 ## Calendar data (VERIFIED — contradicts most tutorials)
 

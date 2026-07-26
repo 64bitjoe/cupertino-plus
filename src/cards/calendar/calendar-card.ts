@@ -13,7 +13,7 @@ import { registerCard } from '../../core/register'
 import type { LovelaceCardEditor } from '../../core/types/ha'
 import { CALENDAR_EDITOR_TAG } from './calendar-card-editor'
 import { timePreferences } from './datetime'
-import { DEFAULT_DEMO_SCENARIO, demoItems } from './demo-data'
+import { demoItems } from './demo-data'
 import { LOOKAHEAD_DAYS, buildFlow } from './flow'
 import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
 import type { FormatContext, ItemTime, TimeToken } from './format'
@@ -29,10 +29,10 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
   /**
    * Which fixture from `demo-data.ts` to draw INSTEAD of the user's calendars.
    *
-   * For the dev harness and for the card picker, which have no calendars worth drawing
-   * between them. Absent — which is what every real dashboard has — means live data, and
-   * it has to: this key defaulting to a fixture is exactly how the card came to show
-   * strangers' lunch plans in a real Home Assistant.
+   * For the dev harness, and nothing else. Absent — which is what every dashboard has,
+   * in edit mode as much as out of it — means live data, and there is no other way to
+   * reach a fixture: this key quietly defaulting to one is exactly how the card came to
+   * show strangers' lunch plans in a real Home Assistant.
    */
   demo_scenario?: string
 }
@@ -340,16 +340,19 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
   /**
    * Whether this card is drawing fixtures rather than the user's calendars.
    *
-   * Two cases, and the second is the interesting one. The harness asks by name. The card
-   * PICKER does not ask at all — `registerCard` sets `preview: true` so the picker draws
-   * a live card, and the stub config it draws carries no `entities`, which means "every
-   * calendar". Left alone that would open a subscription per calendar in the
-   * installation every time the tile scrolls into view, to show a thumbnail. Fixtures
-   * cost nothing and are a better advertisement anyway.
+   * Exactly one way in: the config asks for one by name, which only the dev harness
+   * does. Nothing infers it, and in particular NOT from `preview`.
+   *
+   * That is worth spelling out, because `preview` reads like the place for it and is not.
+   * `hui-section` assigns `preview = lovelace.editMode` to every card it holds, so it is
+   * true for the whole dashboard the moment the pencil is pressed — it means "the user is
+   * editing", not "this is a thumbnail". Keying fixtures off it turned every calendar on
+   * the board into strangers' lunch plans on entering edit mode, which is the one moment
+   * the user most needs to see which calendars they actually picked. HA's own cards use
+   * it to stay visible and to size differently while editing, never to invent data.
    */
   private get _fixtures(): string | undefined {
-    if (this._config?.demo_scenario !== undefined) return this._config.demo_scenario
-    return this.preview ? DEFAULT_DEMO_SCENARIO : undefined
+    return this._config?.demo_scenario
   }
 
   public override connectedCallback(): void {

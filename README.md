@@ -181,7 +181,7 @@ cards/calendar/
   datetime.ts           day arithmetic in the display timezone
   model.ts              the item shape every data source has to produce
   source.ts             the Home Assistant end: subscriptions, colours, wire mapping
-  demo-data.ts          fixtures for the harness and the card picker
+  demo-data.ts          fixtures for the dev harness, never for a dashboard
 ```
 
 Cards read `--cw-*` tokens, never Home Assistant variables directly. `theme/tokens.ts`

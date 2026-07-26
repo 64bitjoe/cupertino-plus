@@ -125,15 +125,46 @@ export interface TimePreferences {
   hour12: boolean
 }
 
-export const timePreferences = (locale?: FrontendLocaleData): TimePreferences => {
-  const format = locale?.time_format ?? 'language'
+/**
+ * What a card may say about its clock, over the top of the profile setting.
+ *
+ * `system` is the default and means "do not interfere" — the card follows whatever the
+ * Home Assistant profile is set to, which is what every card did before this key existed.
+ *
+ * The other two exist because the profile's own `system` cannot always be trusted, and
+ * not through any fault of ours: the only channel a browser gives us is the resolved
+ * locale, and Chrome does not fold macOS's separate "24-Hour Time" switch into it. A user
+ * whose browser speaks British English while their Mac is set to AM/PM has no way to be
+ * shown AM/PM by detection alone, and this is how they say so.
+ */
+export const TIME_FORMAT_OPTIONS = ['system', '12', '24'] as const
+export type TimeFormatOption = (typeof TIME_FORMAT_OPTIONS)[number]
+
+/**
+ * `unknown` rather than `TimeFormatOption`, because YAML is not TypeScript.
+ *
+ * `time_format: 24` without quotes parses to the NUMBER 24, which is exactly what a user
+ * copying the option out of the README would write — and comparing that against the string
+ * `'24'` fails, so the card would quietly go on using the profile's clock. Coerced instead,
+ * which is also what makes a stray `null` from a bare `time_format:` harmless.
+ */
+export const timePreferences = (
+  locale?: FrontendLocaleData,
+  override?: unknown,
+): TimePreferences => {
+  const wanted = override === undefined || override === null ? undefined : String(override)
+  // The card's own key wins over the profile, and only ever to pin the clock down —
+  // `system` is the absence of an opinion rather than an opinion about the browser.
+  const format = wanted === '12' || wanted === '24' ? wanted : (locale?.time_format ?? 'language')
   // `system` deliberately drops the language, so `Intl` falls back to the browser.
   const language = format === 'system' ? undefined : locale?.language
 
   if (format === 'language' || format === 'system') {
     // `hourCycle` is what the locale itself prefers — a far steadier signal than
     // formatting a date and looking for the letters "AM" in it, which is what the
-    // frontend's own `useAmPm` still does.
+    // frontend's own `useAmPm` still does. Verified equivalent to it across en-US, en-GB,
+    // de-DE, ru-RU, pl-PL and the `-u-hc-` overrides of each, so the two agree on the one
+    // thing that could differ: a locale carrying an explicit hour-cycle extension.
     const cycle = new Intl.DateTimeFormat(language, { hour: 'numeric' }).resolvedOptions().hourCycle
     return { locale: language, hour12: cycle === 'h11' || cycle === 'h12' }
   }

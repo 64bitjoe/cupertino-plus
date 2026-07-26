@@ -7,10 +7,10 @@
  * particular the images are not hand-cropped — a hand-cropped screenshot is a screenshot
  * nobody can reproduce.
  *
- * Deliberately NOT the dev harness. That page exists to make the layout rules visible
- * and is covered in furniture — sliders, selects, labels, four footprints of the same
- * card. This one renders each card once, in a box the sections grid would have given it,
- * with a margin of dashboard around it and no chrome at all.
+ * Deliberately NOT the showcase site. That page exists to be used — sidebar, controls
+ * dock, labels under every frame, four footprints of the same card in its Advanced
+ * section. This one renders each card once, in a box the sections grid would have given
+ * it, with a margin of dashboard around it and no chrome at all.
  *
  * Three rules for anything added here:
  *
@@ -24,7 +24,7 @@
  */
 
 import '../src/index'
-import './harness.css'
+import './ha-theme.css'
 import './shots.css'
 
 import type { LitElement } from 'lit'

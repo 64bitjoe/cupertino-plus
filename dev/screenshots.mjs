@@ -1,10 +1,11 @@
 /**
  * Regenerate the README's screenshots. Run by hand, from `pnpm shots`.
  *
- * There is no website for this project, so the README is where the widgets are shown,
- * and an image in a README rots exactly as fast as a comment does. This is the answer:
- * the pictures are built from the cards themselves, by the same Vite dev server the
- * harness runs on, so regenerating them is one command and never a cropping session.
+ * The README is the first place anyone sees the widgets — before the showcase site,
+ * before installing anything — and an image in a README rots exactly as fast as a
+ * comment does. This is the answer: the pictures are built from the cards themselves, by
+ * the same Vite dev server the site runs on, so regenerating them is one command and
+ * never a cropping session.
  *
  * What the page cannot do for itself, and this does:
  *

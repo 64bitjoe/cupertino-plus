@@ -1,0 +1,735 @@
+/* The showcase site's own look.
+   ---------------------------------------------------------------------------------
+   A light, plain shell in the shadcn/ui idiom: white surfaces, one neutral border
+   colour, an 8px radius, text in two sizes. Everything it owns is prefixed `--ui-`, so
+   nothing can collide with the cards' `--cw-*` tokens or with Home Assistant's, which
+   live in `../ha-theme.css` and are read here, never written.
+
+   The one rule worth stating: a preview's body is painted with Home Assistant's own
+   background and the site sets nothing else inside it. That is why the cards look here
+   exactly as they look on a dashboard, and it is what the border and header row around
+   each preview are for — chrome outside, product inside. */
+
+/* ---- Tokens ------------------------------------------------------------------- */
+
+.theme-light {
+  --ui-bg: #ffffff;
+  --ui-fg: #0a0a0a;
+  --ui-muted: #f4f4f5;
+  /* #6b6b6b rather than shadcn's #737373: on the muted fill that one measures 4.35:1,
+     and most of the small print on this page sits on it. */
+  --ui-muted-fg: #6b6b6b;
+  --ui-border: #e5e5e5;
+  --ui-accent: #f4f4f5;
+  --ui-primary: #171717;
+  --ui-primary-fg: #fafafa;
+  --ui-ring: #a1a1a1;
+  color-scheme: light;
+}
+
+.theme-dark {
+  --ui-bg: #0a0a0a;
+  --ui-fg: #fafafa;
+  --ui-muted: #1c1c1c;
+  --ui-muted-fg: #a1a1a1;
+  --ui-border: #262626;
+  --ui-accent: #262626;
+  --ui-primary: #fafafa;
+  --ui-primary-fg: #171717;
+  --ui-ring: #52525b;
+  color-scheme: dark;
+}
+
+body {
+  /* Read, never set: this is the dashboard the cards are shown on. */
+  --ui-stage: var(--primary-background-color);
+
+  --ui-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', system-ui, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  --ui-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, 'Cascadia Mono', 'Roboto Mono', monospace;
+
+  --ui-radius: 8px;
+  --ui-radius-sm: 6px;
+
+  --ui-nav: 240px;
+  /* Wider than the nav, because a select and a row of checkboxes need more room than a
+     link does — but still a column you read down, not a panel you scan across. */
+  --ui-inspector: 300px;
+}
+
+/* ---- Page --------------------------------------------------------------------- */
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  font: 400 14px/20px var(--ui-sans);
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+/* Nav down the left, widgets in the middle, their settings down the right. The widgets
+   are narrow and tall, so the settings sit beside them rather than under them — a control
+   you are dragging should not be off the screen from the card it changes. */
+.site {
+  display: grid;
+  grid-template-columns: var(--ui-nav) 1fr var(--ui-inspector);
+  grid-template-areas: 'nav main inspect';
+  height: 100%;
+}
+
+.sidebar {
+  grid-area: nav;
+}
+
+.main {
+  grid-area: main;
+}
+
+.inspector {
+  grid-area: inspect;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Painted with Home Assistant's own background, so every widget on the page stands on
+   one plane of dashboard rather than in a box of its own. The site sets nothing else
+   inside it beyond each card's width and height — see the note at the top. */
+.canvas {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 32px 40px;
+  background: var(--ui-stage);
+}
+
+:where(a, button, select, input, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Sidebar ------------------------------------------------------------------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 12px;
+  border-right: 1px solid var(--ui-border);
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 10px 20px;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.brand-version {
+  font: 400 12px/16px var(--ui-mono);
+  color: var(--ui-muted-fg);
+}
+
+.nav-label {
+  margin: 0;
+  padding: 0 10px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-muted-fg);
+}
+
+.nav-list + .nav-label {
+  margin-top: 20px;
+}
+
+.nav-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--ui-radius-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 100ms linear;
+}
+
+.nav-item:hover {
+  background: var(--ui-accent);
+}
+
+.nav-item.is-current {
+  background: var(--ui-accent);
+  font-weight: 500;
+}
+
+.nav-item.is-planned {
+  color: var(--ui-muted-fg);
+  cursor: default;
+}
+
+.nav-item.is-planned:hover {
+  background: transparent;
+}
+
+.nav-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nav-note {
+  font-size: 12px;
+  color: var(--ui-muted-fg);
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 20px 10px 0;
+  font-size: 12px;
+  color: var(--ui-muted-fg);
+}
+
+.sidebar-foot p {
+  margin: 0;
+}
+
+.icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: currentcolor;
+}
+
+/* ---- Header -------------------------------------------------------------------- */
+
+.header {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 22px 32px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.header-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.header h1 {
+  margin: 0 0 2px;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.header p {
+  margin: 0;
+  color: var(--ui-muted-fg);
+}
+
+/* A ghost icon button — the only control up here. */
+.icon-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-fg);
+  cursor: pointer;
+  transition: background-color 100ms linear;
+}
+
+.icon-button:hover {
+  background: var(--ui-accent);
+}
+
+/* ---- Previews ------------------------------------------------------------------ */
+
+/* Focusable because it scrolls sideways when a card is wider than the room for it, and
+   nothing inside it is: the cards are inert and a scroll region a keyboard cannot reach
+   is content a keyboard cannot see. */
+.previews:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 2px;
+}
+
+.previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px 32px;
+  align-items: flex-start;
+  overflow-x: auto;
+}
+
+.preview {
+  margin: 0;
+}
+
+.preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.badge {
+  padding: 1px 8px;
+  background: var(--ui-accent);
+  border-radius: 999px;
+  font: 500 11px/16px var(--ui-mono);
+  color: var(--ui-muted-fg);
+}
+
+/* Exactly a width and a height. A plain block, because `base-styles.ts` gives a card
+   `display: block; height: 100%` and no width, so it stretches to a block parent for
+   free — make this a flex container and the card shrinks to its content and then draws
+   narrower than the footprint says it is. */
+.box {
+  display: block;
+}
+
+.drag-box {
+  position: relative;
+  resize: both;
+  overflow: hidden;
+  /* Home Assistant's own floor — `min_columns: 4, min_rows: 3` — which moves with the
+     section width, so it arrives from the template. The fallbacks are that floor at a
+     500px section, for the frame before the first render. */
+  min-width: var(--drag-min-w, 161px);
+  min-height: var(--drag-min-h, 184px);
+  max-width: 720px;
+  max-height: 480px;
+}
+
+/* ---- Advanced ------------------------------------------------------------------- */
+
+.advanced {
+  margin-top: 32px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.advanced-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 2px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ui-muted-fg);
+}
+
+.advanced-head::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-head:hover {
+  color: var(--ui-fg);
+}
+
+.advanced-mark {
+  transition: transform 150ms ease;
+}
+
+.advanced[open] .advanced-mark {
+  transform: rotate(90deg);
+}
+
+.advanced-body {
+  padding-bottom: 8px;
+}
+
+.panel + .panel {
+  margin-top: 28px;
+}
+
+.panel-name {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.panel-note {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ui-muted-fg);
+}
+
+.editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.editor-form {
+  flex: 0 1 280px;
+}
+
+.editor-config {
+  flex: 1 1 240px;
+  max-width: 340px;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  font: 400 12px/20px var(--ui-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Controls ------------------------------------------------------------------ */
+
+.controls {
+  padding-top: 4px;
+}
+
+.controls-group {
+  margin: 18px 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-muted-fg);
+}
+
+.controls-group:first-child {
+  margin-top: 4px;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.control:last-child {
+  border-bottom: 0;
+}
+
+.control-label {
+  min-width: 0;
+}
+
+.control-name {
+  display: block;
+  font-weight: 500;
+}
+
+.control-hint {
+  display: block;
+  font-size: 13px;
+  color: var(--ui-muted-fg);
+}
+
+.control-field {
+  min-width: 0;
+}
+
+.control.is-inert .control-field {
+  opacity: 0.5;
+}
+
+/* ---- Fields -------------------------------------------------------------------- */
+
+.field-menu {
+  position: relative;
+}
+
+.field-select {
+  width: 100%;
+  height: 34px;
+  padding: 0 30px 0 10px;
+  appearance: none;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-fg);
+  font: 400 13px/18px var(--ui-sans);
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.menu-mark {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  width: 0;
+  height: 0;
+  transform: translateY(-2px);
+  pointer-events: none;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--ui-muted-fg);
+}
+
+.field-range {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.field-range input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 20px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.field-range input::-webkit-slider-runnable-track {
+  height: 5px;
+  background: var(--ui-muted);
+  border-radius: 999px;
+}
+
+.field-range input::-moz-range-track {
+  height: 5px;
+  background: var(--ui-muted);
+  border-radius: 999px;
+}
+
+.field-range input::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin-top: -5px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-fg);
+  border-radius: 999px;
+}
+
+.field-range input::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-fg);
+  border-radius: 999px;
+}
+
+.field-readout {
+  min-width: 52px;
+  text-align: right;
+  font: 400 12px/16px var(--ui-mono);
+  color: var(--ui-muted-fg);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-fg);
+  font: 500 13px/18px var(--ui-sans);
+  cursor: pointer;
+  transition: background-color 100ms linear;
+}
+
+.button:hover {
+  background: var(--ui-accent);
+}
+
+.button .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- Config -------------------------------------------------------------------- */
+
+.config {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.config-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-muted-fg);
+}
+
+.config-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ui-muted-fg);
+}
+
+/* Wrapped, not scrolled: `custom:cupertino-widgets-calendar` is longer than this column
+   will ever be, and a horizontal scrollbar on a three-line block hides the very thing the
+   Copy button is there to hand over. */
+.config-yaml {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--ui-muted);
+  border-radius: var(--ui-radius);
+  font: 400 12px/20px var(--ui-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Scrollbars ---------------------------------------------------------------- */
+
+.canvas,
+.inspector,
+.previews {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ui-border);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+/* ---- Narrow -------------------------------------------------------------------- */
+
+/* No room for three columns: the settings drop under the widgets, still one column each. */
+@media (width < 1200px) {
+  .site {
+    grid-template-columns: var(--ui-nav) 1fr;
+    grid-template-rows: 1fr auto;
+    grid-template-areas:
+      'nav main'
+      'nav inspect';
+  }
+
+  .inspector {
+    height: auto;
+    max-height: 42dvh;
+    border-left: 0;
+    border-top: 1px solid var(--ui-border);
+    display: grid;
+    grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+    gap: 0 32px;
+    align-items: start;
+    padding-inline: 32px;
+  }
+
+  .config {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+}
+
+/* The nav becomes a strip of links between the header and the canvas. */
+@media (width < 900px) {
+  .site {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      'nav'
+      'main'
+      'inspect';
+  }
+
+  .inspector {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 20px;
+  }
+
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    height: auto;
+    padding: 8px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
+    overflow-x: auto;
+  }
+
+  .brand,
+  .nav-label,
+  .sidebar-foot {
+    display: none;
+  }
+
+  .nav,
+  .nav-list {
+    display: flex;
+    gap: 4px;
+  }
+
+  .nav-item {
+    white-space: nowrap;
+  }
+
+  .header {
+    padding-inline: 20px;
+  }
+
+  .canvas {
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+  }
+}

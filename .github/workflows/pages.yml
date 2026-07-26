@@ -1,0 +1,57 @@
+name: Pages
+
+# Publishes the showcase site — dev/index.html, built by `pnpm build:site` — to
+# https://sabbaken.github.io/cupertino-widgets/
+#
+# One manual step before the first run: in Settings -> Pages, set Source to
+# "GitHub Actions". Without it `deploy-pages` fails with a 404 on an environment
+# that looks, from the log, like it should exist.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never two deployments at once, and never cancel one half-way: a cancelled
+# deploy leaves the live site on whichever files made it across.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/configure-pages@v5
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

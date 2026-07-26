@@ -50,25 +50,24 @@ const HA_FORM_CSS = `
   }
 
   legend {
-    padding: 0 0 8px;
+    padding: 0 0 10px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .options {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
+  /* A plain row. The real selector draws a searchable picker with friendly names, area
+     breadcrumbs and drag handles, and no amount of border-radius here would get any
+     closer to it — so this stays out of the way instead of imitating a card. */
   .option {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
-    padding: 8px 10px;
-    background: var(--card-background-color);
-    border: 1px solid var(--divider-color);
-    border-radius: 8px;
     cursor: pointer;
   }
 
@@ -78,6 +77,7 @@ const HA_FORM_CSS = `
   }
 
   .option small {
+    font-size: 11px;
     color: var(--secondary-text-color);
   }
 

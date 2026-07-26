@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 /**
  * Separate from `vite.config.ts` on purpose: that config switches its root to `dev/`
- * for the harness, and Vitest runs through the same `serve` branch — tests would then
+ * for the showcase, and Vitest runs through the same `serve` branch — tests would then
  * be looked for in the wrong directory.
  *
  * Only the pure layers are covered here (flow, packing, formatting). They are where

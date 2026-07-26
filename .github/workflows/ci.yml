@@ -24,6 +24,9 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run test
       - run: pnpm run build
+      # The showcase is published from `main` by pages.yml, so a break in it has to fail
+      # here rather than on the deploy that follows the merge.
+      - run: pnpm run build:site
 
       - name: Check the bundle is self-contained
         # Home Assistant loads the file directly, so a leftover bare import would

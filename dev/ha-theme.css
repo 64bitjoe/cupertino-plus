@@ -1,0 +1,80 @@
+/* Home Assistant's own themes and colour tokens — the surface the cards are drawn on.
+
+   Its own file because two pages need it and neither owns it: `site/` renders the
+   showcase around the cards, `shots.ts` photographs them for the README. Everything
+   here is copied from the shipped frontend and nothing here is ours; the site's own
+   look lives in `site/site.css` behind `--site-*` names, so the two can never be
+   confused for each other. */
+
+/* Home Assistant's default light and dark themes, so a card here shows what the
+   dashboard shows. Values taken from the shipped frontend. */
+.theme-light {
+  --primary-background-color: #fafafa;
+  --secondary-background-color: #e5e5e5;
+  --card-background-color: #fff;
+  --primary-text-color: #212121;
+  --secondary-text-color: #727272;
+  --divider-color: #e0e0e0;
+  --primary-color: #03a9f4;
+}
+
+.theme-dark {
+  --primary-background-color: #111;
+  --secondary-background-color: #282828;
+  --card-background-color: #1c1c1c;
+  --primary-text-color: #e1e1e1;
+  --secondary-text-color: #9b9b9b;
+  --divider-color: #e1e1e11f;
+  --primary-color: #03a9f4;
+}
+
+/* Home Assistant's named colour tokens, copied out of `color.globals.ts`'s `html {}`
+   block in the 2026.7.4 bundle. Not decoration, and not for the page's own furniture:
+   a colour set on a calendar in Home Assistant's entity settings is stored as one of
+   these names, and `source.ts` resolves it to `var(--<name>-color)` exactly as the
+   frontend's `computeCssColor` does. Without them here that variable resolves to nothing,
+   and a calendar with a colour renders with NO tint at all — which looks precisely like a
+   broken colour path rather than a missing theme.
+
+   Theme-independent in the real bundle too: there is no dark override for any of them. */
+body {
+  --red-color: #f44336;
+  --pink-color: #e91e63;
+  --purple-color: #926bc7;
+  --deep-purple-color: #6e41ab;
+  --indigo-color: #3f51b5;
+  --blue-color: #2196f3;
+  --light-blue-color: #03a9f4;
+  --cyan-color: #00bcd4;
+  --teal-color: #009688;
+  --green-color: #4caf50;
+  --light-green-color: #8bc34a;
+  --lime-color: #cddc39;
+  --yellow-color: #ffeb3b;
+  --amber-color: #ffc107;
+  --orange-color: #ff9800;
+  --deep-orange-color: #ff6f22;
+  --brown-color: #795548;
+  --light-grey-color: #bdbdbd;
+  --grey-color: #9e9e9e;
+  --dark-grey-color: #606060;
+  --blue-grey-color: #607d8b;
+  --black-color: #000;
+  --white-color: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--primary-background-color);
+  color: var(--primary-text-color);
+  font:
+    400 14px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+}

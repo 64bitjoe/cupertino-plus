@@ -12,6 +12,10 @@ setting you have to think about.
 Requires a current Home Assistant (**2026.7 or newer**) — the cards track the latest
 frontend APIs rather than carrying compatibility shims.
 
+**[Try the cards in your browser →](https://sabbaken.github.io/cupertino-widgets/)** Every
+size, live, with the sample data and the clock under your control — and the config to paste
+when you like what you see. Nothing to install.
+
 ## The widgets
 
 | Card                                | Status       |
@@ -119,8 +123,8 @@ HACS registers the dashboard resource for you.
 ## Usage
 
 Add the card from the dashboard's card picker and configure it there — it has a visual
-editor, so there is no YAML to write. One control: which calendars feed it. The size is
-the Layout tab's job, not ours.
+editor, so there is no YAML to write. Two controls: which calendars feed it, and which
+clock it prints times in. The size is the Layout tab's job, not ours.
 
 The equivalent YAML, if you prefer it:
 
@@ -129,11 +133,21 @@ type: custom:cupertino-widgets-calendar
 entities: # optional; leave it out for every calendar
   - calendar.work
   - calendar.personal
+time_format: system # optional; system | 12 | 24
 ```
 
-| Option     | Default        | Meaning                                                         |
-| ---------- | -------------- | --------------------------------------------------------------- |
-| `entities` | every calendar | Which `calendar.*` entities to draw. Omit it rather than empty. |
+`12` and `24` are read whether or not you quote them.
+
+| Option        | Default        | Meaning                                                         |
+| ------------- | -------------- | --------------------------------------------------------------- |
+| `entities`    | every calendar | Which `calendar.*` entities to draw. Omit it rather than empty. |
+| `time_format` | `system`       | `system` follows your profile; `12` or `24` overrides it.       |
+
+**On `system`.** It follows the time format in your Home Assistant profile, and that
+setting's own auto-detection reads the browser's locale — which is the only channel a
+browser offers. macOS keeps its 24-hour switch outside the locale and Chrome does not fold
+it in, so a Mac set to AM/PM behind a browser set to British English detects 24-hour and
+there is no web API that would know better. That is what `12` and `24` are for.
 
 Plus `grid_options`, which is Home Assistant's own and is what the Layout tab writes.
 
@@ -149,26 +163,44 @@ by the same sorted order Home Assistant's own calendar panel uses.
 
 ```bash
 pnpm install
-pnpm dev          # dev harness at http://localhost:5173 — no Home Assistant needed
+pnpm dev          # the showcase at http://localhost:5173 — no Home Assistant needed
 pnpm test         # the layout rules, as unit tests
 ```
 
-The harness renders every card against a mock `hass` object, at four footprints either
-side of the layout threshold plus a drag-resizable box. Its controls exist to make the layout rules visible: **Data**
-picks either `live (websocket)`, which makes the card resolve `entities` and subscribe to
-the mock's calendars exactly as it would in Home Assistant, or one of the fixtures built
-to hit every layout branch (an empty today, a skipped empty tomorrow, locations that fit
-and locations that do not, reminders, all-day, a tail that turns into `2 more events`).
-Only the first exercises the wire mapping; only the rest can reach every layout rule.
-**Clock**
-flips between 12- and 24-hour formatting, and there is a dark-theme toggle and a
-slider that emulates different dashboard section widths. This is the fast loop: full
-HMR.
+`pnpm dev` serves the same page that is published at
+[sabbaken.github.io/cupertino-widgets](https://sabbaken.github.io/cupertino-widgets/), with
+full HMR: every card against a mock `hass` object, in a box the sections grid would have
+given it. This is the fast loop.
 
-The **Visual editor** panel runs the card's real editor — reached the way Home Assistant
-reaches it, through `getConfigElement()` — against a live card, and prints the config it
-writes. Its `ha-form` is a stand-in (`dev/ha-stubs.ts`): the behaviour is real, the
-widget is not, so check how it _reads_ in the dev Home Assistant below.
+The top of it is what a visitor sees: **Small** and **Medium**, each labelled with the
+footprint the Layout tab would give it, plus a box whose corner drags. They stand on a
+plane painted with Home Assistant's own background, and the site gives each card a width
+and a height and not one other property — so a card there is a card on a dashboard.
+
+The settings column down the right-hand side leads with the config to paste and a Copy
+button, then every knob that changes it, grouped by whether it belongs to the card. **Data**
+picks either `Live`, which makes the card resolve `entities` and subscribe to the mock's
+calendars exactly as it would in Home Assistant, or one of the fixtures built to hit every
+layout branch (an empty today, a skipped empty tomorrow, locations that fit and locations
+that do not, reminders, all-day, a tail that turns into `2 more events`). Only the first
+exercises the wire mapping; only the rest can reach every layout rule. **Clock** flips
+between the system format and an explicit 12 or 24 hours, and **Section width** emulates a wider or narrower
+dashboard section, which re-boxes every footprint on the page.
+
+**Advanced** is the part that is there for working on a card rather than for choosing one:
+the in-between footprints, and the card's real editor — reached the way Home Assistant
+reaches it, through `getConfigElement()` — driving a live card beside the config it writes.
+That editor's `ha-form` is a stand-in (`dev/ha-stubs.ts`): the behaviour is real, the widget
+is not, so check how it _reads_ in the dev Home Assistant below.
+
+```bash
+pnpm build:site   # the same page as static files in dist-site/
+pnpm preview:site # serve that build
+```
+
+The site is published to GitHub Pages by `.github/workflows/pages.yml` on every push to
+`main`. It is served from a subdirectory, so the build hard-codes that prefix; a fork
+serving it from a domain root wants `SITE_BASE=/ pnpm build:site`.
 
 `pnpm test` covers the parts with no pixels in them — selection, ordering, column
 packing, time formatting — including the worked examples at the bottom of the rules
@@ -210,7 +242,7 @@ own copy, and the revalidation it fires behind you is served by the month-old HT
 Changing the URL misses both caches — they key on the full URL including the query, since
 that catch-all route sets no `ignoreSearch`. A reload of some kind is unavoidable
 regardless: a custom element cannot be redefined in a page that already registered it.
-Which is the real argument for the harness above being the loop you live in, and this one
+Which is the real argument for the showcase above being the loop you live in, and this one
 being the loop you finish in.
 
 If you would rather stay in the browser: DevTools → Application → Service Workers →
@@ -240,15 +272,15 @@ the **Local Calendar** integration in the UI.
 
 ### Screenshots
 
-There is no website for this project, so the README is the shop window — which means the
-pictures in it have to be as cheap to regenerate as the code is to rebuild, or they will
-quietly go out of date. One command, run by hand whenever the cards change:
+The README is the first shop window — before the site, before installing anything — which
+means the pictures in it have to be as cheap to regenerate as the code is to rebuild, or
+they will quietly go out of date. One command, run by hand whenever the cards change:
 
 ```bash
 pnpm shots
 ```
 
-It starts the same Vite dev server the harness runs on, opens `dev/shots.html` in
+It starts the same Vite dev server the showcase runs on, opens `dev/shots.html` in
 headless Chromium, and clips one PNG into `docs/images/` per entry in `dev/shots.ts`'s
 `SHOTS` list. That list is the whole edit surface: a shot is a fixture, a footprint in
 Layout-tab columns and rows, and a theme. Nothing is cropped by hand — a hand-cropped
@@ -292,7 +324,12 @@ src/
     tokens.ts           --cw-* tokens, bridged onto Home Assistant theme variables
     base-styles.ts      structural CSS shared by every card
   cards/<widget>/       one directory per widget
-dev/                    mock-hass harness, the screenshot page, the dev HA config
+dev/
+  site/                 the showcase — one entry per widget in catalog.ts
+  ha-stubs.ts           stand-ins for the Home Assistant elements cards use
+  mock-hass.ts          a `hass` object good enough to develop against
+  shots.ts              the README's screenshots, as a page a camera can point at
+  ha-config/            the throwaway Home Assistant instance
 docs/images/            the README's screenshots — generated, never hand-edited
 ```
 
@@ -308,7 +345,7 @@ cards/calendar/
   datetime.ts           day arithmetic in the display timezone
   model.ts              the item shape every data source has to produce
   source.ts             the Home Assistant end: subscriptions, colours, wire mapping
-  demo-data.ts          fixtures for the dev harness, never for a dashboard
+  demo-data.ts          fixtures for the showcase, never for a dashboard
 ```
 
 Cards read `--cw-*` tokens, never Home Assistant variables directly. `theme/tokens.ts`

@@ -85,14 +85,24 @@ export const cardSize = (): number => Math.round(rowsToPx(DEFAULT_ROWS) / 50)
 export const DEFAULT_HEIGHT = rowsToPx(DEFAULT_ROWS)
 
 /**
+ * The measured width, in px, at which a card stops being `small` and becomes `medium`.
+ *
+ * A little under half the ~500px a full-width card gets in a typical section, so the
+ * flip lands at roughly 9 of the 12 columns. That is about right: two columns of event
+ * rows need real width before they stop truncating every title.
+ *
+ * Exported because the showcase site starts its resizable box just under it, so that the
+ * first drag anybody makes visibly reflows the card. A page that hard-coded that number
+ * would go on doing it after this one moved.
+ */
+export const LAYOUT_THRESHOLD = 340
+
+/**
  * Which layout to render, given the box the card actually ended up in.
  *
  * Only width decides. The two layouts differ in how many columns of content they hold,
  * not in how tall they are — height feeds the row budgets instead, so a card dragged
  * taller shows more rows rather than changing shape.
- *
- * 340px is a little under half the ~500px a full-width card gets in a typical section,
- * so the flip lands at roughly 9 of the 12 columns. That is about right: two columns of
- * event rows need real width before they stop truncating every title.
  */
-export const layoutFromBox = (width: number): WidgetLayout => (width < 340 ? 'small' : 'medium')
+export const layoutFromBox = (width: number): WidgetLayout =>
+  width < LAYOUT_THRESHOLD ? 'small' : 'medium'

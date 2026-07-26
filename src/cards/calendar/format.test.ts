@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { FrontendLocaleData } from '../../core/types/ha'
 import { timePreferences } from './datetime'
 import { TIME_DASH, itemTime, moreLabel, widgetDate, type FormatContext } from './format'
 
@@ -130,5 +131,68 @@ describe('clock preference', () => {
     expect(
       timePreferences({ language: 'pl', time_format: 'language', first_weekday: 'monday' }).hour12,
     ).toBe(false)
+  })
+
+  /**
+   * The card's own `time_format`, which exists because the profile's `system` cannot see
+   * macOS's 24-hour switch through any browser API — see `TIME_FORMAT_OPTIONS`.
+   */
+  describe("a card's own override", () => {
+    const profile24: FrontendLocaleData = {
+      language: 'en',
+      time_format: '24',
+      first_weekday: 'monday',
+    }
+    const profile12: FrontendLocaleData = {
+      language: 'en',
+      time_format: '12',
+      first_weekday: 'monday',
+    }
+
+    it('beats the profile in both directions', () => {
+      expect(timePreferences(profile24, '12').hour12).toBe(true)
+      expect(timePreferences(profile12, '24').hour12).toBe(false)
+    })
+
+    it('defers to the profile on `system`, which is the default', () => {
+      expect(timePreferences(profile24, 'system').hour12).toBe(false)
+      expect(timePreferences(profile12, 'system').hour12).toBe(true)
+    })
+
+    it('defers to the profile when the key is absent', () => {
+      expect(timePreferences(profile24).hour12).toBe(false)
+      expect(timePreferences(profile12).hour12).toBe(true)
+    })
+
+    /**
+     * `time_format: 24` without quotes is a NUMBER in YAML, and it is what anybody copying
+     * the option out of the README would write.
+     */
+    it('accepts the number YAML gives an unquoted value', () => {
+      expect(timePreferences(profile24, 12).hour12).toBe(true)
+      expect(timePreferences(profile12, 24).hour12).toBe(false)
+    })
+
+    it('ignores a value it does not know rather than guessing', () => {
+      expect(timePreferences(profile24, 'am_pm').hour12).toBe(false)
+      expect(timePreferences(profile24, null).hour12).toBe(false)
+      expect(timePreferences(profile12, '').hour12).toBe(true)
+    })
+
+    /**
+     * An override pins the clock and nothing else. Dropping the language with it would
+     * hand `Intl` the browser's locale and change the separator and the digits along with
+     * the hour cycle, which is not what "12-hour" asks for.
+     */
+    it('keeps the language it was formatting with', () => {
+      expect(timePreferences({ ...profile24, language: 'pl' }, '12').locale).toBe('pl')
+    })
+
+    /** A profile set to `system` still drops the language, override or not. */
+    it('leaves the browser in charge of the locale under `system`', () => {
+      expect(
+        timePreferences({ language: 'en', time_format: 'system', first_weekday: 'monday' }).locale,
+      ).toBeUndefined()
+    })
   })
 })

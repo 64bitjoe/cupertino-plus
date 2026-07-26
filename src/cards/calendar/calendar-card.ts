@@ -13,7 +13,7 @@ import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { registerCard } from '../../core/register'
 import type { LovelaceCardEditor } from '../../core/types/ha'
 import { CALENDAR_EDITOR_TAG } from './calendar-card-editor'
-import { timePreferences } from './datetime'
+import { timePreferences, type TimeFormatOption } from './datetime'
 import { demoItems } from './demo-data'
 import { LOOKAHEAD_DAYS, buildFlow } from './flow'
 import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
@@ -27,6 +27,14 @@ export const CALENDAR_CARD_TAG = 'cupertino-widgets-calendar'
 export interface CalendarCardConfig extends CupertinoCardConfig {
   /** Calendar entities to show. Empty/absent means "every calendar", decided at render. */
   entities?: string[]
+  /**
+   * The clock this card prints times in, over the top of the Home Assistant profile.
+   *
+   * Absent or `system` means the profile decides, which is what the card has always done.
+   * See `TIME_FORMAT_OPTIONS` in `datetime.ts` for why the two explicit values are worth
+   * having at all.
+   */
+  time_format?: TimeFormatOption
   /**
    * Which fixture from `demo-data.ts` to draw INSTEAD of the user's calendars.
    *
@@ -533,7 +541,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     if (!this._config) return nothing
 
     const now = this._now
-    const { locale, hour12 } = timePreferences(this.hass?.locale)
+    const { locale, hour12 } = timePreferences(this.hass?.locale, this._config.time_format)
     const ctx: FormatContext = { locale, timeZone: this._timeZone, hour12 }
 
     const mode = this.cwLayout

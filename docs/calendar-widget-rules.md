@@ -193,7 +193,10 @@ Location and title are each one line, truncated with an ellipsis.
 
 ## 7. Time
 
-- 12-hour or 24-hour per the locale, AM/PM a size down.
+- 12-hour or 24-hour per the locale, AM/PM a size down. The card's `time_format` pins it
+  when set to `12` or `24`; `system` and an absent key both defer to the Home Assistant
+  profile, whose own detection can only read the browser's locale — see
+  `TIME_FORMAT_OPTIONS` in `datetime.ts` for the case that motivates the override.
 - `:00` is not printed on a 12-hour clock: `5 – 6PM`, `3 – 4:30PM`. A 24-hour clock
   keeps its minutes — `17 – 18` would read as a range of numbers.
 - The meridiem prints **only on the end of a range** while both ends are in the same

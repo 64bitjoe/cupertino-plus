@@ -57,6 +57,29 @@ Grid is **12 columns**. Confirmed by real cards in the bundle:
 - `history-graph`: `getGridOptions(){return{columns:12,min_columns:6,min_rows:2}}`
 - a strategy generating `grid_options:{columns:12}` (full width) and `{columns:6}` (half)
 
+The Layout tab clamps its own sliders to the floors we return, and to nothing else:
+
+```js
+// hui-card-layout-editor
+html`<ha-grid-size-picker
+  .rowMin=${i.min_rows}
+  .rowMax=${i.max_rows}
+  .columnMin=${i.min_columns}
+  .columnMax=${i.max_columns}
+  …
+></ha-grid-size-picker>`
+// ha-grid-size-picker
+const a = this.rowMin ?? 1,
+  n = this.rowMax ?? this.rows // a is the rows slider's floor
+```
+
+So `min_rows` is a promise the card makes rather than a hint it offers: the user can drag
+to exactly that height, and the frontend does nothing else about it — in particular it
+knows nothing of the `min-height` a card keeps on its own `ha-card`, and CSS applies
+`min-height` after `max-height`, so a floor taller than the cell hangs the card over its
+neighbour instead of being clamped. => whatever we name in `min_rows`, the card has to be
+able to draw itself in. See `core/base-card.ts`.
+
 `rows: "auto"` IS supported. Real card in the bundle:
 
 ```js

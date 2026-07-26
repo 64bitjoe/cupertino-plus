@@ -148,6 +148,30 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   }
 
   /**
+   * The floor `ha-card` keeps: the default footprint's height, never taller than the box
+   * the card was measured in.
+   *
+   * The floor is there for the masonry layout, whose cell imposes no height at all. Take it
+   * away and the row budget chases the content down — fewer rows drawn, a shorter card,
+   * fewer rows again — so in that layout this number IS the height of the card.
+   *
+   * In the sections layout the cell has a height of its own and the floor is only ever in
+   * the way, because `min-height` beats the `max-height: 100%` that holds a card inside its
+   * cell (min is applied last; see `base-styles.ts`). A card dragged to the 3 rows
+   * `gridOptions` offers was drawing 248px of `ha-card` into a 184px cell and hanging the
+   * difference over the card below, which is what made 4 rows the shortest a card looked
+   * able to be however low the floor in the Layout tab went.
+   *
+   * Clamped to the measurement rather than switched on which layout we are in, because
+   * "is anything imposing a height on me" is the question the measurement already answers:
+   * a dragged cell reports its own height, while a masonry cell reports whatever this floor
+   * made the card — so there the clamp is a no-op and the floor stands at the full 248.
+   */
+  private _applyMinHeight(): void {
+    this.style.setProperty('--cw-min-height', `${Math.min(DEFAULT_HEIGHT, this.boxHeight)}px`)
+  }
+
+  /**
    * Measurement beats configuration, and the measurement outlives a config change.
    *
    * `setConfig` runs again whenever the card is edited — and a config edit does not
@@ -179,10 +203,9 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
 
   public override connectedCallback(): void {
     super.connectedCallback()
-    // A floor for the masonry layout, whose cell imposes no height at all. Constant, so
-    // it is set once here rather than chased through the update cycle; `base-styles.ts`
-    // explains why it is a floor and not a height.
-    this.style.setProperty('--cw-min-height', `${DEFAULT_HEIGHT}px`)
+    // The default footprint until the first measurement corrects it — see `_applyMinHeight`
+    // for what it is for and what the measurement does to it.
+    this._applyMinHeight()
     this._resizeObserver ??= new ResizeObserver(entries => {
       const box = entries[0]?.contentRect
       // Width 0 means we are not laid out yet; measuring then would flip the card to
@@ -192,6 +215,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
       // dashboard resize.
       this._measuredWidth = Math.round(box.width)
       this._measuredHeight = Math.round(box.height)
+      this._applyMinHeight()
       this._applyLayout()
     })
     this._resizeObserver.observe(this)

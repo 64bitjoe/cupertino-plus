@@ -18,11 +18,12 @@ export const baseStyles = css`
        layout the parent has no definite height, so this resolves to auto and
        --cw-min-height takes over. */
     height: 100%;
-    /* Which also means --cw-min-height must not win against a cell the user dragged
-       *shorter* than the default footprint: the card would spill out of it, and the row
-       budget -- computed from the measured box -- would stop describing what is drawn.
-       A percentage max-height is exactly the clamp we want, because it resolves to
-       none in the masonry layout, where there is no cell to obey. */
+    /* And a clamp for the other direction, a cell the user dragged *shorter* than the
+       default footprint. A percentage max-height is exactly right for it, because it
+       resolves to none in the masonry layout, where there is no cell to obey. It binds
+       this element only, though: min-height is applied after max-height, so an ha-card
+       with a taller --cw-min-height still grows out of the box this holds -- which is why
+       the floor itself is clamped in base-card.ts rather than left to the cascade. */
     max-height: 100%;
     font: var(--cw-text-body);
     color: var(--cw-label);

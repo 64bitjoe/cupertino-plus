@@ -547,6 +547,26 @@ describe('geometry', () => {
   })
 
   /**
+   * The shortest footprint the Layout tab hands out, which the card has to be able to draw.
+   *
+   * 184px is 3 grid rows — `min_rows` in `core/size.ts` — so these budgets are not a
+   * curiosity at the edge of the arithmetic, they are what a user who drags the card all
+   * the way down is looking at: the date and one event beside it, with the second column
+   * carrying the day. It is thin at 100% and comfortable at 80%, which is the reason the
+   * floor is worth offering at all.
+   */
+  it('still draws a day at the 3-row floor', () => {
+    const FLOOR_HEIGHT = 184
+    expect(geometryFor('medium', FLOOR_HEIGHT, false).budgets).toEqual([2, 5])
+    expect(geometryFor('small', FLOOR_HEIGHT, false).budgets).toEqual([2])
+    expect(geometryFor('medium', FLOOR_HEIGHT, false, 0.8).budgets).toEqual([3, 6])
+    // The other end of the trade, and the one worth knowing about: at 130% the date block
+    // takes the whole of the left column, so the flow starts in the second one — the same
+    // shape an empty today produces, arrived at from the other direction.
+    expect(geometryFor('medium', FLOOR_HEIGHT, false, 1.3).budgets).toEqual([0, 3])
+  })
+
+  /**
    * `scale` buys size out of the row budget, in the same box.
    *
    * Which is the honest exchange and the one the editor's helper line promises: the card

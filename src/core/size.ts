@@ -49,25 +49,34 @@ export const columnsToPx = (columns: number, sectionWidth: number): number => {
  *
  * Full width by 4 rows, which in a section of the usual ~500px is about 500×248 — the 2:1
  * shape Apple's medium widget has, and the one that reads well at any dashboard width.
- * The floor is what makes the other layout reachable: 4 columns comes to ~150px, well
- * under the threshold below, so a user who wants the square can simply drag to it.
+ * The column floor is what makes the other layout reachable: 4 columns comes to ~150px,
+ * well under the threshold below, so a user who wants the square can simply drag to it.
+ *
+ * The row floor is 3, one short of the default, and it is a promise rather than a
+ * suggestion: whatever cell the Layout tab hands us at that height, the card has to draw
+ * itself inside it. Three rows is 184px, which is the date block and one event beside it
+ * at 100% and three at 80% — thin, but a widget rather than a ruin, and `scale` is what
+ * makes it worth offering. Below that the date block alone eats the box.
  *
  * `max_columns` is deliberately absent. There is nothing to protect against — the flow
  * pours into two columns and the row budget follows the height, so a card dragged wider
  * just gets roomier.
  *
- * These are only defaults, and the wording matters: `hui-card` spreads the user's
- * `grid_options` AFTER whatever this returns, so anything dragged in the Layout tab wins
- * outright. Which is the point.
+ * The `rows` and `columns` here are only defaults, and the wording matters: `hui-card`
+ * spreads the user's `grid_options` AFTER whatever this returns, so anything dragged in
+ * the Layout tab wins outright. Which is the point. The two floors are not overridden that
+ * way — they are what the Layout tab clamps its own sliders to.
  */
 const DEFAULT_COLUMNS = 12
 const DEFAULT_ROWS = 4
+const MIN_COLUMNS = 4
+const MIN_ROWS = 3
 
 export const gridOptions = (): LovelaceGridOptions => ({
   columns: DEFAULT_COLUMNS,
   rows: DEFAULT_ROWS,
-  min_columns: 4,
-  min_rows: 3,
+  min_columns: MIN_COLUMNS,
+  min_rows: MIN_ROWS,
 })
 
 /**
@@ -85,9 +94,10 @@ export const cardSize = (): number => Math.round(rowsToPx(DEFAULT_ROWS) / 50)
  * Not scaled by `config.scale`, and both halves of that are deliberate. As a first guess
  * it must match the box the card is about to be measured in, which in the sections layout
  * is this footprint whatever the type is set to — a scaled guess would budget rows for a
- * box that does not exist and reflow on arrival. As a floor it must not exceed the cell:
- * `ha-card` takes `min-height` from it, and a floor taller than the height the user
- * dragged is a card that spills over the one below it.
+ * box that does not exist and reflow on arrival. As a floor it must not exceed the cell,
+ * because `ha-card` takes `min-height` from it and a floor taller than the height the user
+ * dragged is a card that spills over the one below it — so the floor is this height
+ * clamped to the box actually measured, which `base-card.ts` does and explains.
  */
 export const DEFAULT_HEIGHT = rowsToPx(DEFAULT_ROWS)
 

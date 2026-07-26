@@ -35,8 +35,13 @@ interface ControlBase {
   name: string
   /** First column of the controls table. */
   label: string
-  /** Second column: one line, in the interface's voice, about what the control does. */
-  description: string
+  /**
+   * Second column: one line, in the interface's voice, about what the control does.
+   *
+   * Optional, for the control whose label already says it — a line that only repeats the
+   * label is noise in a table read top to bottom.
+   */
+  description?: string
   group: ControlGroup
   /**
    * Why this control is currently inert, if it is.
@@ -155,8 +160,8 @@ const calendar: Widget = {
     {
       kind: 'select',
       name: 'data',
-      label: 'Data',
-      description: 'Sample events, or live data over the websocket.',
+      label: 'Calendars',
+      description: 'Chose mock calendars',
       group: 'preview',
       options: DATA_OPTIONS,
       initial: DEFAULT_DEMO_SCENARIO,
@@ -220,7 +225,6 @@ export const ENVIRONMENT: readonly Control[] = [
     kind: 'select',
     name: CLOCK,
     label: 'Clock',
-    description: 'Which clock the times are printed in.',
     group: 'preview',
     /**
      * The three Home Assistant's own profile offers that anybody reasons about. Its fourth,
@@ -244,7 +248,6 @@ export const ENVIRONMENT: readonly Control[] = [
     kind: 'range',
     name: SECTION_WIDTH,
     label: 'Section width',
-    description: 'How wide the dashboard section is.',
     group: 'preview',
     min: 260,
     max: 760,

@@ -110,12 +110,15 @@ const controlRow = (binding: ControlBinding, hass: HomeAssistant): TemplateResul
   const { control, args } = binding
   const reason = control.inert?.(args)
   const disabled = reason !== undefined
+  // A control may carry no description, and an inert one always has a reason worth more
+  // than the description it replaces. Only the empty case drops the line entirely.
+  const hint = reason ?? control.description
 
   return html`
     <div class=${disabled ? 'control is-inert' : 'control'}>
       <div class="control-label">
         <span class="control-name">${control.label}</span>
-        <span class="control-hint">${reason ?? control.description}</span>
+        ${hint === undefined ? nothing : html`<span class="control-hint">${hint}</span>`}
       </div>
       <div class="control-field">
         ${controlInput(control, {

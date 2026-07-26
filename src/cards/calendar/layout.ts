@@ -209,6 +209,13 @@ function expandFromSlack(column: LayoutColumn | undefined): void {
 // the same number of points tall. A Home Assistant card is whatever the user dragged
 // it to, so the budgets are measured instead — and the constants below are chosen so
 // that a card at its default 4-grid-row height lands on exactly Apple's 4 and 7.
+//
+// Every number here is in **design units** — pixels at `scale: 100`. `config.scale`
+// multiplies what the card actually draws, so `geometryFor` divides the box it measured
+// by the same factor and the rest of this section needs to know nothing about it. That is
+// the whole reason for dividing rather than for scaling each constant in turn: there is
+// one place to get it wrong instead of six, and the numbers below go on matching the CSS
+// comments that name them.
 
 /** Must match `--cw-inset`, the padding inside the card. */
 const INSET = 16
@@ -251,14 +258,25 @@ export interface Geometry {
 }
 
 /**
- * Row budgets for a card `height` pixels tall.
+ * Row budgets for a card `height` pixels tall, drawn at `scale`.
  *
  * The left column is short by the date block sitting above it; the right column has
  * the full height to itself. At the default 248px that is 4 and 7 — the numbers
  * Apple's own widget uses.
+ *
+ * The border is subtracted in pixels and the inset in design units, which looks like an
+ * inconsistency and is the point: `ha-card` draws its 1px border at the same 1px however
+ * the widget inside it is scaled, while `--cw-inset` is one of the lengths that scales. So
+ * the pixels come off first, and what is left is divided into the units everything below
+ * is priced in.
  */
-export const geometryFor = (mode: LayoutMode, height: number, todayEmpty: boolean): Geometry => {
-  const content = Math.max(0, height - 2 * INSET - 2 * BORDER)
+export const geometryFor = (
+  mode: LayoutMode,
+  height: number,
+  todayEmpty: boolean,
+  scale = 1,
+): Geometry => {
+  const content = Math.max(0, (height - 2 * BORDER) / scale - 2 * INSET)
   const beside = rowsIn(content)
   const below = rowsIn(content - DATE_BLOCK)
 

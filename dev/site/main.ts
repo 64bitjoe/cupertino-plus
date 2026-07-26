@@ -19,7 +19,7 @@ import './site.css'
 import { VERSION } from '../../src/core/register'
 import { defineHaStubs } from '../ha-stubs'
 import { advanced, previews } from './canvas'
-import { ENVIRONMENT, PLANNED, WIDGETS, type Widget } from './catalog'
+import { CARD_OPTIONS, ENVIRONMENT, PLANNED, WIDGETS, type Widget } from './catalog'
 import { configPanel, controlsPanel, type ControlBinding } from './inspector'
 import { ensureEditor, pushEditorHass, resetEditor } from './editor'
 import { icon } from './icon'
@@ -162,7 +162,14 @@ const copyConfig = (text: string): void => {
  */
 const inspector = (widget: Widget): TemplateResult => {
   const bindings: ControlBinding[] = [
-    ...widget.props.map(control => ({ control, args: currentArgs(), onInput: setArg })),
+    // The widget's own options first, then the ones every card has, then the fake
+    // dashboard's. The panel regroups them by whether they survive installation, so this
+    // order only settles what comes first inside a group.
+    ...[...widget.props, ...CARD_OPTIONS].map(control => ({
+      control,
+      args: currentArgs(),
+      onInput: setArg,
+    })),
     ...ENVIRONMENT.map(control => ({ control, args: envArgs(), onInput: setEnv })),
   ]
 

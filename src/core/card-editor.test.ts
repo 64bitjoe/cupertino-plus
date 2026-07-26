@@ -6,6 +6,7 @@ import type { HaFormSchema, LovelaceCardConfig } from './types/ha'
 const SCHEMA: readonly HaFormSchema[] = [
   { name: 'size', selector: { select: { mode: 'box', options: [] } } },
   { name: 'entities', selector: { entity: { multiple: true, filter: { domain: 'calendar' } } } },
+  { name: 'scale', selector: { number: { min: 80, max: 130, step: 5, mode: 'slider' } } },
 ]
 
 /** Typed as a card config, so `formData` infers the open shape rather than the literal. */
@@ -44,6 +45,19 @@ describe('formData', () => {
     expect(formData(config({ size: 'small' }), {}, SCHEMA).size).toBe('small')
   })
 
+  /**
+   * A row whose selector is neither of the two kinds this started out knowing about.
+   *
+   * `scale` is a `number` selector and has no `multiple` to read, which the first version
+   * of the widening loop discovered by throwing on it — so every editor in the library went
+   * blank the moment a number row was added to the shared schema. Cheap to pin, and the
+   * failure was total.
+   */
+  it('leaves a row it cannot widen alone instead of tripping over its selector', () => {
+    expect(formData(config({ scale: 110 }), { scale: 100 }, SCHEMA).scale).toBe(110)
+    expect(formData(config(), { scale: 100 }, SCHEMA).scale).toBe(100)
+  })
+
   /** A bare `entities:` in the YAML. Widening that would write `[null]` straight back. */
   it('does not widen a blank into a list of one blank', () => {
     expect(formData(config({ entities: null }), {}, SCHEMA).entities).toBeNull()
@@ -58,7 +72,23 @@ describe('formData', () => {
  * and every untouched field comes back on every change.
  */
 describe('applyFormData', () => {
-  const FIELDS = ['size', 'entities'] as const
+  const FIELDS = ['size', 'entities', 'scale'] as const
+
+  /**
+   * A number the form reports goes in as a number.
+   *
+   * Worth its own case because the config is read by `scaleFactor` and by anybody looking
+   * at their YAML, and a `scale: "110"` would satisfy neither — the editor is the one place
+   * that can guarantee the type, since it is the only one that is not hand-written.
+   */
+  it('writes a number through as a number, and forgets one the user cleared', () => {
+    expect(applyFormData(config(), { scale: 110 }, FIELDS)).toEqual({
+      type: 'custom:x',
+      scale: 110,
+    })
+    const scaled = config({ scale: 110 })
+    expect(applyFormData(scaled, { scale: undefined }, FIELDS)).not.toHaveProperty('scale')
+  })
 
   it('writes through the fields the form owns', () => {
     const config = { type: 'custom:x', size: 'medium' }

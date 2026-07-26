@@ -446,6 +446,24 @@ describe('geometry', () => {
   })
 
   /**
+   * `scale` buys size out of the row budget, in the same box.
+   *
+   * Which is the honest exchange and the one the editor's helper line promises: the card
+   * cannot draw larger type and the same amount of it without more height, so at 130% the
+   * default footprint is worth two rows beside the date instead of four. The numbers are
+   * the same arithmetic as above with the box divided by the factor — the extreme scales
+   * rather than a sample, because those are the two ends anything else lands between.
+   */
+  it('spends rows on size: nine at the smallest scale, five at the largest', () => {
+    expect(geometryFor('medium', DEFAULT_HEIGHT, false, 0.8).budgets).toEqual([6, 9])
+    expect(geometryFor('medium', DEFAULT_HEIGHT, false, 1).budgets).toEqual([4, 7])
+    expect(geometryFor('medium', DEFAULT_HEIGHT, false, 1.3).budgets).toEqual([2, 5])
+    // The left column is the one that pays first, having the date block over it: at the
+    // largest scale it holds a single event where at the smallest it holds three.
+    expect(geometryFor('small', DEFAULT_HEIGHT, false, 1.3).budgets).toEqual([2])
+  })
+
+  /**
    * The budget is only worth anything if a full column actually fits in the box.
    *
    * The numbers below are measured, not assumed — every one of them is a rendered height
@@ -457,8 +475,16 @@ describe('geometry', () => {
    *
    * The tallest way to spend N rows is on compact rows, which are the dearest per row,
    * and — for an odd budget — on the tallest of the nodes that cost a single row.
+   *
+   * Run at every scale the option offers, and this is where the CSS and the arithmetic are
+   * held to each other: those measured heights are all `calc(… * var(--cw-scale))` now, so
+   * the whole rendering scales by the factor while `ha-card`'s border does not. Divide the
+   * border along with the rest — the easy version of `geometryFor` — and the column is
+   * credited with a couple of design units it never gets, which at 80% is most of a row and
+   * lands on a boundary soon enough. That failure is invisible on screen until a column
+   * packed exactly full clips its last descender.
    */
-  it('never budgets more rows than the column can draw, at any height', () => {
+  it('never budgets more rows than the column can draw, at any height or scale', () => {
     const INSET = 16
     const BORDER = 1
     const DATE_BLOCK = 84
@@ -478,12 +504,18 @@ describe('geometry', () => {
       return compacts * COMPACT + single * ONE_ROW + (nodes - 1) * GAP
     }
 
-    for (let height = 100; height <= 800; height += 1) {
-      const content = height - 2 * INSET - 2 * BORDER
-      const [left, right] = geometryFor('medium', height, false).budgets
-      expect(tallestRendering(right!)).toBeLessThanOrEqual(content)
-      expect(tallestRendering(left!)).toBeLessThanOrEqual(Math.max(0, content - DATE_BLOCK))
-      expect(geometryFor('small', height, false).budgets[0]).toBe(left)
+    // The ends of the range and the design size. `scale.test.ts` owns the bounds; what
+    // matters here is that the two extremes are as safe as the middle.
+    for (const scale of [0.8, 0.9, 1, 1.1, 1.3]) {
+      for (let height = 100; height <= 800; height += 1) {
+        // In design units, which is what `tallestRendering` counts in: the drawn heights
+        // are all multiplied by the factor, and the border is not.
+        const content = (height - 2 * BORDER) / scale - 2 * INSET
+        const [left, right] = geometryFor('medium', height, false, scale).budgets
+        expect(tallestRendering(right!)).toBeLessThanOrEqual(content)
+        expect(tallestRendering(left!)).toBeLessThanOrEqual(Math.max(0, content - DATE_BLOCK))
+        expect(geometryFor('small', height, false, scale).budgets[0]).toBe(left)
+      }
     }
   })
 })

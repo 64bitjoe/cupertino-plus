@@ -171,6 +171,32 @@ off the last row of a column packed exactly full:
   line 22px instead of 20 and the row 58px on any 12-hour clock; the `.meridiem` rule
   zeroes its line-height to take the box back out of the sum.
 
+### And at another scale
+
+`scale` — the one option in this library that is about the room rather than the data —
+multiplies everything the card draws: 56px, 31px, 84px, 16px and every type size are
+**design units**, and at 120% they are drawn at 120% of themselves. `ha-card`'s border is
+not, because it is Home Assistant's and it stays 1px.
+
+So `geometryFor` takes the pixels off for the border, divides what is left by the factor,
+and hands the numbers above a box in the units they are priced in. Nothing else in this
+section changes, and that is the point of dividing the box rather than scaling six
+constants: there is one conversion to get wrong instead of six, and the numbers here go on
+matching the CSS that draws them.
+
+Two consequences worth stating, because both are the widget behaving and both look like
+bugs from a distance:
+
+- **Size costs rows.** The same footprint holds 4 and 7 rows at 100%, 2 and 5 at 130%, 6
+  and 9 at 80%. A card scaled up wants dragging taller in the Layout tab; scaled down, it
+  fills the height it already has with more of the day.
+- **Size can change the layout.** §4's threshold is a statement about type — two columns
+  of event rows need so much room before every title truncates — so it too is compared in
+  design units. Scaled up far enough, a card that had two columns folds to one; scaled
+  down, a narrow one unfolds. The range `scale.ts` permits is chosen to keep the two
+  designed footprints, 6 × 4 and 12 × 4, in the layouts they were designed for at every
+  value it offers, and `scale.test.ts` holds it to that.
+
 ## 6. When a location shows
 
 The location is a third line, drawn only when the item has one and there is room. The

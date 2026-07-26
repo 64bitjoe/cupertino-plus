@@ -15,7 +15,9 @@ export const CALENDAR_EDITOR_TAG = 'cupertino-widgets-calendar-editor'
 const CALENDARS_KEY = 'ui.panel.lovelace.editor.card.calendar.calendar_entities'
 
 /**
- * Two rows, and it took a detour to get here.
+ * Two rows of the card's own, and it took a detour to get here. (A third, **Scale**,
+ * arrives from `CupertinoCardEditor` — it belongs to every card in the library, not to
+ * this one.)
  *
  * There was a `size` row as well: two tiles, Small and Medium, each with a line of copy.
  * It looked like the more helpful editor and was the less helpful one. The sections layout
@@ -61,12 +63,13 @@ const SCHEMA: readonly HaFormSchema[] = [
 /**
  * The calendar card's visual editor.
  *
- * Which calendars feed the card, and which clock it draws them on. The footprint belongs
- * to the Layout tab, and everything else about how the card is drawn it works out from the
- * box it ends up in — see `docs/calendar-widget-rules.md`.
+ * Which calendars feed the card, and which clock it draws them on — plus the library-wide
+ * **Scale** the base adds. The footprint belongs to the Layout tab, and everything else
+ * about how the card is drawn it works out from the box it ends up in and that one factor
+ * — see `docs/calendar-widget-rules.md`.
  */
 class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig> {
-  protected override schema(): readonly HaFormSchema[] {
+  protected override fields(): readonly HaFormSchema[] {
     return SCHEMA
   }
 
@@ -78,6 +81,7 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
     return { time_format: 'system' }
   }
 
+  /** The default branches hand the shared rows back to the base — see `CupertinoCardEditor`. */
   protected override label(schema: HaFormSchema): string {
     switch (schema.name) {
       case 'entities':
@@ -85,7 +89,7 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
       case 'time_format':
         return 'Clock'
       default:
-        return schema.name
+        return super.label(schema)
     }
   }
 
@@ -99,7 +103,7 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
         // macOS's 24-hour switch, which is exactly when the other two earn their place.
         return 'System follows your Home Assistant time format. Pick one to override it.'
       default:
-        return undefined
+        return super.helper(schema)
     }
   }
 }

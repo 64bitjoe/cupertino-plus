@@ -16,7 +16,7 @@
 
 import { LAYOUT_THRESHOLD, columnsToPx, rowsToPx } from '../../src/core/size'
 import type { HomeAssistant, LovelaceCard, LovelaceCardConfig } from '../../src/core/types/ha'
-import type { Args, Widget } from './catalog'
+import { widgetConfig, type Args, type Widget } from './catalog'
 
 // ---- Footprints ---------------------------------------------------------------
 
@@ -67,6 +67,13 @@ export const footprintBox = (footprint: Footprint, sectionWidth: number): Box =>
  * Deliberately on the `small` side of it and only one nudge away, so the first drag
  * anybody makes crosses the line. Start it comfortably inside either layout and the
  * story reads as a third static size rather than as the one place the rule is felt.
+ *
+ * At 100%, that is — the threshold is compared against design units, so turning Scale down
+ * moves the line out from under a box that has not moved and it begins on the wide side
+ * instead. Left alone rather than recomputed, because the box's size stops being ours the
+ * moment anybody drags it: snapping it back to a fresh start on an unrelated change would
+ * undo their drag to preserve a first impression they have already had. The rule is still
+ * demonstrable from either side, which is all the box is for.
  *
  * Set as an inline style on the element itself, once, when it is made — never from a
  * template, because the resize handle writes to the same two properties and a template
@@ -135,7 +142,7 @@ export function clearStage(): void {
  * measuring things cannot afford.
  */
 export function syncStage(widget: Widget, args: Args, hass: HomeAssistant): void {
-  const props = widget.toConfig(args)
+  const props = widgetConfig(widget, args)
   const fixture = widget.toFixture(args)
 
   for (const slot of slots.values()) {

@@ -81,6 +81,13 @@ export const cardSize = (): number => Math.round(rowsToPx(DEFAULT_ROWS) / 50)
 /**
  * Height to assume until the ResizeObserver has reported, and the floor a card keeps in
  * the masonry layout, where the cell imposes no height of its own.
+ *
+ * Not scaled by `config.scale`, and both halves of that are deliberate. As a first guess
+ * it must match the box the card is about to be measured in, which in the sections layout
+ * is this footprint whatever the type is set to — a scaled guess would budget rows for a
+ * box that does not exist and reflow on arrival. As a floor it must not exceed the cell:
+ * `ha-card` takes `min-height` from it, and a floor taller than the height the user
+ * dragged is a card that spills over the one below it.
  */
 export const DEFAULT_HEIGHT = rowsToPx(DEFAULT_ROWS)
 
@@ -103,6 +110,12 @@ export const LAYOUT_THRESHOLD = 340
  * Only width decides. The two layouts differ in how many columns of content they hold,
  * not in how tall they are — height feeds the row budgets instead, so a card dragged
  * taller shows more rows rather than changing shape.
+ *
+ * `scale` is the factor from `config.scale`, and the threshold is compared against the
+ * width in design units rather than in pixels — which is the only reading of it that
+ * stays true. The threshold is a statement about type: two columns of event rows need so
+ * much room before every title truncates. Draw that type 20% larger and the room they
+ * need grows with it, so a card that was just wide enough is not any more.
  */
-export const layoutFromBox = (width: number): WidgetLayout =>
-  width < LAYOUT_THRESHOLD ? 'small' : 'medium'
+export const layoutFromBox = (width: number, scale = 1): WidgetLayout =>
+  width / scale < LAYOUT_THRESHOLD ? 'small' : 'medium'

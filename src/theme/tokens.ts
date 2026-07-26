@@ -14,24 +14,44 @@ import { css } from 'lit'
  */
 export const tokens = css`
   :host {
+    /* ---- Scale ------------------------------------------------------------- */
+    /* Set inline on the element by the base card, from config.scale. Every length below
+       that belongs to the widget's own design is multiplied by it; the ones bridged
+       straight from Home Assistant — the card radius, the font family — are not.
+       core/scale.ts has the whole story, including why a stylesheet must not set this
+       itself. The 1 here is what a card renders at before it is configured. */
+    --cw-scale: 1;
+
     /* ---- Typography -------------------------------------------------------- */
     /* San Francisco on Apple hardware, then whatever the HA theme asked for. */
     --cw-font:
       -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui,
       var(--ha-font-family-body, Roboto), 'Helvetica Neue', Arial, sans-serif;
 
-    /* Apple's text styles, trimmed to what widgets use. size / line-height */
-    --cw-text-large-title: 700 34px/41px var(--cw-font);
-    --cw-text-title-1: 700 28px/34px var(--cw-font);
-    --cw-text-title-2: 700 22px/28px var(--cw-font);
-    --cw-text-title-3: 600 20px/25px var(--cw-font);
-    --cw-text-headline: 600 17px/22px var(--cw-font);
-    --cw-text-body: 400 17px/22px var(--cw-font);
-    --cw-text-callout: 400 16px/21px var(--cw-font);
-    --cw-text-subheadline: 400 15px/20px var(--cw-font);
-    --cw-text-footnote: 400 13px/18px var(--cw-font);
-    --cw-text-caption-1: 400 12px/16px var(--cw-font);
-    --cw-text-caption-2: 500 11px/13px var(--cw-font);
+    /* Apple's text styles, trimmed to what widgets use. size / line-height, both
+       scaled — a size that grew while its line-height stood still would re-space the
+       paragraph rather than resize it, and layout.ts prices rows off the line box. */
+    --cw-text-large-title: 700 calc(34px * var(--cw-scale)) / calc(41px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-title-1: 700 calc(28px * var(--cw-scale)) / calc(34px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-title-2: 700 calc(22px * var(--cw-scale)) / calc(28px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-title-3: 600 calc(20px * var(--cw-scale)) / calc(25px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-headline: 600 calc(17px * var(--cw-scale)) / calc(22px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-body: 400 calc(17px * var(--cw-scale)) / calc(22px * var(--cw-scale)) var(--cw-font);
+    --cw-text-callout: 400 calc(16px * var(--cw-scale)) / calc(21px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-subheadline: 400 calc(15px * var(--cw-scale)) / calc(20px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-footnote: 400 calc(13px * var(--cw-scale)) / calc(18px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-caption-1: 400 calc(12px * var(--cw-scale)) / calc(16px * var(--cw-scale))
+      var(--cw-font);
+    --cw-text-caption-2: 500 calc(11px * var(--cw-scale)) / calc(13px * var(--cw-scale))
+      var(--cw-font);
 
     /* ---- Colour ------------------------------------------------------------ */
     --cw-label: var(--primary-text-color, #000);
@@ -54,22 +74,28 @@ export const tokens = css`
 
     /* ---- Surface ----------------------------------------------------------- */
     --cw-surface: var(--ha-card-background, var(--card-background-color, #fff));
-    /* Phone widgets are noticeably rounder than HA's default card. */
+    /* Phone widgets are noticeably rounder than HA's default card. Not scaled: this is
+       the outline the dashboard sees, and a card whose corners disagreed with the ones
+       beside it would read as a mistake rather than as a setting. */
     --cw-radius: var(--ha-card-border-radius, 22px);
-    --cw-radius-inner: 12px;
+    /* Scaled, unlike the one above: this radius is inside the card, and the all-day
+       badge is drawn concentric with it — see the .row.allday rule. */
+    --cw-radius-inner: calc(12px * var(--cw-scale));
     --cw-radius-pill: 999px;
 
     /* ---- Spacing ----------------------------------------------------------- */
     /* Home Assistant's own scale is 4px-stepped (--ha-space-1 is 4px), the same
-       grid Apple uses, so we ride on it and inherit any theme that rescales it. */
-    --cw-space-1: var(--ha-space-1, 4px);
-    --cw-space-2: var(--ha-space-2, 8px);
-    --cw-space-3: var(--ha-space-3, 12px);
-    --cw-space-4: var(--ha-space-4, 16px);
-    --cw-space-5: var(--ha-space-5, 20px);
-    --cw-space-6: var(--ha-space-6, 24px);
-    /* Apple keeps widget content off the rounded edge by roughly this much. */
-    --cw-inset: 16px;
+       grid Apple uses, so we ride on it and inherit any theme that rescales it —
+       and then scale that, so a theme's grid and the card's own stay in step. */
+    --cw-space-1: calc(var(--ha-space-1, 4px) * var(--cw-scale));
+    --cw-space-2: calc(var(--ha-space-2, 8px) * var(--cw-scale));
+    --cw-space-3: calc(var(--ha-space-3, 12px) * var(--cw-scale));
+    --cw-space-4: calc(var(--ha-space-4, 16px) * var(--cw-scale));
+    --cw-space-5: calc(var(--ha-space-5, 20px) * var(--cw-scale));
+    --cw-space-6: calc(var(--ha-space-6, 24px) * var(--cw-scale));
+    /* Apple keeps widget content off the rounded edge by roughly this much.
+       layout.ts holds the unscaled 16 as its INSET. */
+    --cw-inset: calc(16px * var(--cw-scale));
 
     /* ---- Motion ------------------------------------------------------------ */
     /* The curve the phone uses for sheets and springs; feels "settled", not linear. */

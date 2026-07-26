@@ -56,10 +56,11 @@ const NO_EVENTS_TODAY = 'No Events Today'
  * How the MDI glyph is centred in the badge.
  *
  * `mdiCalendarMonth` inks x 3–21 and y 1–21, so (12, 11) is its centre and 18 is its
- * width. The scale lands it 10 units wide on a badge whose viewBox is 1:1 with CSS
- * pixels, so the calendar draws 10px however wide the disc around it gets. That is a
- * fixed size and not a fraction of the badge: it is set by what survives being drawn at
- * this size, and the disc is sized by the chip it caps.
+ * width. The transform lands it 10 units wide on a badge whose viewBox is 1:1 with CSS
+ * pixels at `scale: 100`, so the calendar draws 10px there — half the disc, and set by
+ * what survives being drawn that small rather than by any ratio. Above and below 100% the
+ * whole badge is one length like any other and takes the glyph with it; what stays fixed
+ * is the proportion, which is what the choice of 10 was about.
  */
 const GLYPH = 'translate(10 10) scale(0.5556) translate(-12 -11)'
 
@@ -98,11 +99,15 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
   static override styles: CSSResultGroup = [
     CupertinoCard.styles,
     css`
+      /* Every px in this stylesheet is a design unit multiplied by --cw-scale, and
+         layout.ts holds the same numbers unscaled — it divides the measured box by the
+         factor instead. So the comments below go on naming the sizes the card is drawn at
+         at 100%, which are the sizes the budget is priced in. */
       .widget {
         /* layout.ts prices its row budget in pixels off this and off the height of a
            compact row (its GAP and COMPACT_PX). Change either here and the budget
            stops describing what actually gets drawn. */
-        --cw-flow-gap: 6px;
+        --cw-flow-gap: calc(6px * var(--cw-scale));
 
         flex: 1;
         min-height: 0;
@@ -135,14 +140,14 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       }
 
       .weekday {
-        font: 600 13px/16px var(--cw-font);
+        font: 600 calc(13px * var(--cw-scale)) / calc(16px * var(--cw-scale)) var(--cw-font);
         letter-spacing: 0.05em;
         text-transform: uppercase;
         color: var(--cw-red);
       }
 
       .day {
-        font: 700 52px/56px var(--cw-font);
+        font: 700 calc(52px * var(--cw-scale)) / calc(56px * var(--cw-scale)) var(--cw-font);
         /* Tabular figures keep the numeral from shifting between the 1st and the 30th. */
         font-variant-numeric: tabular-nums;
         letter-spacing: -0.03em;
@@ -161,8 +166,8 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
       .heading {
         flex: none;
-        padding-top: 4px;
-        font: 600 13px/16px var(--cw-font);
+        padding-top: calc(4px * var(--cw-scale));
+        font: 600 calc(13px * var(--cw-scale)) / calc(16px * var(--cw-scale)) var(--cw-font);
         letter-spacing: 0.04em;
         color: var(--cw-label-secondary);
       }
@@ -181,7 +186,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         display: flex;
         align-items: stretch;
         gap: var(--cw-space-2);
-        padding: 2px 10px 0;
+        padding: calc(2px * var(--cw-scale)) calc(10px * var(--cw-scale)) 0;
         font: var(--cw-text-subheadline);
         color: var(--cw-label-secondary);
       }
@@ -194,7 +199,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         display: flex;
         align-items: stretch;
         gap: var(--cw-space-2);
-        padding: 7px 10px;
+        padding: calc(7px * var(--cw-scale)) calc(10px * var(--cw-scale));
         border-radius: var(--cw-radius-inner);
       }
 
@@ -226,7 +231,8 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
          looking like a badge. Both radii and both insets move together or not at all. */
       .row.allday {
         align-items: center;
-        padding: 1px 10px 1px 2px;
+        padding: calc(1px * var(--cw-scale)) calc(10px * var(--cw-scale))
+          calc(1px * var(--cw-scale)) calc(2px * var(--cw-scale));
       }
 
       /* 20px inside a 24px chip, so the badge clears the chip's edge by 2px on every
@@ -235,14 +241,14 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
          why the width and the row's padding have to move together. */
       .badge {
         flex: none;
-        width: 20px;
-        height: 20px;
+        width: calc(20px * var(--cw-scale));
+        height: calc(20px * var(--cw-scale));
       }
 
       /* The colour bar that says which calendar an event belongs to. */
       .rail {
         flex: none;
-        width: 3px;
+        width: calc(3px * var(--cw-scale));
         border-radius: var(--cw-radius-pill);
         background: var(--item-color);
       }
@@ -251,10 +257,10 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       .bullet {
         flex: none;
         align-self: center;
-        width: 13px;
-        height: 13px;
+        width: calc(13px * var(--cw-scale));
+        height: calc(13px * var(--cw-scale));
         border-radius: 50%;
-        border: 1.5px solid var(--item-color);
+        border: calc(1.5px * var(--cw-scale)) solid var(--item-color);
       }
 
       .body {
@@ -550,7 +556,10 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
     // Small is today and nothing else, however busy tomorrow looks.
     const flow = buildFlow(items, { now, ctx, todayOnly: mode === 'small' })
-    const { budgets } = geometryFor(mode, this.boxHeight, flow.todayEmpty)
+    // The scale goes in as a factor, not as scaled constants: `layout.ts` prices rows in
+    // design units and divides the box it was handed, so the budget shrinks as the type
+    // grows without either side restating the other's numbers.
+    const { budgets } = geometryFor(mode, this.boxHeight, flow.todayEmpty, this.scaleFactor)
     const columns = packFlow(flow.nodes, budgets, mode)
     const date = widgetDate(now, ctx)
 

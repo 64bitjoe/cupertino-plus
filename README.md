@@ -106,6 +106,12 @@ But those are the flexibility, not the design: the two above are the proportions
 content was laid out for. A freshly added card arrives full width by 4 rows and can be
 dragged down to 4 × 3.
 
+**`scale` is the other question.** The footprint settles how much room the card has; `scale`
+settles how large what goes in it is drawn — the type at 80% or 130% of the size above,
+along with the spacing around it, for a wall tablet read from across the room or a dense
+dashboard read at a desk. It is not a preset of the two shapes and it is not a substitute
+for dragging: what fits changes, the two shapes do not. See [Usage](#usage).
+
 ## Install
 
 ### HACS
@@ -123,8 +129,9 @@ HACS registers the dashboard resource for you.
 ## Usage
 
 Add the card from the dashboard's card picker and configure it there — it has a visual
-editor, so there is no YAML to write. Two controls: which calendars feed it, and which
-clock it prints times in. The size is the Layout tab's job, not ours.
+editor, so there is no YAML to write. Three controls: which calendars feed it, which clock
+it prints times in, and how large to draw it. The footprint is the Layout tab's job, not
+ours.
 
 The equivalent YAML, if you prefer it:
 
@@ -134,20 +141,36 @@ entities: # optional; leave it out for every calendar
   - calendar.work
   - calendar.personal
 time_format: system # optional; system | 12 | 24
+scale: 100 # optional; 80–130, percent
 ```
 
-`12` and `24` are read whether or not you quote them.
+`12` and `24` are read whether or not you quote them, and so is `scale`.
 
 | Option        | Default        | Meaning                                                         |
 | ------------- | -------------- | --------------------------------------------------------------- |
 | `entities`    | every calendar | Which `calendar.*` entities to draw. Omit it rather than empty. |
 | `time_format` | `system`       | `system` follows your profile; `12` or `24` overrides it.       |
+| `scale`       | `100`          | Percent. Draws the whole widget larger or smaller. 80–130.      |
 
 **On `system`.** It follows the time format in your Home Assistant profile, and that
 setting's own auto-detection reads the browser's locale — which is the only channel a
 browser offers. macOS keeps its 24-hour switch outside the locale and Chrome does not fold
 it in, so a Mac set to AM/PM behind a browser set to British English detects 24-hour and
 there is no web API that would know better. That is what `12` and `24` are for.
+
+**On `scale`.** The dashboard you work in and the tablet on the hallway wall want different
+type, and dragging a card wider only ever gave you more of the same 17px of it. This is the
+other knob: one factor over the whole widget — type, rows, spacing and insets together — so
+the card at 120% is the card at 100% seen from closer up rather than a differently
+proportioned one.
+
+It is spent out of the row budget, which is the trade worth knowing about. The same
+footprint that holds 4 rows beside the date and 7 in the second column at 100% holds 2 and
+5 at 130%, and 6 and 9 at 80% — so a card scaled up wants dragging taller, and a card
+scaled down fills the height it already has with more of the day. Values outside 80–130 are
+clamped rather than refused: past those the widget stops looking like itself, mostly
+because the layout's own thresholds start moving under it.
+[`docs/calendar-widget-rules.md`](docs/calendar-widget-rules.md) has the arithmetic.
 
 Plus `grid_options`, which is Home Assistant's own and is what the Layout tab writes.
 
@@ -178,14 +201,17 @@ plane painted with Home Assistant's own background, and the site gives each card
 and a height and not one other property — so a card there is a card on a dashboard.
 
 The settings column down the right-hand side leads with the config to paste and a Copy
-button, then every knob that changes it, grouped by whether it belongs to the card. **Data**
-picks either `Live`, which makes the card resolve `entities` and subscribe to the mock's
-calendars exactly as it would in Home Assistant, or one of the fixtures built to hit every
-layout branch (an empty today, a skipped empty tomorrow, locations that fit and locations
-that do not, reminders, all-day, a tail that turns into `2 more events`). Only the first
-exercises the wire mapping; only the rest can reach every layout rule. **Clock** flips
-between the system format and an explicit 12 or 24 hours, and **Section width** emulates a wider or narrower
-dashboard section, which re-boxes every footprint on the page.
+button, then every knob that changes it, grouped by whether it belongs to the card.
+**Scale** is the one in the Card group, and the only one of these that ends up in the YAML
+above it — every card in the library has it, so it is here whichever widget is on screen.
+The rest stand in for Home Assistant. **Calendars** picks either `Live`, which makes the
+card resolve `entities` and subscribe to the mock's calendars exactly as it would in Home
+Assistant, or one of the fixtures built to hit every layout branch (an empty today, a
+skipped empty tomorrow, locations that fit and locations that do not, reminders, all-day, a
+tail that turns into `2 more events`). Only the first exercises the wire mapping; only the
+rest can reach every layout rule. **Clock** flips between the system format and an explicit
+12 or 24 hours, and **Section width** emulates a wider or narrower dashboard section, which
+re-boxes every footprint on the page.
 
 **Advanced** is the part that is there for working on a card rather than for choosing one:
 the in-between footprints, and the card's real editor — reached the way Home Assistant

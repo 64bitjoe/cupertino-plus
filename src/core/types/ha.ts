@@ -164,14 +164,29 @@ export interface SelectSelector {
   }
 }
 
+export interface NumberSelector {
+  number: {
+    min?: number
+    max?: number
+    step?: number
+    /**
+     * Omit it and `min`/`max` decide: `ha-selector-number` draws a box unless both are
+     * given, and a slider — with the value and its unit beside it — when they are.
+     */
+    mode?: 'box' | 'slider'
+    /** Shown after the value, and only ever cosmetic: the config carries the bare number. */
+    unit_of_measurement?: string
+  }
+}
+
 /**
  * A selector, as `ha-selector` reads it.
  *
  * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful —
  * hence a union rather than a bag of optional keys. The shipped build knows 57 of
- * these; these are the two our editors ask for.
+ * these; these are the three our editors ask for.
  */
-export type Selector = EntitySelector | SelectSelector
+export type Selector = EntitySelector | SelectSelector | NumberSelector
 
 /**
  * One row of an `ha-form`.

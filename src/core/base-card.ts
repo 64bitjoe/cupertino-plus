@@ -3,6 +3,7 @@ import { property, state } from 'lit/decorators.js'
 
 import { baseStyles } from '../theme/base-styles'
 import { tokens } from '../theme/tokens'
+import { scaleFactor } from './scale'
 import {
   DEFAULT_HEIGHT,
   DEFAULT_LAYOUT,
@@ -19,13 +20,22 @@ import type {
 } from './types/ha'
 
 /**
- * Nothing here yet, and that is deliberate.
+ * What every card in the library can be configured with, whatever it draws.
  *
- * It held a `size` preset until the Layout tab was found to do the same job properly.
- * Kept as the shared base so a card's own config still names one type, and so the next
- * genuinely cross-card option has somewhere to go.
+ * It held a `size` preset until the Layout tab was found to do the same job properly, and
+ * then nothing at all for a while — kept as the shared base so a card's own config still
+ * named one type, and so the next genuinely cross-card option had somewhere to go. `scale`
+ * is that option: it is about the room the dashboard is in, which is a question no card
+ * gets to answer differently from its neighbour.
  */
-export type CupertinoCardConfig = LovelaceCardConfig
+export interface CupertinoCardConfig extends LovelaceCardConfig {
+  /**
+   * How large to draw the widget, as a percentage of the size it was designed at. Absent
+   * means 100%. See `core/scale.ts` — including why an out-of-range value is clamped
+   * rather than refused.
+   */
+  scale?: number
+}
 
 /**
  * Shared behaviour for every card in the library:
@@ -103,12 +113,38 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
     return this._measuredHeight || DEFAULT_HEIGHT
   }
 
+  /**
+   * `config.scale` as a multiplier, ready to divide a measured box by.
+   *
+   * The CSS side of it is set on the element by `_applyScale`; this is the same number for
+   * the arithmetic side, which every card that prices its content in pixels needs. Read
+   * from the config on each call rather than cached — it is a clamp and a division, and a
+   * second copy of a number that has to agree with a stylesheet is a way to get it wrong.
+   */
+  protected get scaleFactor(): number {
+    return scaleFactor(this._config?.scale)
+  }
+
   public setConfig(config: C): void {
     if (!config) {
       throw new Error('Invalid configuration')
     }
     this._config = config
+    this._applyScale()
     this._applyLayout()
+  }
+
+  /**
+   * Hand the factor to CSS.
+   *
+   * Inline on the element, so it beats the `:host` default in `tokens.ts` and anything a
+   * theme has to say — see `core/scale.ts` on why this must not be a theme hook. Set from
+   * `setConfig` rather than from an update, because the config is the only thing it
+   * depends on and a scaled card must be scaled on its first paint: this runs before Lit
+   * has rendered anything, and it works on an element that is not in the document yet.
+   */
+  private _applyScale(): void {
+    this.style.setProperty('--cw-scale', String(this.scaleFactor))
   }
 
   /**
@@ -118,9 +154,15 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * resize anything, so the ResizeObserver will not fire to put things right. Reading
    * back the last measured width instead of resetting to the default is what stops an
    * edit from leaving a narrow card rendering the two-column layout for a frame.
+   *
+   * It is also why this is called from `setConfig` at all now that `scale` exists: a
+   * change of scale does not move the box either, and yet it can flip the layout, because
+   * the threshold is about design units rather than pixels.
    */
   private _applyLayout(): void {
-    this.cwLayout = this._measuredWidth ? layoutFromBox(this._measuredWidth) : DEFAULT_LAYOUT
+    this.cwLayout = this._measuredWidth
+      ? layoutFromBox(this._measuredWidth, this.scaleFactor)
+      : DEFAULT_LAYOUT
   }
 
   // ---- Sizing -------------------------------------------------------------

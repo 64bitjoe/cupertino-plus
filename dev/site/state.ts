@@ -14,6 +14,7 @@
 import type { HomeAssistant, TimeFormat } from '../../src/core/types/ha'
 import { createMockHass } from '../mock-hass'
 import {
+  CARD_OPTIONS,
   CLOCK,
   ENVIRONMENT,
   SECTION_WIDTH,
@@ -36,7 +37,11 @@ interface SiteState {
   advanced: boolean
   /** The dashboard knobs, shared by every widget. */
   env: Record<string, ArgValue>
-  /** The card options, per widget, so switching routes does not lose them. */
+  /**
+   * The card options, per widget, so switching routes does not lose them. Both the
+   * widget's own and the ones every card has — one record, because they end up in one
+   * config and are edited in one group of the panel.
+   */
   args: Record<string, Record<string, ArgValue>>
   /** The drag box, as last measured. */
   drag: Box
@@ -81,7 +86,9 @@ const state: SiteState = {
   widget: WIDGETS[0] as Widget,
   advanced: false,
   env: seed(ENVIRONMENT),
-  args: Object.fromEntries(WIDGETS.map(widget => [widget.id, seed(widget.props)])),
+  args: Object.fromEntries(
+    WIDGETS.map(widget => [widget.id, seed([...widget.props, ...CARD_OPTIONS])]),
+  ),
   drag: { ...DRAG_START },
 }
 

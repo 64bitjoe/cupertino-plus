@@ -443,11 +443,12 @@ that matter:
 
 ### Selectors
 
-`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Two we use:
+`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Three we use:
 
 ```js
 { entity: { filter: { domain: 'calendar' }, multiple: true } }
 { select: { mode: 'box', box_max_columns: 2, options: [{ value, label, description }] } }
+{ number: { min: 80, max: 130, step: 5, mode: 'slider', unit_of_measurement: '%' } }
 ```
 
 - `filter` is the current spelling. A top-level `{ entity: { domain } }` still works, but
@@ -464,6 +465,28 @@ that matter:
   (radios), six or more `dropdown`. `box` — tiles with an optional `description` line —
   is never chosen for you. An older frontend that does not know `box` falls through to
   the dropdown rather than breaking.
+- `number` is a box, not a slider, unless it is given **both** `min` and `max`:
+
+  ```js
+  // ha-selector-number.render(), chunk 6749 — the same decision, unminified
+  const isBox =
+    'box' === this.selector.number?.mode ||
+    void 0 === this.selector.number?.min ||
+    void 0 === this.selector.number?.max
+  ```
+
+  So `mode: 'slider'` is a statement of intent rather than the thing that decides it. The
+  slider is drawn with an `ha-input` beside it, which is where the value and the unit are
+  read; `unit_of_measurement` is passed through raw unless a `translation_key` sits beside
+  it, so a bare `'%'` shows as `%`.
+
+- Both of its handlers emit a **number**: `Number(target.value)` from the slider, and from
+  the box the same or `undefined` when the field is emptied or unparseable — never `''`,
+  and never a numeric string. So a number selector is the one control that cannot put a
+  `"110"` in somebody's config, and `applyFormData` sees a real blank when they clear it.
+- Its chunk is **not** in the `lovelace` panel group (the check above prints `False` for
+  6749), so it arrives with the lazy import `ha-selector` does when it first sees the
+  selector — same as `ha-select-box` and `ha-entities-picker`, and it needs no help either.
 
 Home Assistant's own calendar card editor is a useful reference but not a model: it
 predates the entity selector and still hand-renders an `<ha-entities-picker>` beside its

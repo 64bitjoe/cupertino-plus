@@ -8,7 +8,13 @@
  * the note on it.
  */
 
-import type { EntityFilter, HaFormSchema, HomeAssistant, SelectOption } from '../src/core/types/ha'
+import type {
+  EntityFilter,
+  HaFormSchema,
+  HomeAssistant,
+  NumberSelector,
+  SelectOption,
+} from '../src/core/types/ha'
 
 const asArray = <T>(value: T | readonly T[] | undefined): readonly T[] =>
   value === undefined ? [] : Array.isArray(value) ? value : [value as T]
@@ -85,6 +91,23 @@ const HA_FORM_CSS = `
     margin-top: 6px;
     font-size: 11px;
     color: var(--secondary-text-color);
+  }
+
+  .number {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .number input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .number output {
+    min-width: 44px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
   }
 `
 
@@ -205,6 +228,8 @@ class HaFormStub extends HTMLElement {
 
     if ('select' in node.selector) {
       row.append(this._renderSelect(node, node.selector.select.options))
+    } else if ('number' in node.selector) {
+      row.append(this._renderNumber(node, node.selector.number))
     } else if (node.selector.entity.multiple) {
       row.append(this._renderEntities(node, node.selector.entity.filter))
     } else {
@@ -256,6 +281,40 @@ class HaFormStub extends HTMLElement {
     }
 
     return list
+  }
+
+  /**
+   * A slider and its reading, which is the shape the real selector settles on too once it
+   * has been given a `min` and a `max`.
+   *
+   * The one thing worth copying exactly is the type of the value it reports: `ha-form`
+   * hands back a **number**, and an editor that folded a string into the config would put
+   * `scale: "110"` in somebody's YAML and look fine doing it here.
+   */
+  private _renderNumber(node: HaFormSchema, number: NumberSelector['number']): HTMLElement {
+    const min = number.min ?? 0
+    const max = number.max ?? 100
+    const value = this._data[node.name]
+    const current = typeof value === 'number' ? value : min
+
+    const wrap = document.createElement('div')
+    wrap.className = 'number'
+
+    const input = document.createElement('input')
+    input.type = 'range'
+    input.id = `${node.name}-range`
+    input.min = String(min)
+    input.max = String(max)
+    input.step = String(number.step ?? 1)
+    input.value = String(current)
+
+    const readout = document.createElement('output')
+    readout.textContent = `${current}${number.unit_of_measurement ?? ''}`
+
+    input.addEventListener('input', () => this._emit(node.name, Number(input.value)))
+
+    wrap.append(input, readout)
+    return wrap
   }
 
   private _renderEntities(

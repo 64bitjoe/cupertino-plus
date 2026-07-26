@@ -1,11 +1,13 @@
 import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
 import { property, state } from 'lit/decorators.js'
 
+import { DEFAULT_SCALE, SCALE_FIELD, SCALE_HELPER, SCALE_LABEL, SCALE_ROW } from './scale'
 import type {
   HaFormSchema,
   HomeAssistant,
   LovelaceCardConfig,
   LovelaceCardEditor,
+  Selector,
 } from './types/ha'
 
 /**
@@ -24,6 +26,19 @@ const isBlank = (value: unknown): boolean =>
   (Array.isArray(value) && value.length === 0)
 
 /**
+ * Whether a row reports a list rather than a scalar.
+ *
+ * Written as a lookup with a false tail rather than as an either/or, because the union of
+ * selectors is open: a `number` row has no `multiple` to read, and the version of this
+ * that assumed there were only two kinds threw on the first one that was added.
+ */
+const isMultiple = (selector: Selector): boolean => {
+  if ('entity' in selector) return selector.entity.multiple === true
+  if ('select' in selector) return selector.select.multiple === true
+  return false
+}
+
+/**
  * What `ha-form` is handed: the config, with the defaults showing through where it is
  * silent, and a scalar widened to a list wherever the schema says `multiple`.
  *
@@ -39,14 +54,13 @@ const isBlank = (value: unknown): boolean =>
  */
 export const formData = <C extends LovelaceCardConfig>(
   config: C,
-  defaults: Partial<C>,
+  defaults: Record<string, unknown>,
   schema: readonly HaFormSchema[],
 ): Record<string, unknown> => {
   const data: Record<string, unknown> = { ...defaults, ...config }
 
   for (const node of schema) {
-    const multiple =
-      'entity' in node.selector ? node.selector.entity.multiple : node.selector.select.multiple
+    const multiple = isMultiple(node.selector)
     const value = data[node.name]
     // `isBlank`, not `!== undefined`: a bare `entities:` in the YAML parses to `null`,
     // and wrapping that would show the picker one empty row it cannot fill and then
@@ -128,15 +142,38 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
     this._config = config
   }
 
-  /** The rows of the form, in order. */
-  protected abstract schema(): readonly HaFormSchema[]
+  /** The rows this card asks for, in order. */
+  protected abstract fields(): readonly HaFormSchema[]
 
-  /** The label for one row. */
-  protected abstract label(schema: HaFormSchema): string
+  /**
+   * Every row of the form: the card's own, and then the ones every card in the library
+   * shares.
+   *
+   * Composed here rather than left to each editor to remember, for the same reason `scale`
+   * lives on `CupertinoCardConfig` rather than on one card's config: it is not a question
+   * one widget gets to answer differently from another, and an option that has to be
+   * re-added by hand to each new editor is an option the third card will ship without.
+   *
+   * The shared rows go last. A card's own subject — which calendars, which clock — is why
+   * somebody opened the dialog; how big to draw it is a decision taken after that.
+   */
+  private schema(): readonly HaFormSchema[] {
+    return [...this.fields(), SCALE_ROW]
+  }
 
-  /** The grey line under one row, if it has anything to add. */
-  protected helper(_schema: HaFormSchema): string | undefined {
-    return undefined
+  /**
+   * The label for one row.
+   *
+   * A subclass answers for its own rows and hands the rest back here, which is what puts
+   * one wording on the shared fields across the library.
+   */
+  protected label(schema: HaFormSchema): string {
+    return schema.name === SCALE_FIELD ? SCALE_LABEL : schema.name
+  }
+
+  /** The grey line under one row, if it has anything to add. Same arrangement as `label`. */
+  protected helper(schema: HaFormSchema): string | undefined {
+    return schema.name === SCALE_FIELD ? SCALE_HELPER : undefined
   }
 
   /**
@@ -146,6 +183,9 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * rather than an empty control — an unset radio group reads as broken, not as a
    * default. The first edit then writes the value through into the config, which is
    * what Home Assistant's own card editors do with theirs.
+   *
+   * The shared fields' defaults are added by `render` rather than here, so that a subclass
+   * overriding this cannot drop them by forgetting to spread `super.defaults()`.
    */
   protected defaults(): Partial<C> {
     return {}
@@ -192,10 +232,15 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
   protected override render(): TemplateResult | typeof nothing {
     if (!this.hass || !this._config) return nothing
 
+    // 100% shown rather than a slider parked at its left-hand end, which is what a card
+    // with no `scale` would otherwise look like: the one reading a slider cannot express
+    // is "unset".
+    const defaults = { [SCALE_FIELD]: DEFAULT_SCALE, ...this.defaults() }
+
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${formData(this._config, this.defaults(), this.schema())}
+        .data=${formData(this._config, defaults, this.schema())}
         .schema=${this.schema()}
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}

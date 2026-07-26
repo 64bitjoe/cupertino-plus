@@ -17,6 +17,14 @@ import { mdiBatteryHigh, mdiCalendarMonth, mdiFormatListChecks } from '@mdi/js'
 
 import { DEMO_SCENARIOS, DEFAULT_DEMO_SCENARIO } from '../../src/cards/calendar/demo-data'
 import { CALENDAR_CARD_TAG } from '../../src/index'
+import {
+  DEFAULT_SCALE,
+  MAX_SCALE,
+  MIN_SCALE,
+  SCALE_FIELD,
+  SCALE_LABEL,
+  SCALE_STEP,
+} from '../../src/core/scale'
 import type { LovelaceCardConfig } from '../../src/core/types/ha'
 
 // ---- Control values ----------------------------------------------------------
@@ -97,9 +105,12 @@ export interface Widget {
   icon: string
   /** The custom element the cards are made of. */
   tag: string
-  /** The card's own options, as rows of the Controls table. */
+  /** The card's own options, as rows of the Controls table. `CARD_OPTIONS` joins them. */
   props: readonly Control[]
-  /** The config a real dashboard would hold. Goes into the Config tab as-is. */
+  /**
+   * This widget's half of the config a real dashboard would hold — `widgetConfig` adds the
+   * half every card shares. Goes into the Config tab as it comes.
+   */
   toConfig(args: Args): Partial<LovelaceCardConfig>
   /**
    * Preview-only keys, spread last so a panel that pins its own config down still
@@ -202,6 +213,56 @@ export const PLANNED: readonly { name: string; icon: string }[] = [
   { name: 'To-do lists', icon: mdiFormatListChecks },
 ]
 
+// ---- Options every card has --------------------------------------------------
+
+/**
+ * The knobs that belong to `CupertinoCardConfig` rather than to one widget's config.
+ *
+ * In the **Card** group with a widget's own props, and rightly — unlike the Demo knobs
+ * these do survive installation, and the Config pane above prints them. Kept as a separate
+ * list only because the card that has none of its own still has these.
+ */
+export const CARD_OPTIONS: readonly Control[] = [
+  {
+    kind: 'range',
+    name: SCALE_FIELD,
+    label: SCALE_LABEL,
+    description: 'Type, rows and spacing together. 100% is the design size.',
+    group: 'card',
+    min: MIN_SCALE,
+    max: MAX_SCALE,
+    step: SCALE_STEP,
+    unit: '%',
+    initial: DEFAULT_SCALE,
+  },
+]
+
+/**
+ * What `CARD_OPTIONS` came to, as config — every key, always, including one sitting at its
+ * default.
+ *
+ * It dropped the defaults at first, on the grounds that a `scale: 100` says exactly what
+ * its absence says and the pane is a thing to paste. What that overlooked is where the pane
+ * is: directly above the controls. A key appearing and disappearing changes the height of
+ * the YAML, which moves every control below it — so dragging the Scale slider off 100
+ * pushed the slider itself down a line, out from under the cursor, and back up again on the
+ * way home. Tidy output is not worth a control that flinches when you use it.
+ *
+ * So the rule for this panel is that the set of keys it writes never changes: whatever it
+ * prints, it prints at every setting. Which is honest about the config anyway — Home
+ * Assistant's own editor writes `scale` into the YAML the moment anything in the form is
+ * touched, default or not.
+ */
+export const cardOptions = (args: Args): Partial<LovelaceCardConfig> => ({
+  [SCALE_FIELD]: readNumber(args, SCALE_FIELD, DEFAULT_SCALE),
+})
+
+/** One widget's whole config: its own options, then the ones every card has. */
+export const widgetConfig = (widget: Widget, args: Args): Partial<LovelaceCardConfig> => ({
+  ...widget.toConfig(args),
+  ...cardOptions(args),
+})
+
 // ---- The dashboard the widgets are shown in ----------------------------------
 
 export const CONTROL_GROUPS: readonly { id: ControlGroup; name: string }[] = [
@@ -284,4 +345,4 @@ export const configToYaml = (config: LovelaceCardConfig): string =>
  * own, and a config without it fails to render with a message about an unknown card.
  */
 export const widgetYaml = (widget: Widget, args: Args): string =>
-  configToYaml({ type: `custom:${widget.tag}`, ...widget.toConfig(args) })
+  configToYaml({ type: `custom:${widget.tag}`, ...widgetConfig(widget, args) })

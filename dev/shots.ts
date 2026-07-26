@@ -31,9 +31,10 @@ import './shots.css'
 
 import type { LitElement } from 'lit'
 
-import { CALENDAR_CARD_TAG } from '../src/index'
+import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG } from '../src/index'
 import { columnsToPx, layoutFromBox, rowsToPx } from '../src/core/size'
-import type { LovelaceCard } from '../src/core/types/ha'
+import type { LovelaceCard, LovelaceCardConfig } from '../src/core/types/ha'
+import { deviceSet } from './battery-devices'
 import { defineHaStubs } from './ha-stubs'
 import { createMockHass } from './mock-hass'
 
@@ -57,8 +58,18 @@ interface Shot {
   name: string
   /** Printed beside the frame on this page. Never inside it — see `shots.css`. */
   caption: string
-  /** A key from `demo-data.ts`'s scenarios. */
-  scenario: string
+  /** The card to draw. */
+  tag: string
+  /**
+   * What to draw it with, over the top of its `type`.
+   *
+   * Whatever the card's own data door is, which is not the same door twice: the calendar
+   * takes a `demo_scenario`, because its rows only exist on the far side of a websocket
+   * mapper, while the battery card takes plain `entities` pointing at the mock
+   * installation's sensors. So this is a config rather than a fixture name, and the shot is
+   * as close to a real dashboard's card as the harness can get.
+   */
+  config: Partial<LovelaceCardConfig>
   /**
    * The footprint, in the Layout tab's own units, and **only ever 6×4 or 12×4 here.**
    *
@@ -74,11 +85,20 @@ interface Shot {
   theme: 'light' | 'dark'
 }
 
+const calendarShot = (scenario: string): Partial<LovelaceCardConfig> => ({
+  demo_scenario: scenario,
+})
+
+const batteryShot = (set: string): Partial<LovelaceCardConfig> => ({
+  entities: [...deviceSet(set)],
+})
+
 const SHOTS: readonly Shot[] = [
   {
     name: 'calendar-medium',
     caption: 'medium — a full day, and what follows it',
-    scenario: 'default',
+    tag: CALENDAR_CARD_TAG,
+    config: calendarShot('default'),
     columns: 12,
     rows: 4,
     theme: 'light',
@@ -86,7 +106,8 @@ const SHOTS: readonly Shot[] = [
   {
     name: 'calendar-small',
     caption: 'small — today only, led by an all-day event',
-    scenario: 'all-day-busy',
+    tag: CALENDAR_CARD_TAG,
+    config: calendarShot('all-day-busy'),
     columns: 6,
     rows: 4,
     theme: 'light',
@@ -94,7 +115,8 @@ const SHOTS: readonly Shot[] = [
   {
     name: 'calendar-empty-today',
     caption: 'medium — nothing today, so the flow starts in the second column',
-    scenario: 'today-empty',
+    tag: CALENDAR_CARD_TAG,
+    config: calendarShot('today-empty'),
     columns: 12,
     rows: 4,
     theme: 'light',
@@ -102,7 +124,44 @@ const SHOTS: readonly Shot[] = [
   {
     name: 'calendar-dark',
     caption: 'medium, dark — tomorrow is empty and gets skipped',
-    scenario: 'skip-empty-day',
+    tag: CALENDAR_CARD_TAG,
+    config: calendarShot('skip-empty-day'),
+    columns: 12,
+    rows: 4,
+    theme: 'dark',
+  },
+  {
+    name: 'battery-medium',
+    caption: 'medium — four devices, so the rings keep their percentages',
+    tag: BATTERY_CARD_TAG,
+    config: batteryShot('four'),
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'battery-small',
+    caption: 'small — two devices, the left half of the medium card',
+    tag: BATTERY_CARD_TAG,
+    config: batteryShot('two'),
+    columns: 6,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'battery-compact',
+    caption: 'small — four devices, so the percentages come off and the grid closes up',
+    tag: BATTERY_CARD_TAG,
+    config: batteryShot('four'),
+    columns: 6,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'battery-dark',
+    caption: 'medium, dark — four devices, one of them not reporting',
+    tag: BATTERY_CARD_TAG,
+    config: batteryShot('awkward'),
     columns: 12,
     rows: 4,
     theme: 'dark',
@@ -158,10 +217,10 @@ for (const shot of SHOTS) {
   slot.style.width = `${width}px`
   slot.style.height = `${height}px`
 
-  const card = document.createElement(CALENDAR_CARD_TAG) as LovelaceCard
+  const card = document.createElement(shot.tag) as LovelaceCard
   // `hass` first, then `setConfig` — the order Home Assistant uses.
   card.hass = createMockHass({ dark: shot.theme === 'dark', timeFormat: '12' })
-  card.setConfig({ type: CALENDAR_CARD_TAG, demo_scenario: shot.scenario })
+  card.setConfig({ type: shot.tag, ...shot.config })
 
   const caption = document.createElement('div')
   caption.className = 'caption'

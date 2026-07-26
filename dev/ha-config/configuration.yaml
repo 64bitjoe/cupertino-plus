@@ -15,6 +15,89 @@ homeassistant:
 # it is writable, so events can be created from the card.
 demo:
 
+# Devices for the battery card, because `demo:` has almost nothing it can use: two
+# battery sensors, both `entity_category: diagnostic`, both at a fixed level and neither
+# ever charging. Not enough to fill the six rings the wide footprint holds, and not enough
+# to reach a single one of the card's branches.
+#
+# So: one device per branch, mirroring `dev/battery-devices.ts` so that a card looks the
+# same here as it does in the showcase. The three ways an integration reports charging are
+# one each -- a separate binary sensor, `is_charging`, `battery_state` -- because only the
+# first of them has to be named in the card's config and the other two are what the card
+# reads for free. The last two are the unhappy paths: no icon of its own, and not
+# reporting at all.
+#
+# `sensor.dev_creeping_battery` is the one that moves. Template sensors re-render on the
+# minute whenever `now()` is in them, so its arc visibly advances while you watch -- which
+# is the only way to see that the card repaints on a state change rather than on a config
+# one.
+template:
+  - sensor:
+      - name: Dev phone battery
+        unique_id: dev_phone_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '72'
+        icon: mdi:cellphone
+      - name: Dev watch battery
+        unique_id: dev_watch_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '41'
+        icon: mdi:watch
+        attributes:
+          battery_state: Charging
+      - name: Dev earbuds battery
+        unique_id: dev_earbuds_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '8'
+        icon: mdi:headphones
+      - name: Dev tablet battery
+        unique_id: dev_tablet_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '100'
+        icon: mdi:tablet
+      - name: Dev laptop battery
+        unique_id: dev_laptop_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '63'
+        icon: mdi:laptop
+        attributes:
+          is_charging: true
+      # No icon: the card falls back to a battery glyph, which is what a real battery
+      # sensor looks like when nobody has named the device.
+      - name: Dev remote battery
+        unique_id: dev_remote_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '22'
+      # `availability: false` is how a template sensor is made `unavailable` -- an empty
+      # state template only gets you `unknown`, which the card treats the same way but
+      # which is not the state an integration that has stopped answering produces.
+      - name: Dev doorbell battery
+        unique_id: dev_doorbell_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '15'
+        icon: mdi:doorbell-video
+        availability: 'false'
+      - name: Dev creeping battery
+        unique_id: dev_creeping_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: '{{ now().minute | int }}'
+        icon: mdi:battery-clock
+  - binary_sensor:
+      # The one form of charging that has to be named in the card's config, since it is
+      # not on the battery sensor at all: `charging_entity: binary_sensor.dev_tablet_charging`.
+      - name: Dev tablet charging
+        unique_id: dev_tablet_charging
+        device_class: battery_charging
+        state: 'true'
+
 lovelace:
   # Dashboards stay in storage mode (the default), so the UI card picker and
   # visual editors work. But resources are pinned here declaratively, so the
@@ -43,5 +126,5 @@ lovelace:
     # empty directory and serving 404 for a bundle that is sitting right there on the
     # host. `ha:up` force-recreates, which re-resolves the mount. Same failure the README
     # warns about for `rm -rf dist`, reached by a different route.
-    - url: /local/cupertino-widgets/cupertino-widgets.js?v=7
+    - url: /local/cupertino-widgets/cupertino-widgets.js?v=9
       type: module

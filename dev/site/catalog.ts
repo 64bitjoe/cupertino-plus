@@ -16,7 +16,8 @@
 import { mdiBatteryHigh, mdiCalendarMonth, mdiFormatListChecks } from '@mdi/js'
 
 import { DEMO_SCENARIOS, DEFAULT_DEMO_SCENARIO } from '../../src/cards/calendar/demo-data'
-import { CALENDAR_CARD_TAG } from '../../src/index'
+import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG } from '../../src/index'
+import { DEFAULT_DEVICE_SET, DEVICE_SETS, deviceSet } from '../battery-devices'
 import {
   DEFAULT_SCALE,
   MAX_SCALE,
@@ -198,7 +199,61 @@ const calendar: Widget = {
   },
 }
 
-export const WIDGETS: readonly Widget[] = [calendar]
+/**
+ * Readable names for the device sets, and each one names the layout it lands on rather than
+ * the devices in it — that is what a visitor is choosing between.
+ */
+const DEVICE_LABELS: Record<string, string> = {
+  none: 'Nothing configured',
+  one: 'One device',
+  two: 'Two — with percentages',
+  three: 'Three',
+  four: 'Four — one on a charger',
+  awkward: 'Four — one not reporting',
+  overflow: 'Six — more than these sizes draw',
+}
+
+const battery: Widget = {
+  id: 'battery',
+  name: 'Batteries',
+  tagline: 'What is left in everything you have to charge.',
+  icon: mdiBatteryHigh,
+  tag: BATTERY_CARD_TAG,
+
+  props: [
+    {
+      kind: 'select',
+      name: 'devices',
+      label: 'Devices',
+      description: 'Mock devices, in the order the rings follow them.',
+      group: 'card',
+      options: Object.keys(DEVICE_SETS).map(value => ({
+        value,
+        label: DEVICE_LABELS[value] ?? titleCase(value),
+      })),
+      initial: DEFAULT_DEVICE_SET,
+    },
+  ],
+
+  /**
+   * In the **Card** group and printed in the Config pane, unlike the calendar's Data knob —
+   * because there is nothing preview-only about it. This card has no fixtures: it reads
+   * `hass.states` like it would on a dashboard, and the only thing the harness supplies is
+   * which entities to point it at. So the YAML above the control is the config that produced
+   * what is on screen, per-device overrides and all. The entity ids are the mock
+   * installation's, which is the one thing a visitor has to substitute.
+   */
+  toConfig(args) {
+    const rows = deviceSet(readString(args, 'devices', DEFAULT_DEVICE_SET))
+    return rows.length > 0 ? { entities: [...rows] } : {}
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+export const WIDGETS: readonly Widget[] = [calendar, battery]
 
 export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => w.id === id)
 
@@ -207,10 +262,9 @@ export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => 
  *
  * Listed but not linked — a route to a page saying "not built yet" is a worse answer
  * than a greyed row that already says it. They are here because the first question a
- * visitor asks a one-widget library is whether there will be more.
+ * visitor asks a two-widget library is whether there will be more.
  */
 export const PLANNED: readonly { name: string; icon: string }[] = [
-  { name: 'Battery levels', icon: mdiBatteryHigh },
   { name: 'To-do lists', icon: mdiFormatListChecks },
 ]
 
@@ -329,12 +383,29 @@ const yamlScalar = (value: unknown): string => {
   return /^[\w.:/-]+$/.test(text) ? text : JSON.stringify(text)
 }
 
-/** Just enough YAML for a card config: scalars and lists of scalars, in key order. */
+/**
+ * One item of a list: a scalar, or a mapping whose first key rides on the dash.
+ *
+ * The mapping form is here for the battery card's `entities`, whose rows carry a
+ * `charging_entity` when the device's own state cannot say — so a config the visitor is
+ * invited to paste has to be able to print one. Two spaces of indent and the dash, exactly
+ * as every Home Assistant document writes it.
+ */
+const yamlItem = (item: unknown): string => {
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+    return `  - ${yamlScalar(item)}`
+  }
+  return Object.entries(item)
+    .map(([key, value], index) => `  ${index === 0 ? '-' : ' '} ${key}: ${yamlScalar(value)}`)
+    .join('\n')
+}
+
+/** Just enough YAML for a card config: scalars, and lists of scalars or flat mappings. */
 export const configToYaml = (config: LovelaceCardConfig): string =>
   Object.entries(config)
     .map(([key, value]) =>
       Array.isArray(value)
-        ? [`${key}:`, ...value.map(item => `  - ${yamlScalar(item)}`)].join('\n')
+        ? [`${key}:`, ...value.map(item => yamlItem(item))].join('\n')
         : `${key}: ${yamlScalar(value)}`,
     )
     .join('\n')

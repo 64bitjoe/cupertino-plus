@@ -109,6 +109,18 @@ export const cardSize = (): number => Math.round(rowsToPx(DEFAULT_ROWS) / 50)
 export const DEFAULT_HEIGHT = rowsToPx(DEFAULT_ROWS)
 
 /**
+ * Width to assume until the ResizeObserver has reported.
+ *
+ * The other half of `DEFAULT_HEIGHT`, and there for cards that price their content in two
+ * directions rather than one — the battery grid's cells have a width as well as a height,
+ * where the calendar's rows only ever needed to know how many columns there were. Same
+ * argument as the height, so the same answer: the default footprint, which is full width in
+ * a section of the usual ~500px, because a guess that did not match the box the card is
+ * about to be measured in would reflow on arrival.
+ */
+export const DEFAULT_WIDTH = 500
+
+/**
  * The measured width, in px, at which a card stops being `small` and becomes `medium`.
  *
  * A little under half the ~500px a full-width card gets in a typical section, so the

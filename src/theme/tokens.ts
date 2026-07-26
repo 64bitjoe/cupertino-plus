@@ -61,6 +61,12 @@ export const tokens = css`
     /* The system "fill" greys: the tint behind chips, dividers and empty slots. */
     --cw-fill: rgba(120, 120, 128, 0.12);
     --cw-fill-strong: rgba(120, 120, 128, 0.2);
+    /* The unfilled part of a gauge — the battery card's rings run on this. Deliberately
+       not the fill above, and not a shade of it either: a fill sits behind content and
+       reads as a surface, while a track is the part of a measurement that has not been
+       reached. It has to stay quieter than the arc drawn over it, or the ring reads as
+       two colours rather than as a length. Half the fill's weight, in each theme. */
+    --cw-track: rgba(0, 0, 0, 0.1);
 
     --cw-accent: var(--primary-color, #007aff);
     --cw-red: #ff3b30;
@@ -111,6 +117,7 @@ export const tokens = css`
     --cw-separator: var(--divider-color, rgba(84, 84, 88, 0.65));
     --cw-fill: rgba(120, 120, 128, 0.24);
     --cw-fill-strong: rgba(120, 120, 128, 0.36);
+    --cw-track: rgba(255, 255, 255, 0.12);
 
     --cw-red: #ff453a;
     --cw-orange: #ff9f0a;

@@ -523,6 +523,57 @@ is the right shape. `ui.panel.lovelace.editor.card.calendar.calendar_entities`
 lazily-loaded `lovelace` translation fragment — which is loaded whenever an editor is
 open, so a card editor can borrow it.
 
+## Icons and more-info (VERIFIED)
+
+### `ha-icon` needs no loading either, same as `ha-form`
+
+`ha-icon` (chunk **14628**) and `ha-svg-icon` (**72966**) are both in the `lovelace` panel's
+own initial promise group, so a card can render `<ha-icon icon="mdi:…">` with no import dance.
+Re-check with the script in the `ha-form` section above, substituting the tag names.
+
+`ha-icon` takes its size from `--mdc-icon-size` and from nothing else — its `:host` rule is
+`width: var(--mdc-icon-size, 24px); height: var(--mdc-icon-size, 24px)`, with `fill:
+currentcolor`. A card that wants an icon to scale with its own layout has to set that property;
+there is no `size` attribute.
+
+Two reasons to reach for `ha-icon` rather than an inlined `@mdi/js` path, and one against.
+For: it resolves whatever name the user put in `attributes.icon`, which a card cannot enumerate
+ahead of time, and it goes through HA's own icon cache. Against: it resolves asynchronously out
+of IndexedDB, so anything measured off the glyph is measured at the wrong height for a frame —
+which is why the calendar's all-day badge is an inlined path and the battery card's device icon
+is not. The battery icon's size is a CSS length, not a measurement.
+
+The dev harness has no icon registry at all, so `dev/ha-stubs.ts` carries a small lookup table
+standing in for one. Importing all of `@mdi/js` there would put ~1MB of path strings into the
+published showcase.
+
+### `hass-more-info`
+
+The event Home Assistant's own cards fire to open a device's dialog, with the entity id under
+`entityId`:
+
+```js
+_openMoreInfo(e) { fireEvent(this, "hass-more-info", { entityId: e.currentTarget.stateObj.entity_id }) }
+```
+
+`fireEvent` sets `bubbles: true, composed: true, cancelable: false`, and the listener is on the
+dashboard, so a card firing this from inside its own shadow root must set both flags itself.
+
+```bash
+docker run --rm --entrypoint bash ghcr.io/home-assistant/home-assistant:stable -c \
+  'grep -roh -E ".{80}\"hass-more-info\".{120}" /usr/local/lib/python3.*/site-packages/hass_frontend/frontend_latest/*.js | head'
+```
+
+### The device classes the battery card leans on
+
+`sensor` has `battery` (a percentage) and `binary_sensor` has `battery_charging` — both in
+`/usr/src/homeassistant/homeassistant/components/*/__init__.py` inside the image, which is
+where core's Python lives; `site-packages/homeassistant` is only the dist-info licence copy.
+A single `filter: { domain: 'sensor', device_class: 'battery' }` clause is therefore enough to
+turn the card's picker from every sensor in the installation into the dozen that are batteries.
+`battery_charging` is not in a picker at all — `charging_entity` is per row, and a multiple
+entity picker cannot express that (see `CupertinoCardEditor`'s `toForm`/`fromForm`).
+
 ## Theming — HA has a real design-token system now
 
 Legacy card vars (still present):

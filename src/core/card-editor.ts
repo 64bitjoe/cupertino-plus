@@ -52,8 +52,8 @@ const isMultiple = (selector: Selector): boolean => {
  * `changed.get` answers the previous value, which on a first update is `undefined`, so
  * the one render where it matters is the one render it sits out.
  */
-export const formData = <C extends LovelaceCardConfig>(
-  config: C,
+export const formData = (
+  config: Record<string, unknown>,
   defaults: Record<string, unknown>,
   schema: readonly HaFormSchema[],
 ): Record<string, unknown> => {
@@ -192,6 +192,31 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
   }
 
   /**
+   * The config as `ha-form` should see it, and its answer folded back into the config.
+   *
+   * Both are the identity for a card whose config is exactly what its rows say, which is
+   * most of them — `toForm` hands the config straight over, `fromForm` writes the named
+   * fields back with `applyFormData`. The pair exists for the one shape that cannot round
+   * trip: a list whose rows carry more than the selector can express.
+   *
+   * The battery card is that shape. Its `entities` may hold
+   * `{ entity, charging_entity, name, icon }` objects, and `ha-entities-picker` reports a
+   * list of ids and nothing else — so a form that showed the config verbatim would hand the
+   * picker objects it maps over as strings, and an editor that wrote its answer back
+   * verbatim would delete every override the moment anybody opened the visual editor. Home
+   * Assistant's own entities card answers this with a bespoke editor element instead of a
+   * selector; two hooks are the cheaper half of that, and they keep the plumbing in one
+   * place rather than in each card that grows a list.
+   */
+  protected toForm(config: C): Record<string, unknown> {
+    return config
+  }
+
+  protected fromForm(config: C, data: Record<string, unknown>, fields: readonly string[]): C {
+    return applyFormData(config, data, fields)
+  }
+
+  /**
    * Bound once, the way Home Assistant's own card editors bind theirs.
    *
    * Not an optimisation, and it would be wrong to describe it as one: `ha-form` compares
@@ -214,7 +239,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
     if (!this._config) return
 
     const fields = this.schema().map(node => node.name)
-    const config = applyFormData(this._config, event.detail.value, fields)
+    const config = this.fromForm(this._config, event.detail.value, fields)
 
     this.dispatchEvent(
       new CustomEvent('config-changed', {
@@ -240,7 +265,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${formData(this._config, defaults, this.schema())}
+        .data=${formData(this.toForm(this._config), defaults, this.schema())}
         .schema=${this.schema()}
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}

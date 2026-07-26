@@ -1,4 +1,5 @@
 import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
+import { BATTERY_STATES } from './battery-devices'
 
 /**
  * A `hass` object good enough to develop cards against.
@@ -40,12 +41,9 @@ const STATES: Record<string, HassEntity> = {
     all_day: false,
     supported_features: 7,
   }),
-  // Here for the battery widget that comes next.
-  'sensor.phone_battery': entity('sensor.phone_battery', '72', {
-    friendly_name: 'Phone',
-    device_class: 'battery',
-    unit_of_measurement: '%',
-  }),
+  // The battery card's devices, which are a list of their own — see `battery-devices.ts`,
+  // where the config that points at them lives beside them.
+  ...Object.fromEntries(BATTERY_STATES.map(one => [one.entity_id, one])),
 }
 
 /**

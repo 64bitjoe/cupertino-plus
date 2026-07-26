@@ -7,7 +7,9 @@ taken from the box you drag them into rather than from a size setting.
 **[Live demo](https://sabbaken.github.io/cupertino-widgets/)** ·
 **[Install](#install)** ·
 **[The calendar](#the-calendar)** ·
-**[Card rules](docs/calendar-widget-rules.md)**
+**[The batteries](#the-batteries)** ·
+**[Card rules](docs/calendar-widget-rules.md)** ·
+**[Ring rules](docs/battery-widget-rules.md)**
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/sabbaken)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/sabbaken)
@@ -20,9 +22,9 @@ taken from the box you drag them into rather than from a size setting.
 The demo runs every size live, with sample data and the clock under your control, and hands
 you the config to paste when you like what you see — nothing to install to look.
 
-> **Status: early.** The calendar card draws your real calendars and lays itself out exactly
-> like the phone's. It is the only card there is so far, and the grey reminder rows are not
-> wired up yet — those need `todo` entities.
+> **Status: early.** Two cards. The calendar draws your real calendars and lays itself out
+> exactly like the phone's, though the grey reminder rows are not wired up yet — those need
+> `todo` entities. The battery card draws any battery sensors you point it at.
 >
 > It needs a current Home Assistant, **2026.7 or newer** — the cards track the latest
 > frontend APIs rather than carrying compatibility shims.
@@ -76,6 +78,56 @@ what order, is written down in
 [`docs/calendar-widget-rules.md`](docs/calendar-widget-rules.md) — down to why `5 – 6PM`
 prints only one `PM`.
 
+## The batteries
+
+A ring per device, green all the way, with the level read off the length of the arc and a bolt
+on whatever is charging. Point it at the battery sensors you actually care about and it works
+out the rest: how many rings across, whether there is room for the percentages, and how big to
+draw them. **Four devices per card at these two sizes** — two across in the square, four across
+in the wide one.
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/battery-medium.png" width="420"
+           alt="A medium battery card: four green rings with a phone at 72%, a watch at 41% charging, earbuds at 8% and a tablet at 100% charging">
+      <br />
+      <sub><b>Medium.</b> Four devices fit one row, so they keep their percentages. The bolts
+      are the two on a charger.</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/battery-small.png" width="222"
+           alt="A small square battery card: two green rings, a phone at 72% and a watch at 41% charging">
+      <br />
+      <sub><b>Small.</b> One or two devices in the square is the left half of the medium card,
+      percentages and all.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="docs/images/battery-compact.png" width="222"
+           alt="A small square battery card: four green rings without percentages, in a two by two grid">
+      <br />
+      <sub><b>Three or more in the square.</b> The percentages come off and the grid closes up
+      — a caption is worth a row of its own, and past one row there is nowhere to keep buying
+      it.</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="docs/images/battery-dark.png" width="420"
+           alt="A medium battery card on a dark theme: four rings reading 72%, 41% charging, 22% and a dash, the last one an empty ring with a dimmed doorbell icon">
+      <br />
+      <sub><b>Dark theme.</b> It follows the one you picked in Home Assistant. The last ring is
+      empty with its icon dimmed and a dash for a reading — that device has stopped reporting,
+      which is a thing the card says rather than hides.</sub>
+    </td>
+  </tr>
+</table>
+
+The ring is green at 5% as much as at 95%, and that is on purpose: the arc's length is already
+the reading, so a colour changing underneath it would be a second, coarser version of the same
+number. [`docs/battery-widget-rules.md`](docs/battery-widget-rules.md) has the whole argument,
+along with every rule above.
+
 ## Install
 
 Through [HACS](https://hacs.xyz/), which is where a dashboard card belongs — it registers the
@@ -92,10 +144,14 @@ Then add a card — the next section.
 
 ## Adding a card
 
-Pick **Cupertino Calendar** from the dashboard's card picker and set it up there — it has a
-visual editor, so there is no YAML to write. Three fields: **Calendars**, which calendars
-feed it; **Clock**, which format it prints times in; and **Scale**, how large to draw it.
-Leave all three alone and you get every calendar, your Home Assistant time format, and 100%.
+Both cards are in the dashboard's card picker — **Cupertino Calendar** and **Cupertino
+Batteries** — and both have a visual editor, so there is no YAML to write unless you want to.
+
+### The calendar
+
+Three fields: **Calendars**, which calendars feed it; **Clock**, which format it prints times
+in; and **Scale**, how large to draw it. Leave all three alone and you get every calendar, your
+Home Assistant time format, and 100%.
 
 The equivalent YAML, if you prefer it:
 
@@ -127,14 +183,62 @@ calendar panel deals its own — so a calendar keeps the colour you have got use
 calendar is subscribed to rather than polled, so the card follows Home Assistant as events
 change.
 
+### The batteries
+
+Two fields: **Devices** and **Scale**. This is the one card that draws nothing useful before it
+is configured — it says `No Devices` — because an installation's battery sensors are every
+remote, every valve and every door contact, and no order over them would be the one you meant.
+The picker lists the sensors carrying Home Assistant's `battery` device class, and you can drag
+them into the order you want the rings in.
+
+```yaml
+type: custom:cupertino-widgets-battery
+entities:
+  - sensor.phone_battery
+  - sensor.watch_battery
+  # a row can carry more than an id, for the things a sensor cannot say itself:
+  - entity: sensor.tablet_battery
+    charging_entity: binary_sensor.tablet_charging
+    name: Tablet
+    icon: mdi:tablet
+scale: 100 # optional; 80–130, percent
+```
+
+| Option            | Default          | Meaning                                                           |
+| ----------------- | ---------------- | ----------------------------------------------------------------- |
+| `entities`        | none             | Which devices, in the order the rings follow. Ids or rows.        |
+| `charging_entity` | the sensor's own | A `binary_sensor` that is `on` while the device charges.          |
+| `name`            | `friendly_name`  | Tooltip and screen-reader label only — never drawn.               |
+| `icon`            | the sensor's own | Any `mdi:` name. This is the only thing that says _which_ device. |
+| `scale`           | `100`            | Percent. Draws the whole widget larger or smaller. 80–130.        |
+
+**Four rings, and a longer list is not an error.** Both sizes here draw four devices and stay
+quiet about the rest, so a card given six shows the first four — and looks pixel-for-pixel like
+a card given four. Writing six now is groundwork for a `large` size with two rows to put them
+in; until then four is the design rather than a shortfall, and the wide card in particular does
+not stack a stub row under a full one.
+
+**Worth setting `icon`.** Home Assistant computes a battery sensor's icon from its level, so
+without one you get a battery glyph inside a battery ring, six times over. The picker cannot
+set it — nor `charging_entity`, nor `name` — because Home Assistant's entity picker reports a
+list of ids and nothing else; those three are YAML, and the visual editor keeps them when you
+reorder or add a device rather than writing over them.
+
+**Charging is detected without help** where the sensor says so itself — `is_charging` or
+`battery_state` on its attributes, which is what many integrations publish. `charging_entity`
+is for the rest, and it is the separate binary sensor the companion app and friends ship.
+
+A device whose sensor cannot be read is still drawn: an empty ring, a dimmed icon and a dash
+instead of a percentage. That is the point of putting the card up.
+
 ## How big it is
 
-**There is no size option.** Resize the card the normal way — the **Layout** tab in the
-dashboard editor — and it works out which of the two widget shapes fits the box you gave it:
-the square shows today, and the wider 2:1 shows today and what follows it. The line is at
-340px of card — roughly 9 of the 12 columns in a section of the usual width — and it moves
-with `scale`, because larger type needs more room before two columns of it stop truncating
-every title.
+**There is no size option.** Resize a card the normal way — the **Layout** tab in the dashboard
+editor — and it works out which of the two widget shapes fits the box you gave it. The calendar
+shows today in the square and today plus what follows it in the wider 2:1; the battery card
+puts two rings across the square and four across the 2:1. The line is at 340px of card —
+roughly 9 of the 12 columns in a section of the usual width — and it moves with `scale`,
+because larger type needs more room before two columns of it stop truncating every title.
 
 | footprint       | comes out at  | shape            |
 | --------------- | ------------- | ---------------- |
@@ -142,11 +246,14 @@ every title.
 | **12 × 4** rows | ~500 × 248 px | the medium 2:1   |
 
 Everything between and around them works too — that is the whole point of measuring the box
-instead of reading a preset. A card dragged taller fills the extra height with more rows
-rather than leaving it blank, and one dragged narrow folds to a single column. But those two
-are the proportions the content was laid out for. A new card arrives full width and 4 rows
-tall, and can be dragged down to 4 columns by 3 rows — a square that short holds the date and
-the next event and nothing else, so it is one to leave at 100% or below.
+instead of reading a preset. A card dragged taller fills the extra height rather than leaving it
+blank: the calendar with more rows of the week, the battery card with bigger rings, since its
+rows are its devices and there is nothing else to put there. One dragged narrow folds to a
+single column, or to two rings across. But those two footprints are the proportions the content
+was laid out for. A new card
+arrives full width and 4 rows tall, and can be dragged down to 4 columns by 3 rows — a square
+that short holds the date and the next event and nothing else, so it is one to leave at 100%
+or below.
 
 **`scale` is the other question.** The footprint settles how much room the card has; `scale`
 settles how large what goes in it is drawn — the type at 80% or 130% of the size above,
@@ -154,11 +261,12 @@ along with the spacing around it, for a wall tablet read from across the room or
 dashboard read at a desk. One factor over the whole widget, so the card at 120% is the card
 at 100% seen from closer up rather than a differently proportioned one.
 
-It is spent out of the row budget, which is the trade worth knowing about. The same
-footprint that holds 4 rows under the date and 7 in the second column at 100% holds 2 and 5
-at 130%, and 6 and 9 at 80% — so a card scaled up wants dragging taller, and a card scaled
-down fills the height it already has with more of the day. Values outside 80–130 are clamped
-rather than refused.
+It is spent out of whatever the card has to give, which is the trade worth knowing about. On the
+calendar that is rows: the same footprint that holds 4 under the date and 7 in the second column
+at 100% holds 2 and 5 at 130%, and 6 and 9 at 80%, so a card scaled up wants dragging taller and
+a card scaled down fills the height it has with more of the day. On the battery card the rows
+are the devices and cannot be given up, so the rings shrink instead — the same four devices in
+the same box, drawn smaller. Values outside 80–130 are clamped rather than refused.
 
 The Layout tab writes its footprint into `grid_options`, which is Home Assistant's own and
 belongs to every card rather than to this one.
@@ -168,8 +276,8 @@ belongs to every card rather than to this one.
 | Widget                          | Status                |
 | ------------------------------- | --------------------- |
 | Calendar                        | events, live          |
+| Battery levels                  | live                  |
 | Reminders, in the calendar card | needs `todo` entities |
-| Battery levels                  | planned               |
 | To-do lists                     | planned               |
 
 ## Development

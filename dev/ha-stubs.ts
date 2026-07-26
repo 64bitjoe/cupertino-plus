@@ -4,9 +4,21 @@
  * `ha-card`'s CSS is copied from the one that ships inside home-assistant 2026.7.4, so
  * the harness shows the same surface the real dashboard does — including the 1px border
  * that is easy to forget about, which `layout.ts` prices its row budget against. The one
- * departure is marked below. `ha-form` is the opposite: a working shape, not a copy. See
- * the note on it.
+ * departure is marked below. `ha-form` and `ha-icon` are the opposite: a working shape,
+ * not a copy. See the notes on them.
  */
+
+import {
+  mdiBattery,
+  mdiBatteryUnknown,
+  mdiCellphone,
+  mdiDoorbellVideo,
+  mdiHeadphones,
+  mdiHelpCircleOutline,
+  mdiLaptop,
+  mdiTablet,
+  mdiWatch,
+} from '@mdi/js'
 
 import type {
   EntityFilter,
@@ -110,6 +122,102 @@ const HA_FORM_CSS = `
     text-align: right;
   }
 `
+
+/**
+ * A stand-in for the Home Assistant icon registry, which is a much bigger thing than this.
+ *
+ * The real `ha-icon` resolves any of the ~7500 `mdi:` names — and a custom icon set, and an
+ * entity's computed icon — out of an IndexedDB cache it fills over the network. Here it is a
+ * lookup table, deliberately: importing all of `@mdi/js` would put a megabyte of path strings
+ * into the showcase that GitHub Pages then serves to every visitor, for the sake of icons only
+ * this file's own mock devices ever ask for.
+ *
+ * So: add an entry when `battery-devices.ts` grows one. A name with no entry draws the
+ * question mark rather than nothing, on the same grounds as the `ha-form` stub's unsupported
+ * row — a silently blank icon reads as a broken card, and the cards are what this page is for.
+ */
+const ICONS: Record<string, string> = {
+  'mdi:battery': mdiBattery,
+  'mdi:battery-unknown': mdiBatteryUnknown,
+  'mdi:cellphone': mdiCellphone,
+  'mdi:doorbell-video': mdiDoorbellVideo,
+  'mdi:headphones': mdiHeadphones,
+  'mdi:laptop': mdiLaptop,
+  'mdi:tablet': mdiTablet,
+  'mdi:watch': mdiWatch,
+}
+
+/**
+ * The `:host` rule is the real one's, and it is the part worth copying exactly: a card sizes
+ * an icon by setting `--mdc-icon-size` and by nothing else, so a stub that took its size from
+ * the glyph would draw every icon at the same size however the card scaled.
+ */
+const HA_ICON_CSS = `
+  :host {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    vertical-align: middle;
+    fill: currentcolor;
+    width: var(--mdc-icon-size, 24px);
+    height: var(--mdc-icon-size, 24px);
+  }
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+`
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+class HaIconStub extends HTMLElement {
+  private readonly _root: ShadowRoot
+  private _icon = ''
+
+  public constructor() {
+    super()
+    this._root = this.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = HA_ICON_CSS
+    this._root.append(style)
+  }
+
+  /** Both a property and an attribute, because the real one is — cards use either. */
+  public static get observedAttributes(): string[] {
+    return ['icon']
+  }
+
+  public attributeChangedCallback(_name: string, _old: string | null, value: string | null): void {
+    this.icon = value ?? ''
+  }
+
+  public set icon(value: string) {
+    if (this._icon === value) return
+    this._icon = value
+    this._render()
+  }
+
+  public get icon(): string {
+    return this._icon
+  }
+
+  private _render(): void {
+    const style = this._root.firstElementChild as HTMLStyleElement
+    const path = ICONS[this._icon] ?? mdiHelpCircleOutline
+
+    const svg = document.createElementNS(SVG_NS, 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('aria-hidden', 'true')
+    const shape = document.createElementNS(SVG_NS, 'path')
+    shape.setAttribute('d', path)
+    svg.append(shape)
+
+    this._root.replaceChildren(style, svg)
+  }
+}
 
 class HaCardStub extends HTMLElement {
   constructor() {
@@ -375,5 +483,8 @@ export function defineHaStubs(): void {
   }
   if (!customElements.get('ha-form')) {
     customElements.define('ha-form', HaFormStub)
+  }
+  if (!customElements.get('ha-icon')) {
+    customElements.define('ha-icon', HaIconStub)
   }
 }

@@ -7,6 +7,7 @@ import { scaleFactor } from './scale'
 import {
   DEFAULT_HEIGHT,
   DEFAULT_LAYOUT,
+  DEFAULT_WIDTH,
   cardSize,
   gridOptions,
   layoutFromBox,
@@ -95,9 +96,19 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   /** Reflected from `hass.themes.darkMode`; drives the dark token set. */
   @property({ type: Boolean, reflect: true }) protected dark = false
 
-  /** Measured box of the card, or 0 before the first measurement. */
+  /**
+   * Measured box of the card, or 0 before the first measurement.
+   *
+   * Both are `@state()`, and the width has to be: it used to be a plain field on the
+   * grounds that the only thing reading it was `layoutFromBox`, whose answer is reflected
+   * through `cwLayout` and reactive on its own. That holds only for a card whose rendering
+   * depends on the width in no finer a way than which of the two layouts it is — the
+   * calendar. A card that sizes cells from the width, as the battery grid does, would
+   * otherwise keep last frame's ring diameter through every resize that did not happen to
+   * cross the layout threshold.
+   */
   @state() private _measuredHeight = 0
-  private _measuredWidth = 0
+  @state() private _measuredWidth = 0
 
   private _resizeObserver?: ResizeObserver
 
@@ -111,6 +122,18 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    */
   protected get boxHeight(): number {
     return this._measuredHeight || DEFAULT_HEIGHT
+  }
+
+  /**
+   * How wide the card actually is, in px.
+   *
+   * `cwLayout` answers the question most cards have about their width — one column of
+   * content or two — and this answers the one it cannot: how much room a single column
+   * actually got. The battery card's ring is drawn to fit its cell, and a cell is the
+   * measured width shared out, so it reads this directly.
+   */
+  protected get boxWidth(): number {
+    return this._measuredWidth || DEFAULT_WIDTH
   }
 
   /**

@@ -22,17 +22,27 @@ plane painted with Home Assistant's own background, and the site gives each card
 and a height and not one other property — so a card there is a card on a dashboard.
 
 The settings column down the right-hand side leads with the config to paste and a Copy
-button, then every knob that changes it, grouped by whether it belongs to the card.
-**Scale** is the one in the Card group, and the only one of these that ends up in the YAML
-above it — every card in the library has it, so it is here whichever widget is on screen.
-The rest stand in for Home Assistant. **Calendars** picks either `Live`, which makes the
-card resolve `entities` and subscribe to the mock's calendars exactly as it would in Home
-Assistant, or one of the fixtures built to hit every layout branch (an empty today, a
-skipped empty tomorrow, locations that fit and locations that do not, reminders, all-day, a
-tail that turns into `2 more events`). Only the first exercises the wire mapping; only the
-rest can reach every layout rule. **Clock** flips between the system format and an explicit
-12 or 24 hours, and **Section width** emulates a wider or narrower dashboard section, which
-re-boxes every footprint on the page.
+button, then every knob that changes it, grouped by whether it belongs to the card. The Card
+group is what ends up in the YAML above it; the Demo group stands in for Home Assistant.
+
+**Scale** is in the Card group whichever widget is on screen — every card in the library has
+it. So is the battery card's **Devices**, and that is the honest grouping rather than an
+oversight: that card has no fixtures at all. It reads `hass.states` exactly as it would on a
+dashboard, so the only thing the harness supplies is which of the mock installation's sensors
+to point it at, and the YAML above the control is genuinely the config that produced what is on
+screen. `dev/battery-devices.ts` holds both halves — the mock entities and the named sets — and
+its sets are chosen for the layout branch each one lands on: the captioned row, the grid that
+gives the percentages up, two rows of rings, a device that has stopped reporting.
+
+The calendar's **Calendars** is in the Demo group for the opposite reason: it picks either
+`Live`, which makes the card resolve `entities` and subscribe to the mock's calendars as it
+would in Home Assistant, or one of the fixtures built to hit every layout branch (an empty
+today, a skipped empty tomorrow, locations that fit and locations that do not, reminders,
+all-day, a tail that turns into `2 more events`). Only the first exercises the wire mapping;
+only the rest can reach every layout rule, and none of them is a config anybody could paste.
+
+**Clock** flips between the system format and an explicit 12 or 24 hours, and **Section width**
+emulates a wider or narrower dashboard section, which re-boxes every footprint on the page.
 
 **Advanced** is the part that is there for working on a card rather than for choosing one:
 the in-between footprints, and the card's real editor — reached the way Home Assistant
@@ -191,12 +201,13 @@ dev/
   site/                 the showcase — one entry per widget in catalog.ts
   ha-stubs.ts           stand-ins for the Home Assistant elements cards use
   mock-hass.ts          a `hass` object good enough to develop against
+  battery-devices.ts    the battery card's mock devices, and the sets that point at them
   shots.ts              the README's screenshots, as a page a camera can point at
   ha-config/            the throwaway Home Assistant instance
 docs/images/            the README's screenshots — generated, never hand-edited
 ```
 
-The calendar card is split so that the rules can be read and tested without a browser:
+Both cards are split so that the rules can be read and tested without a browser:
 
 ```
 cards/calendar/
@@ -209,7 +220,18 @@ cards/calendar/
   model.ts                 the item shape every data source has to produce
   source.ts                the Home Assistant end: subscriptions, colours, wire mapping
   demo-data.ts             fixtures for the showcase, never for a dashboard
+
+cards/battery/
+  battery-card.ts          the element: measure the box, draw what the two below decide
+  battery-card-editor.ts   one row, plus the fold that keeps a hand-written override
+  layout.ts                how many rings, in how many rows, captioned or not, how big
+  ring.ts                  the arc: its coordinate space, and why it is always green
+  model.ts                 a Home Assistant state as a device — level, icon, charging
 ```
+
+The battery card has no `demo-data.ts` and needs none: everything it draws comes out of
+`hass.states`, so a fixture is a mock entity plus the config that points at it, and both live
+in `dev/` rather than in the shipped bundle.
 
 Cards read `--cw-*` tokens, never Home Assistant variables directly. `theme/tokens.ts`
 is the single place that bridge lives, so a user's theme restyles every card for free.
@@ -219,6 +241,9 @@ is the single place that bridge lives, so a user's theme restyles every card for
 - [`calendar-widget-rules.md`](calendar-widget-rules.md) — what the calendar card decides
   to show and in what order, written down as rules with worked examples. The tests are
   transcribed from it.
+- [`battery-widget-rules.md`](battery-widget-rules.md) — the same for the battery card: how
+  many rings, when they get a percentage, and why the ring is never red. Its §8 table is
+  `layout.test.ts`'s first two cases.
 - [`ha-api-notes.md`](ha-api-notes.md) — the Home Assistant APIs this library depends on,
   each verified against the frontend bundle shipped in the HA image rather than against
   documentation, including several points where the widely-repeated advice is now wrong.

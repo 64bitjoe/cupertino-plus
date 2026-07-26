@@ -562,8 +562,13 @@ describe('geometry', () => {
     expect(geometryFor('medium', FLOOR_HEIGHT, false, 0.8).budgets).toEqual([3, 6])
     // The other end of the trade, and the one worth knowing about: at 130% the date block
     // takes the whole of the left column, so the flow starts in the second one — the same
-    // shape an empty today produces, arrived at from the other direction.
+    // shape an empty today produces, arrived at from the other direction. The small size
+    // has no second column to start in, which is the one combination the widget has nothing
+    // to say in: the floor and the largest type together leave room for the date and
+    // nothing else. Arithmetic arriving at the advice the editor's helper line gives, which
+    // is to drag a scaled-up card taller.
     expect(geometryFor('medium', FLOOR_HEIGHT, false, 1.3).budgets).toEqual([0, 3])
+    expect(geometryFor('small', FLOOR_HEIGHT, false, 1.3).budgets).toEqual([0])
   })
 
   /**

@@ -38,17 +38,21 @@ export const SMALL: Footprint = { columns: 6, rows: 4 }
 export const MEDIUM: Footprint = { columns: 12, rows: 4 }
 
 /**
- * Everything between the two, and one below both.
+ * Everything between the two, and the edges of what may be dragged to at all.
  *
  * For the Advanced panel, where the question is whether the in-between footprints hold
- * up rather than what the widget is meant to look like. 4 columns is the floor
- * `gridOptions()` allows.
+ * up rather than what the widget is meant to look like. Both floors `gridOptions()` allows
+ * are in here: 4 columns, and the 3-row height, which is the one worth looking at with
+ * **Scale** turned up — the date block takes the left column first, so the short
+ * footprints are where a scaled-up card runs out of room.
  */
 export const ODD_FOOTPRINTS: readonly Footprint[] = [
   { columns: 4, rows: 4 },
   { columns: 6, rows: 4 },
   { columns: 9, rows: 4 },
   { columns: 12, rows: 4 },
+  { columns: 6, rows: 3 },
+  { columns: 12, rows: 3 },
 ]
 
 export interface Box {

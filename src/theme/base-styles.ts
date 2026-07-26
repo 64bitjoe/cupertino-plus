@@ -25,6 +25,29 @@ export const baseStyles = css`
        with a taller --cw-min-height still grows out of the box this holds -- which is why
        the floor itself is clamped in base-card.ts rather than left to the cascade. */
     max-height: 100%;
+    /* And the floor must not be able to lift THIS element, which reads like a nothing
+       declaration and is the difference between a card that fits its cell and one that
+       budgets rows for a cell twice the size.
+
+       A block parent leaves a child's minimum height at zero, so the two lines above
+       settle the matter -- and every parent Home Assistant puts a card in is a block:
+       hui-card in the sections layout, a masonry column in the legacy one. A parent
+       laying its children out with grid or flex is a different contract: its items get
+       min-height: auto, an automatic minimum size taken from their own content, and our
+       content is an ha-card carrying the --cw-min-height floor. So a card in a
+       button-card custom field -- or in anything else that reaches for display: grid --
+       was pushed to the floor's 248px inside a 184px area, the ResizeObserver measured
+       that 248, and _applyMinHeight confirmed it as the floor. A loop that fed itself:
+       the card budgeted nine rows for a box that held six and the parent's
+       overflow: hidden cut the difference off mid-event, while every measurement it took
+       agreed with it.
+
+       Zero, rather than making the floor conditional on which layout we are in: the
+       floor already clamps itself to the measurement, and the only thing wrong was the
+       measurement, so this belongs where the corruption was and not in a second guess
+       about our parent. Verified in a browser against the grid above -- see
+       docs/development.md. */
+    min-height: 0;
     font: var(--cw-text-body);
     color: var(--cw-label);
     -webkit-font-smoothing: antialiased;

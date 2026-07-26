@@ -189,6 +189,10 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * "is anything imposing a height on me" is the question the measurement already answers:
    * a dragged cell reports its own height, while a masonry cell reports whatever this floor
    * made the card — so there the clamp is a no-op and the floor stands at the full 248.
+   *
+   * Which leaves the clamp only as honest as the measurement, and the measurement is one
+   * `min-height: 0` away from being this floor read back to itself — `:host` in
+   * `base-styles.ts` has the loop and why it only closes under a grid or flex parent.
    */
   private _applyMinHeight(): void {
     this.style.setProperty('--cw-min-height', `${Math.min(DEFAULT_HEIGHT, this.boxHeight)}px`)

@@ -236,6 +236,44 @@ in `dev/` rather than in the shipped bundle.
 Cards read `--cw-*` tokens, never Home Assistant variables directly. `theme/tokens.ts`
 is the single place that bridge lives, so a user's theme restyles every card for free.
 
+## Cards inside somebody else's container
+
+A card that measures its own box has to survive being put somewhere Home Assistant never
+puts it. People nest these widgets in `button-card` custom fields, in `layout-card`, in
+stacks — and the container a card ends up in there is routinely laid out with grid or
+flex rather than as a block.
+
+That distinction has teeth. A grid or flex item gets `min-height: auto`, an automatic
+minimum size taken from its own content, where a block child's minimum is zero. Our
+content is an `ha-card` carrying the `--cw-min-height` floor, so under such a parent the
+floor lifted the element itself, the ResizeObserver measured the lifted height, and the
+floor was set from that measurement — a card sitting in a 184px area, measuring 248px,
+budgeting nine rows where six fit, and clipping the difference. `:host { min-height: 0 }`
+in `base-styles.ts` is the whole fix and carries the argument.
+
+The reproduction is worth keeping in mind for the next one of these, because it takes a
+minute and does not need Home Assistant at all: on the showcase, build the foreign
+container by hand around a card of your own and read what it measured.
+
+```js
+// In the console on the showcase, with a card already on the page as a source of `hass`.
+const host = document.createElement('div')
+host.style.cssText = 'display:grid;height:184px;width:600px;overflow:hidden'
+document.body.append(host)
+
+const card = document.createElement('cupertino-widgets-calendar')
+card.setConfig({ type: 'cupertino-widgets-calendar', scale: 80, demo_scenario: 'default' })
+host.append(card)
+card.hass = existingCard.hass
+
+// After a frame: the measurement, and what the floor was set from it.
+;[card._measuredWidth, card._measuredHeight, card.getAttribute('style')]
+```
+
+One trap: a background tab does not paint, and a tab that does not paint delivers no
+`ResizeObserver` callbacks, so every measurement reads 0 and the card looks broken in a
+different way than it is. Keep the tab in front, or take a screenshot to bring it there.
+
 ## The rest of the documentation
 
 - [`calendar-widget-rules.md`](calendar-widget-rules.md) — what the calendar card decides

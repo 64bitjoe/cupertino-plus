@@ -164,10 +164,12 @@ export const sectionHeading = (date: Date, today: Date, ctx: FormatContext): str
  * The tail indicator: `1 more event`, `2 more events`.
  *
  * English-only, like `No Events Today` — Home Assistant has no string for either and the
- * widget being copied says exactly this. Kept in one place because two open questions
- * end here: whether a tail of nothing but reminders should read `2 more items`, and
- * whether the count should be the whole loaded fortnight or only the days already on
- * screen. Today it is every item that did not fit, and it is always `events`.
+ * widget being copied says exactly this. Kept in one place because one open question ends
+ * here: whether a tail of nothing but reminders should read `2 more items`. It is always
+ * `events`, uglier though that is when everything hidden is a to-do.
+ *
+ * What the number means is settled and lives in `addMoreRow`: the rest of the one day the
+ * row is drawn inside, never the rest of the loaded window.
  */
 export const moreLabel = (count: number): string =>
   `${count} more ${count === 1 ? 'event' : 'events'}`

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FlowNode } from './flow'
-import { COST, geometryFor, packFlow, type MoreNode } from './layout'
+import { COST, geometryFor, packFlow, type LayoutColumn, type MoreNode } from './layout'
 import type { CalendarItem } from './model'
 
 const item = (title: string, location?: string): CalendarItem => ({
@@ -43,6 +43,34 @@ const titles = (flow: FlowNode[], budgets: number[], mode: 'small' | 'medium'): 
     }),
   )
 
+/**
+ * What the flow was cut off in the middle of saying: the rest of the section the last
+ * drawn row belongs to, and nothing at all from the days past it.
+ *
+ * The drawn rows are always a prefix of the flow, so where they end is where the tail
+ * begins — a row the indicator evicted included, that being undrawn like any other.
+ */
+const unfinishedSection = (flow: FlowNode[], columns: LayoutColumn[]): FlowNode[] => {
+  const drawn = columns.flatMap(column => column.rows).filter(r => r.node.type !== 'more').length
+  const tail = flow.slice(drawn)
+  const nextDay = tail.findIndex(node => node.type === 'header')
+  return nextDay === -1 ? tail : tail.slice(0, nextDay)
+}
+
+/** The one tail indicator among the packed rows, if the flow ended with one. */
+const more = (columns: LayoutColumn[]): MoreNode | undefined =>
+  columns
+    .flatMap(column => column.rows)
+    .map(r => r.node)
+    .find((node): node is MoreNode => node.type === 'more')
+
+/** Whether a packed column has anything left to buy the indicator's row with. */
+const canAfford = (column: LayoutColumn): boolean => {
+  if (column.budget - column.used >= COST.more) return true
+  if (column.rows.some(r => r.expanded)) return true
+  return column.rows.length >= 2 && column.rows.slice(-2).every(r => r.node.type === 'item')
+}
+
 const TOMORROW = heading('TOMORROW')
 const REST_OF_TOMORROW = [row('T1'), row('T2'), row('T3')]
 
@@ -54,15 +82,16 @@ const REST_OF_TOMORROW = [row('T1'), row('T2'), row('T3')]
 describe('the reference screenshots', () => {
   it('three plain events today: the third flows into the right column', () => {
     const flow = [row('A'), row('B'), row('C'), TOMORROW, ...REST_OF_TOMORROW]
+    // The column came out exactly full with a third item of tomorrow still to draw, so
+    // `T2` buys the row that says so — the one place this card departs from the
+    // screenshots, where that item vanished with nothing to mark it.
     expect(costs(flow, [4, 7], 'medium')).toEqual([
       [2, 2],
-      [2, 1, 2, 2],
+      [2, 1, 2, 1],
     ])
-    // The third item of tomorrow is dropped in silence: the column came out exactly
-    // full, so there is not even the one row `2 more events` would have cost.
     expect(titles(flow, [4, 7], 'medium')).toEqual([
       ['A', 'B'],
-      ['C', 'TOMORROW', 'T1', 'T2'],
+      ['C', 'TOMORROW', 'T1', '2 more'],
     ])
   })
 
@@ -115,8 +144,10 @@ describe('the reference screenshots', () => {
 
   it('a location wins even when it pushes the next event across', () => {
     const flow = [row('A', 'Długa 36, Warsawa'), row('B'), TOMORROW, ...REST_OF_TOMORROW]
-    expect(costs(flow, [4, 7], 'medium')).toEqual([[3], [2, 1, 2, 2]])
-    expect(titles(flow, [4, 7], 'medium')[1]).toEqual(['B', 'TOMORROW', 'T1', 'T2'])
+    // `A`'s location is in the other column, so there is nothing cheap for the indicator
+    // to reclaim here and `T2` pays for it instead.
+    expect(costs(flow, [4, 7], 'medium')).toEqual([[3], [2, 1, 2, 1]])
+    expect(titles(flow, [4, 7], 'medium')[1]).toEqual(['B', 'TOMORROW', 'T1', '2 more'])
   })
 })
 
@@ -203,24 +234,55 @@ describe('the tail indicator', () => {
     item: { ...item(title), kind: 'reminder' },
   })
 
-  const more = (columns: ReturnType<typeof packFlow>): MoreNode | undefined =>
-    columns
-      .flatMap(column => column.rows)
-      .map(r => r.node)
-      .find((node): node is MoreNode => node.type === 'more')
-
   it('says nothing when everything fitted', () => {
     expect(more(packFlow([row('A'), row('B')], [4, 7], 'medium'))).toBeUndefined()
   })
 
-  it('says nothing when the last column came out exactly full', () => {
+  it('buys a row off the last event when the column came out exactly full', () => {
     const flow = [row('A'), row('B'), row('C'), TOMORROW, ...REST_OF_TOMORROW]
-    expect(more(packFlow(flow, [4, 7], 'medium'))).toBeUndefined()
+    expect(more(packFlow(flow, [4, 7], 'medium'))?.count).toBe(2)
+    // The event that stepped aside is the one that lends the row its colour, being the
+    // first thing the reader can no longer see.
+    expect(titles(flow, [4, 7], 'medium')[1]).toEqual(['C', 'TOMORROW', 'T1', '2 more'])
   })
 
-  it('counts the items that did not fit and not the headings over them', () => {
+  it('gives back a location rather than an event when it can', () => {
+    // Same column, exactly full, but this time the row above carries a location: dropping
+    // that line buys the indicator its row and every event stays on screen.
+    const flow = [row('A'), row('B'), row('C', 'Focha 4, Warsawa'), row('D'), row('E'), row('F')]
+    expect(titles(flow, [4, 7], 'medium')).toEqual([
+      ['A', 'B'],
+      ['C', 'D', 'E', '1 more'],
+    ])
+    // `C` came out of the packing expanded and gives the line back: three rows to two.
+    expect(costs(flow, [4, 7], 'medium')).toEqual([
+      [2, 2],
+      [2, 2, 2, 1],
+    ])
+  })
+
+  it('counts only the day it is drawn inside, not the fortnight behind it', () => {
+    // Four of today's events did not fit and neither did any of tomorrow's three. The row
+    // sits inside today, so it speaks for today: `4 more events`, not seven.
+    const flow = [
+      row('A'),
+      row('B'),
+      row('C'),
+      row('D'),
+      row('E'),
+      row('F'),
+      row('G'),
+      row('H'),
+      TOMORROW,
+      ...REST_OF_TOMORROW,
+    ]
+    expect(titles(flow, [4, 5], 'medium')[1]).toEqual(['C', 'D', '4 more'])
+  })
+
+  it('says nothing at all about a section that never made it on screen', () => {
     // The Sunday heading needs three rows to arrive with its first event and has one, so
-    // the whole section is cut — and it is the one event in it that gets counted.
+    // the whole section is cut. There is no Sunday on the card for a count to belong to,
+    // and putting one under `T2` would read as two more events tomorrow.
     const flow = [
       row('A'),
       row('B'),
@@ -231,7 +293,20 @@ describe('the tail indicator', () => {
       heading('SUNDAY, 26 JUL'),
       row('S1'),
     ]
-    expect(titles(flow, [4, 8], 'medium')[1]).toEqual(['C', 'TOMORROW', 'T1', 'T2', '1 more'])
+    expect(titles(flow, [4, 8], 'medium')[1]).toEqual(['C', 'TOMORROW', 'T1', 'T2'])
+    expect(more(packFlow(flow, [4, 8], 'medium'))).toBeUndefined()
+  })
+
+  it('will not spend a section’s only visible event on the count', () => {
+    // Tomorrow arrives at the foot of the column with room for one event and has three.
+    // Evicting `T1` would leave `TOMORROW` heading nothing at all, so the widget keeps the
+    // event it can show and stays quiet about the two it cannot.
+    const flow = [row('A'), row('B'), TOMORROW, ...REST_OF_TOMORROW]
+    expect(titles(flow, [4, 3], 'medium')).toEqual([
+      ['A', 'B'],
+      ['TOMORROW', 'T1'],
+    ])
+    expect(more(packFlow(flow, [4, 3], 'medium'))).toBeUndefined()
   })
 
   it('goes at the end of the flow, not in the column that had room to spare', () => {
@@ -264,10 +339,14 @@ describe('the tail indicator', () => {
 
   /**
    * The appearance rule itself, rather than one case of it: over every budget pair the
-   * card can actually produce, a spare row at the foot plus something undrawn means the
-   * indicator — and nothing undrawn means no indicator, whatever room is going spare.
+   * card can actually produce, an unfinished section means the indicator — and a section
+   * that finished means no indicator, whatever is undrawn further down the week.
+   *
+   * The one excuse for silence is having nothing to pay with, and after packing that is
+   * three things and no others: a spare row, a location line to give back, or an event
+   * with another event of its own above it.
    */
-  it('appears exactly when there is something to say and a row to say it in', () => {
+  it('appears exactly when a section on screen was left unfinished', () => {
     const flows: FlowNode[][] = [
       Array.from({ length: 9 }, (_, index) => row(`E${index}`)),
       [row('A', 'here'), row('B'), row('C', 'there'), TOMORROW, ...REST_OF_TOMORROW],
@@ -277,25 +356,24 @@ describe('the tail indicator', () => {
 
     const broken: string[] = []
     for (const flow of flows) {
-      const items = flow.filter(node => node.type === 'item').length
       for (let height = 100; height <= 800; height += 2) {
         for (const mode of ['small', 'medium'] as const) {
           for (const todayEmpty of [false, true]) {
             const { budgets } = geometryFor(mode, height, todayEmpty)
             const columns = packFlow(flow, budgets, mode)
             const rows = columns.flatMap(column => column.rows)
-            const drawn = rows.filter(r => r.node.type === 'item').length
             const indicator = rows.some(r => r.node.type === 'more')
-            // After packing, so this is the room the indicator really had going spare.
+            const missed = unfinishedSection(flow, columns)
+            // After packing, so this is what the indicator really had to work with.
             const last = columns.filter(column => column.rows.length).pop()
-            const spare = last ? last.budget - last.used : 0
-            const where = `${mode} ${JSON.stringify(budgets)}, ${items} items`
+            const affordable = last ? canAfford(last) : false
+            const where = `${mode} ${JSON.stringify(budgets)}, ${flow.length} nodes`
 
-            if (drawn === items && indicator) {
-              broken.push(`nothing hidden and it said so anyway: ${where}`)
+            if (!missed.length && indicator) {
+              broken.push(`nothing left in the section and it said so anyway: ${where}`)
             }
-            if (drawn < items && !indicator && spare >= COST.more) {
-              broken.push(`${items - drawn} hidden, ${spare} rows spare, said nothing: ${where}`)
+            if (missed.length && !indicator && affordable) {
+              broken.push(`${missed.length} left in the section, said nothing: ${where}`)
             }
           }
         }
@@ -330,6 +408,30 @@ describe('small — count first, locations out of the slack', () => {
     // Five rows, two events, both with locations: only the first one can expand.
     const columns = packFlow([row('A', 'here'), row('B', 'there')], [5], 'small')
     expect(columns[0]!.rows.map(r => r.expanded)).toEqual([true, false])
+  })
+
+  it('gives up the second of three events to admit that a third exists', () => {
+    // Four rows and three timed events: two of them fit exactly, and the row the count
+    // needs can only come out of one of the two. This is "count wins" at its most
+    // expensive — one event you can read for two you know are there — and it is the whole
+    // of the small size's argument, that four rows are too few to be quietly wrong in.
+    const columns = packFlow([row('A'), row('B'), row('C')], [4], 'small')
+    expect(columns[0]!.rows.map(r => r.cost)).toEqual([2, 1])
+    expect(more(columns)?.count).toBe(2)
+
+    // The row an eviction frees and the count does not need is slack like any other, so
+    // a location on the event still standing takes it rather than the white space.
+    const withLocation = packFlow([row('A', 'here'), row('B'), row('C')], [4], 'small')
+    expect(withLocation[0]!.rows.map(r => r.cost)).toEqual([3, 1])
+    expect(withLocation[0]!.rows[0]!.expanded).toBe(true)
+  })
+
+  it('keeps its one event rather than replacing it with a count', () => {
+    // Two rows, three events: there is nothing above the event to evict, and a column
+    // holding `3 more events` and no calendar at all would be worse than a quiet one.
+    const columns = packFlow([row('A'), row('B'), row('C')], [2], 'small')
+    expect(titles([row('A'), row('B'), row('C')], [2], 'small')).toEqual([['A']])
+    expect(more(columns)).toBeUndefined()
   })
 })
 
@@ -393,13 +495,12 @@ describe('invariants, over twenty thousand random flows', () => {
         }
       }
 
-      // The count is exactly what is missing: every item of the flow is either drawn
-      // or counted, and nothing is both.
-      const drawn = rows.filter(r => r.node.type === 'item').length
-      const items = flow.filter(node => node.type === 'item').length
+      // The count is exactly the rest of its own section: the items after the cut and
+      // before the next heading, which is where the flow stops being about this day.
+      const missed = unfinishedSection(flow, columns).length
       const counted = tail[0]?.node.type === 'more' ? tail[0].node.count : 0
-      if (counted > 0 && drawn + counted !== items) {
-        broken.push(`counted ${counted} on top of ${drawn} of ${items}: ${where}`)
+      if (counted > 0 && counted !== missed) {
+        broken.push(`counted ${counted} of the ${missed} left in the section: ${where}`)
       }
       if (counted === 0 && tail.length === 1) broken.push(`says "0 more": ${where}`)
 

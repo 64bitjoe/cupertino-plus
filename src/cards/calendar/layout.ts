@@ -12,13 +12,17 @@
  *
  * A node goes in the current column if it fits whole, otherwise the next column takes
  * it. A heading never ends up alone at the bottom of a column — if its first event will
- * not follow it there, the entire section moves on.
+ * not follow it there, the entire section moves on. Nothing is ever skipped over to make
+ * something later fit: the flow is chronological, so today is drawn before tomorrow is
+ * drawn before Sunday, and what falls off the bottom is always the far end of the week.
  *
- * What is left over when the columns run out is summarised as `2 more events`, but only
- * if a row is spare to say it in: the indicator costs a row like everything else, and it
- * does not get to evict the event above it. A column that came out exactly full loses
- * its tail in silence — which is not a bug in the widget being copied, it is the reason
- * an event can simply vanish off the bottom of a full column.
+ * What is left over is summarised as `2 more events`, and that row speaks for ONE DAY —
+ * the section it lands in, never the whole loaded fortnight behind it. It costs a row
+ * like everything else, and on a column that came out exactly full it buys one: a
+ * location line gives way first, and failing that the last event drawn steps aside and
+ * joins the count. The one thing it will not buy is its own section's last visible row —
+ * a section with nothing on screen was cut, and a cut section goes in silence, heading
+ * and all.
  *
  * The two sizes disagree about locations, and the disagreement is deliberate:
  *
@@ -30,7 +34,7 @@
  */
 
 import type { FlowNode } from './flow'
-import { hasLocation } from './model'
+import { hasLocation, type CalendarItem } from './model'
 
 export const COST = { header: 1, compact: 2, expanded: 3, more: 1, allday: 1 } as const
 
@@ -145,7 +149,8 @@ export function packFlow(
 
   // The indicator before the slack, and in that order for a reason: in the small size a
   // spare row spent admitting that an event is missing beats one spent on a location.
-  // "Count wins" is about how much of the day you know about, not how much is drawn.
+  // "Count wins" is about how much of the day you know about, not how much is drawn — and
+  // it is why the indicator may take a row back off the packing above, never the reverse.
   addMoreRow(columns, flow.slice(cursor), Math.min(index, columns.length - 1))
   if (mode === 'small') expandFromSlack(columns[0])
 
@@ -153,30 +158,54 @@ export function packFlow(
 }
 
 /**
- * Summarise what did not fit, if there is a row left to summarise it in.
+ * Summarise what did not fit, if there is anything to summarise and a row to buy for it.
  *
  * The row goes at the end of the flow, which means the last column the flow reached
  * rather than whichever column happens to have space: a `2 more events` sitting under
  * the left column while the right one continues past it would be nonsense.
  *
- * Headings are not counted. A heading is not a thing you can miss — a section that got
- * cut takes its heading with it — and `2 more events` that meant "one event and one
+ * **It counts one day, not the window.** `N` is the rest of the section the row lands in,
+ * so the tail is read only as far as the next heading. A card that said `19 more events`
+ * was answering a question nobody asked — how busy the loaded fortnight is — while the
+ * line sits inside `TOMORROW`, where it reads as a statement about tomorrow. Two events
+ * of five drawn under that heading is `3 more events`, whatever the rest of the month
+ * holds. The days past the cut are not mentioned at all, and that is the honest answer:
+ * there is no section on screen for them to be counted in.
+ *
+ * Headings are not counted either, for the same reason they end the count: a section that
+ * got cut takes its heading with it, and `2 more events` meaning "one event and one
  * Thursday" would be a lie.
  */
 function addMoreRow(columns: LayoutColumn[], tail: readonly FlowNode[], index: number): void {
   const column = columns[index]
-  if (!column || column.budget - column.used < COST.more) return
+  if (!column) return
 
   let count = 0
   let color: string | undefined
   for (const node of tail) {
-    if (node.type !== 'item') continue
+    // The next day starts here, and it is not this row's day to speak for.
+    if (node.type === 'header') break
     count += 1
     // The first thing you cannot see lends the row its colour.
     color ??= node.item.color
   }
 
   if (color === undefined) return
+
+  if (column.budget - column.used < COST.more) {
+    // Nothing was spare, so the row is bought — cheapest first, and a location line is
+    // always cheaper than an event. Either way it is exactly the one row that is short,
+    // never two: `used` cannot exceed `budget`, so the shortfall is `COST.more` at most.
+    const hidden = reclaimLocation(column) ? undefined : evictLast(column)
+    if (hidden) {
+      count += 1
+      // It has overtaken the tail as the first thing you cannot see.
+      color = hidden.color
+    } else if (column.budget - column.used < COST.more) {
+      return
+    }
+  }
+
   column.used += COST.more
   column.rows.push({
     node: { type: 'more', key: 'more', count, color },
@@ -186,11 +215,55 @@ function addMoreRow(columns: LayoutColumn[], tail: readonly FlowNode[], index: n
 }
 
 /**
+ * Take back the last location line drawn in `column`, freeing its row.
+ *
+ * The last rather than the first: locations are handed out top-down, so the one given
+ * last is the one given most cheaply, and taking it back leaves the top of the column
+ * where the reader last saw it. This only ever finds anything in the medium size — the
+ * small size packs compactly and expands out of the slack afterwards, which is the same
+ * priority arrived at from the other direction (§5, §6).
+ */
+function reclaimLocation(column: LayoutColumn): boolean {
+  for (let index = column.rows.length - 1; index >= 0; index -= 1) {
+    const row = column.rows[index]
+    if (!row?.expanded) continue
+    row.expanded = false
+    row.cost = COST.compact
+    column.used -= COST.expanded - COST.compact
+    return true
+  }
+  return false
+}
+
+/**
+ * Give up the last event drawn in `column`, and answer with what is now hidden.
+ *
+ * The trade the indicator is allowed to make: one event you can see for the knowledge
+ * that several exist. Refused — `undefined`, and the widget says nothing — when the row
+ * above is not an event of its own, which is the two cases where the trade eats the point
+ * of the row. A heading above would leave `TOMORROW` announcing nothing but its own
+ * absence, and nothing above would leave a column holding a count and no calendar.
+ */
+function evictLast(column: LayoutColumn): CalendarItem | undefined {
+  const last = column.rows[column.rows.length - 1]
+  const above = column.rows[column.rows.length - 2]
+  if (last?.node.type !== 'item' || above?.node.type !== 'item') return undefined
+
+  column.rows.pop()
+  column.used -= last.cost
+  return last.node.item
+}
+
+/**
  * Spend a small column's leftover rows on locations, top-down.
  *
  * Runs after packing, which is the whole point: one event in a four-row column shows
  * its location, two events do not — neither of them, even though the first one would
  * have fitted, because a lopsided pair reads worse than a tidy one.
+ *
+ * It runs after the indicator too, so a row the indicator freed and did not need is slack
+ * like any other: an eviction gives back two rows and spends one, and the odd one left
+ * over goes on the location of an event still on screen rather than on white space.
  */
 function expandFromSlack(column: LayoutColumn | undefined): void {
   if (!column) return

@@ -29,14 +29,14 @@ when you like what you see. Nothing to install.
 Today's date, then today's events, then as much of the days after today as the card has
 room for — one continuous flow, poured through however many columns the footprint gives
 it. Each event is tinted with the colour of the calendar it came from. Empty days are not
-listed as empty, they simply do not appear, and whatever ran out of room at the bottom
-becomes `2 more events`.
+listed as empty, they simply do not appear, and whatever is left of the day the card ran
+out of room in becomes `2 more events`.
 
 <table>
   <tr>
     <td align="center" valign="top" width="50%">
       <img src="docs/images/calendar-medium.png" width="540"
-           alt="A medium calendar card: Friday 24, Design review and Lunch with Anna in the left column, Dentist and tomorrow's Market run in the right, then 3 more events">
+           alt="A medium calendar card: Friday 24, Design review and Lunch with Anna in the left column, Dentist and tomorrow's Market run in the right, then 2 more events">
       <br />
       <sub><b>Medium.</b> A full day, then tomorrow. <code>Dentist</code> is still today —
       the flow simply ran out of left column.</sub>
@@ -74,9 +74,9 @@ See [Screenshots](#screenshots).
 
 What the card decides to show, and in what order, is written down in
 [`docs/calendar-widget-rules.md`](docs/calendar-widget-rules.md) — empty days
-disappearing, `TOMORROW` meaning literally tomorrow, when a location earns its line, when
-the rest becomes `2 more events` and when it just goes, why `5 – 6PM` prints only one
-`PM`.
+disappearing, `TOMORROW` meaning literally tomorrow, when a location earns its line, which
+day `2 more events` is counting and what it will give up to say so, why `5 – 6PM` prints
+only one `PM`.
 
 ### Size
 

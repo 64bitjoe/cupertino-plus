@@ -128,26 +128,45 @@ not.
 
 ### The tail
 
-What is left over when the columns run out is summarised as `2 more events`, at the end
-of the flow — meaning the last column the flow actually reached, not whichever column
-happens to have space left in it.
+One row, at the end of the flow — meaning the last column the flow actually reached, not
+whichever column happens to have space left in it — and it speaks for **one day**: the
+section it is drawn inside.
 
-The indicator costs a row like everything else, and it is added **after** the packing, out
-of what is left: it never evicts the row above it. So a column that came out exactly full
-loses its tail in silence, with nothing at all to mark it. That is not an oversight in the
-widget being copied — it is why `Training` simply vanished in the third and fifth
-screenshots: the right column was occupied to exactly seven rows.
+`N` is the rest of that section. The items counted are the ones of that day that did not
+fit, read up to the next heading and no further, and the days past the cut are not
+summarised at all. A calendar carrying a month of recurring events used to read
+`90 more events` under `TOMORROW`, which is a true statement about the loaded fortnight
+and a nonsense one about tomorrow; two of tomorrow's five events drawn under that heading
+is `3 more events`. Headings do not count either, for the same reason they end the count:
+a section that got cut takes its heading with it, and `2 more events` that meant "one
+event and one Thursday" would be a lie. Singular is `1 more event`.
 
-`N` counts the items that were not drawn. Headings do not count: a section that got cut
-takes its heading with it, and `2 more events` that meant "one event and one Thursday"
-would be a lie. Singular is `1 more event`.
+The indicator costs a row like everything else, and on a column that came out exactly full
+it buys one, cheapest first:
 
-In the small size the indicator competes with §6's locations for the same leftover rows,
-and wins: "count wins" is about how much of the day you know about, not how much of it is
-drawn. Two timed events fill four rows exactly and leave nothing to argue over, but an
-all-day entry costs one row instead of two, so `1 + 2` leaves the row that decides it —
-which is why this is a live contest at the default height, not only on a card dragged
-taller.
+1. the last location line drawn in that column gives way — §6's third line, handed back;
+2. failing that, the last event drawn steps aside and joins the count.
+
+What it will not buy is its own section's last visible row. If what sits above the event it
+would evict is a heading, or there is nothing above it at all, the event stays and the
+widget says nothing: `TOMORROW` heading nothing but a count announces its own absence, a
+column holding a count and no calendar is worse than a quiet one, and in both cases the
+section has nothing on screen for an `N` to be the rest _of_.
+
+**This is the one place the card knowingly departs from the widget it copies.** Apple adds
+the indicator out of whatever is left over and never takes a row back, which is why
+`Training` simply vanished in the third and fifth screenshots: the right column was
+occupied to exactly seven rows. An event that is neither on the card nor in a count is one
+the reader has no way to know about, and a widget that cannot be trusted to be complete is
+one you open the calendar app behind anyway.
+
+In the small size that trade is at its most expensive, and the answer is the same. The
+indicator beats §6's locations to a leftover row — "count wins" is about how much of the
+day you know about, not how much of it is drawn — and where there is no leftover row it
+beats the second of two events as well: four rows and three timed events come out as one
+event and `2 more events`. A row an eviction frees and the count does not need is slack
+like any other, so a location on the event still standing takes it (`3 + 1`) rather than
+leaving white space at the foot of the column.
 
 ### Where those numbers come from here
 
@@ -238,19 +257,24 @@ Location and title are each one line, truncated with an ellipsis.
 Each of these is a test in `layout.test.ts`. A column is written as the cost of each
 row in it, in order. Tomorrow is three more rows in every case.
 
-| Today                             | Left  | Right     | The tail                                   |
-| --------------------------------- | ----- | --------- | ------------------------------------------ |
-| 3 events, no locations            | `2+2` | `2+1+2+2` | one event gone in silence — column is full |
-| 2 events                          | `2+2` | `1+2+2+2` | — everything fitted                        |
-| 1 event with a location           | `3`   | `1+2+2+2` | — everything fitted                        |
-| 2 events, a location on the first | `3`   | `2+1+2+2` | one event gone in silence — column is full |
-| 2 events, a location on both      | `3`   | `3+1+2+1` | that last `1` is `2 more events`           |
-| all-day + 1 event with a location | `1+3` | `1+2+2+2` | — everything fitted                        |
+| Today                             | Left  | Right     | The tail                           |
+| --------------------------------- | ----- | --------- | ---------------------------------- |
+| 3 events, no locations            | `2+2` | `2+1+2+1` | full column: an event buys the row |
+| 2 events                          | `2+2` | `1+2+2+2` | — everything fitted                |
+| 1 event with a location           | `3`   | `1+2+2+2` | — everything fitted                |
+| 2 events, a location on the first | `3`   | `2+1+2+1` | full column: an event buys the row |
+| 2 events, a location on both      | `3`   | `3+1+2+1` | that last `1` is `2 more events`   |
+| all-day + 1 event with a location | `1+3` | `1+2+2+2` | — everything fitted                |
+
+The first and fourth rows are the two the screenshots disagree with, and §5 says why: Apple
+came out at `2+1+2+2` there and let tomorrow's third event vanish, where this card ends the
+column on `2 more events` — the event that had been drawn last is the one that paid for it.
+Both are still cut mid-tomorrow, so both counts are tomorrow's own.
 
 The fifth row is the seventh screenshot, and it is worth reading twice: the location
 `Focha 4, Warsawa` on the second event is what cost tomorrow two of its three rows.
 Greedy locations are paid for in events (§6), and the indicator is how the widget admits
-it.
+it — here out of a row that was going spare, with nothing to buy.
 
 The sixth is the eighth screenshot, and it is the same trade read the other way: the
 all-day entry costs one row instead of two, and that saved row is exactly what pays for
@@ -260,15 +284,16 @@ all-day entry costs one row instead of two, and that saved row is exactly what p
 ## 9. Still open
 
 No screenshot settles these, so they are decided rather than known. Each is one edit —
-the count in `addMoreRow`, the wording in `moreLabel` — and the current answer is
+the trade in `addMoreRow`, the wording in `moreLabel` — and the current answer is
 whichever keeps the rule simplest to state.
 
-- **How far `N` reaches.** Today it counts every item that did not fit anywhere in the
-  loaded window, which is a fortnight (`LOOKAHEAD_DAYS`), so a busy calendar can read
-  `19 more events`. The alternative is to count only the days already on screen — the
-  sections the flow had started — and say nothing about the rest.
 - **What to call them.** Always `events`, even when everything hidden is a reminder.
   `2 more items` would be truthful and is uglier.
-- **Whether the small size gets one at all.** It does; see §5. An all-day entry costing
-  one row is what makes it reachable at the default four rows — `1 + 2` and the indicator
-  in the row left over.
+- **What the indicator is worth in the small size.** It is worth an event there, same as
+  in the medium size (§5), which is the most expensive answer available: four rows hold
+  two events, so the third one costs the second one. The alternative is to buy the row
+  only where it is free — a location line, or slack — and go quiet on a full column, which
+  is what Apple does and what this card did until the count stopped over-reporting.
+
+How far `N` reaches used to be open here as well. It is settled: the section the row is
+drawn inside, and nothing beyond the next heading.

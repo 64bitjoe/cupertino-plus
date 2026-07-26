@@ -112,7 +112,11 @@ const SHOTS: readonly Shot[] = [
 /** What `screenshots.mjs` needs to know: one entry per file it is about to write. */
 export interface ShotHandle {
   name: string
-  /** CSS px of the clipped frame — the `width` the README should pin the `<img>` to. */
+  /**
+   * CSS px of the clipped frame, and the ratio the README's `<img>` widths keep: it pins
+   * them proportionally to these but smaller, so a half-width table cell caps neither.
+   * See `docs/development.md`.
+   */
   width: number
   height: number
 }

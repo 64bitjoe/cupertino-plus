@@ -291,7 +291,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         color: var(--cw-label-secondary);
       }
 
-      /* AM/PM rides smaller than the digits, the way iOS sets it.
+      /* AM/PM rides smaller than the digits, the way the phone sets it.
 
          The zero line-height is load-bearing, not decoration. A smaller font in the same
          line box gets a bigger half-leading, so its inline box hangs below the parent's
@@ -581,7 +581,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
 registerCard(CALENDAR_CARD_TAG, CupertinoCalendarCard, {
   name: 'Cupertino Calendar',
-  description: 'An iOS-style calendar widget for your dashboard.',
+  description: 'A Cupertino-style calendar widget for your dashboard.',
 })
 
 export { CupertinoCalendarCard }

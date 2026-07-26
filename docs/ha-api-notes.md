@@ -485,7 +485,7 @@ Legacy card vars (still present):
 `--ha-card-header-color`, `--ha-card-header-font-family`, `--ha-card-header-font-size`,
 `--ha-card-feature-gap`, `--ha-card-features-border-radius`
 
-Newer token scales — these are what we bridge our iOS tokens onto:
+Newer token scales — these are what we bridge our Cupertino tokens onto:
 
 - Typography: `--ha-font-family-body|heading|code|longform`,
   `--ha-font-size-xs|s|m|l|xl|2xl|3xl|4xl|5xl`, `--ha-font-size-scale`,
@@ -495,7 +495,7 @@ Newer token scales — these are what we bridge our iOS tokens onto:
 - Radii: `--ha-border-radius-sm|s|small|md|lg|2xl|3xl|4xl|5xl|6xl|pill|circle`
 
 Consuming these means a user theme restyles our cards for free, while our own
-`--cw-*` layer adds the iOS rhythm on top.
+`--cw-*` layer adds the Cupertino rhythm on top.
 
 ## Toolchain — probed locally, not guessed
 

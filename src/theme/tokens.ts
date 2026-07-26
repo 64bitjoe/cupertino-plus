@@ -38,7 +38,7 @@ export const tokens = css`
     --cw-label-secondary: var(--secondary-text-color, rgba(60, 60, 67, 0.6));
     --cw-label-tertiary: color-mix(in srgb, var(--cw-label-secondary) 55%, transparent);
     --cw-separator: var(--divider-color, rgba(60, 60, 67, 0.29));
-    /* iOS "fill" greys: the tint behind chips, dividers and empty slots. */
+    /* The system "fill" greys: the tint behind chips, dividers and empty slots. */
     --cw-fill: rgba(120, 120, 128, 0.12);
     --cw-fill-strong: rgba(120, 120, 128, 0.2);
 
@@ -54,7 +54,7 @@ export const tokens = css`
 
     /* ---- Surface ----------------------------------------------------------- */
     --cw-surface: var(--ha-card-background, var(--card-background-color, #fff));
-    /* iOS widgets are noticeably rounder than HA's default card. */
+    /* Phone widgets are noticeably rounder than HA's default card. */
     --cw-radius: var(--ha-card-border-radius, 22px);
     --cw-radius-inner: 12px;
     --cw-radius-pill: 999px;
@@ -72,7 +72,7 @@ export const tokens = css`
     --cw-inset: 16px;
 
     /* ---- Motion ------------------------------------------------------------ */
-    /* The curve iOS uses for sheets and springs; feels "settled", not linear. */
+    /* The curve the phone uses for sheets and springs; feels "settled", not linear. */
     --cw-ease: cubic-bezier(0.32, 0.72, 0, 1);
     --cw-ease-out: cubic-bezier(0.25, 0.1, 0.25, 1);
     --cw-duration-fast: 150ms;

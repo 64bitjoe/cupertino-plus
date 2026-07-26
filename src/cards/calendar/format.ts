@@ -35,7 +35,7 @@ export interface FormatContext {
   hour12: boolean
 }
 
-/** Range separator: en dash, spaced, as on iOS. */
+/** Range separator: en dash, spaced, as on the phone. */
 export const TIME_DASH = '–'
 
 const formatters = new Map<string, Intl.DateTimeFormat>()
@@ -80,7 +80,7 @@ const timeToken = (date: Date, ctx: FormatContext): TimeToken => {
   const periodIndex = parts.findIndex(part => part.type === 'dayPeriod')
   const hour = parts[hourIndex]?.value ?? ''
   const minute = parts.find(part => part.type === 'minute')?.value ?? ''
-  // en-GB and friends hand back a lowercase "pm"; iOS sets it in capitals whatever
+  // en-GB and friends hand back a lowercase "pm"; the phone sets it in capitals whatever
   // the locale thinks, and the card renders it a size down to match.
   const rawMeridiem = periodIndex === -1 ? undefined : parts[periodIndex]?.value
   const meridiem = rawMeridiem?.toLocaleUpperCase(locale)

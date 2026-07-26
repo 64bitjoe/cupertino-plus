@@ -38,11 +38,11 @@ describe('selection', () => {
     const overdue: CalendarItem = {
       id: 'r',
       kind: 'reminder',
-      title: 'Weigh in',
+      title: 'Pick up dry cleaning',
       start: new Date('2026-07-24T10:30:00+02:00'),
       color: 'purple',
     }
-    expect(labels([overdue])).toEqual(['Weigh in'])
+    expect(labels([overdue])).toEqual(['Pick up dry cleaning'])
   })
 
   it('leaves yesterday behind', () => {
@@ -97,7 +97,7 @@ describe('order', () => {
     const allDay: CalendarItem = {
       id: 'a',
       kind: 'event',
-      title: 'Kraków trip',
+      title: 'Poznań trip',
       allDay: true,
       start: new Date('2026-07-24T00:00:00+02:00'),
       color: 'blue',
@@ -107,22 +107,22 @@ describe('order', () => {
       event('Early', '2026-07-24T14:00:00+02:00', '2026-07-24T15:00:00+02:00'),
       allDay,
     ]
-    expect(labels(items)).toEqual(['Kraków trip', 'Early', 'Late'])
+    expect(labels(items)).toEqual(['Poznań trip', 'Early', 'Late'])
   })
 
   it('interleaves reminders with events instead of grouping them', () => {
     const reminder: CalendarItem = {
       id: 'r',
       kind: 'reminder',
-      title: 'Weigh in',
+      title: 'Pick up dry cleaning',
       start: new Date('2026-07-24T14:30:00+02:00'),
       color: 'purple',
     }
     const items = [
-      event('Lessons', '2026-07-24T16:00:00+02:00', '2026-07-24T17:00:00+02:00'),
+      event('Language class', '2026-07-24T16:00:00+02:00', '2026-07-24T17:00:00+02:00'),
       reminder,
     ]
-    expect(labels(items)).toEqual(['Weigh in', 'Lessons'])
+    expect(labels(items)).toEqual(['Pick up dry cleaning', 'Language class'])
   })
 })
 

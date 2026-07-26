@@ -15,8 +15,10 @@
  * Three rules for anything added here:
  *
  *  - **Only fixtures that read like somebody's real week.** Several scenarios in
- *    `demo-data.ts` are width probes with titles like `Test 1`, and they are the right
- *    fixtures for the harness and the wrong ones for a shop window.
+ *    `demo-data.ts` exist to probe one layout branch — two events, three events, an
+ *    all-day entry on its own — and a day assembled to hit a branch reads as assembled
+ *    however plausible its rows are. Those are the right fixtures for the harness and the
+ *    wrong ones for a shop window.
  *  - **Only behaviour that actually works.** Reminders render, but nothing feeds them
  *    yet (they want `todo` entities), so a screenshot led by reminders would be
  *    advertising a feature. Fixtures whose reminders sit below the fold are fine.

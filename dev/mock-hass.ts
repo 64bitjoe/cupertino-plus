@@ -94,7 +94,7 @@ const WIRE_EVENTS: Record<string, () => Record<string, unknown>[]> = {
     { summary: 'Design review', start: wireTime(45), end: wireTime(105), all_day: false },
     {
       summary: 'Lunch with Anna',
-      location: 'City Fit, Kruszwicka 1',
+      location: 'Gdańska 12, Warsawa',
       start: wireTime(180),
       end: wireTime(240),
       all_day: false,
@@ -104,7 +104,7 @@ const WIRE_EVENTS: Record<string, () => Record<string, unknown>[]> = {
   'calendar.calendar_2': () => [
     // End is the day AFTER the one it covers: all-day ends are exclusive, and an
     // off-by-one here would either retire this a day early or leave it up a day late.
-    { summary: 'Kraków trip', start: wireDate(0), end: wireDate(2), all_day: true },
+    { summary: 'Poznań trip', start: wireDate(0), end: wireDate(2), all_day: true },
     { summary: 'Dentist', start: wireTime(300), end: wireTime(360), all_day: false },
     { summary: 'Training', start: wireTime(1_700), end: wireTime(1_760), all_day: false },
   ],

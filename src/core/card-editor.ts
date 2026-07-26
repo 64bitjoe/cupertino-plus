@@ -111,8 +111,8 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
 {
   /**
    * Deliberately none of the `--cw-*` tokens the cards use. This element is Home
-   * Assistant's furniture, not ours: a widget that looks like iOS should still have a
-   * config panel that looks like the dialog it is sitting in.
+   * Assistant's furniture, not ours: a widget that looks like a phone's should still have
+   * a config panel that looks like the dialog it is sitting in.
    */
   static override styles: CSSResultGroup = css`
     :host {

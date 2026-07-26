@@ -222,7 +222,7 @@ describe('toCalendarItem', () => {
   it('maps a timed event', () => {
     const item = map({
       summary: 'Design review',
-      location: 'Długa 36',
+      location: 'Długa 36, Warsawa',
       start: '2026-07-26T09:30:00+02:00',
       end: '2026-07-26T10:30:00+02:00',
       all_day: false,
@@ -231,7 +231,7 @@ describe('toCalendarItem', () => {
     expect(item).toMatchObject({
       kind: 'event',
       title: 'Design review',
-      location: 'Długa 36',
+      location: 'Długa 36, Warsawa',
       color: 'var(--cw-blue)',
     })
     expect(item?.start.toISOString()).toBe('2026-07-26T07:30:00.000Z')
@@ -246,9 +246,9 @@ describe('toCalendarItem', () => {
    * inclusive last day or dropped.
    */
   it('keeps an all-day event’s exclusive end and files it on the right day', () => {
-    const item = map({ summary: 'Kraków trip', start: '2026-07-26', end: '2026-07-28' })
+    const item = map({ summary: 'Poznań trip', start: '2026-07-26', end: '2026-07-28' })
 
-    expect(item).toMatchObject({ title: 'Kraków trip', allDay: true })
+    expect(item).toMatchObject({ title: 'Poznań trip', allDay: true })
     expect(dayNumber(item!.start, WARSAW)).toBe(dayNumber(NOW, WARSAW))
     // Midnight on the 28th in Warsaw: still up for the whole of the 27th, gone on the 28th.
     expect(item?.end?.toISOString()).toBe('2026-07-27T22:00:00.000Z')
@@ -283,7 +283,7 @@ describe('toCalendarItem', () => {
 
   /** An all-day row is one line; there is nowhere to draw a location even if it has one. */
   it('does not give an all-day event a location', () => {
-    const item = map({ summary: 'Trip', location: 'Kraków', start: '2026-07-26', all_day: true })
+    const item = map({ summary: 'Trip', location: 'Poznań', start: '2026-07-26', all_day: true })
     expect(item?.location).toBeUndefined()
   })
 

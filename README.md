@@ -1,9 +1,9 @@
 # Cupertino Widgets
 
-iOS-style widget cards for Home Assistant dashboards. Install, drop a card on a
-dashboard, done — the cards pick sensible defaults instead of asking you to fill in a
-config, and they take their shape from the box you drag them into rather than from a size
-setting you have to think about.
+Widget cards for Home Assistant dashboards, styled like the ones on a phone's home screen.
+Install, drop a card on a dashboard, done — the cards pick sensible defaults instead of
+asking you to fill in a config, and they take their shape from the box you drag them into
+rather than from a size setting you have to think about.
 
 > **Status: early.** The calendar card lays itself out exactly like Apple's and draws
 > your real calendars. Reminders are not wired up yet — that needs `todo` entities — and
@@ -43,7 +43,7 @@ becomes `2 more events`.
     </td>
     <td align="center" valign="top" width="50%">
       <img src="docs/images/calendar-small.png" width="286"
-           alt="A small square calendar card: Friday 24, an all-day Kraków trip, Standup, and 1 more event">
+           alt="A small square calendar card: Friday 24, an all-day Poznań trip, Standup, and 1 more event">
       <br />
       <sub><b>Small.</b> Today and nothing else, ever. The badge is an all-day event,
       which has no time to show and so gets a row to itself.</sub>
@@ -153,8 +153,8 @@ Plus `grid_options`, which is Home Assistant's own and is what the Layout tab wr
 
 Each calendar is subscribed separately over `calendar/event/subscribe`, so the card
 follows Home Assistant rather than polling it. Colours come from the colour set on the
-calendar in Home Assistant's entity settings, and otherwise from the iOS palette, dealt
-by the same sorted order Home Assistant's own calendar panel uses.
+calendar in Home Assistant's entity settings, and otherwise from this library's own
+palette, dealt by the same sorted order Home Assistant's own calendar panel uses.
 
 > Reminders — the grey rows with a circle — are `todo` entities and are not read yet.
 > Everything the card draws today comes from `calendar.*`.

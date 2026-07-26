@@ -126,7 +126,7 @@ export const calendarsFor = (value: unknown, hass: HomeAssistant | undefined): s
 // ---- Colours -------------------------------------------------------------------
 
 /**
- * The iOS palette, in the order calendars are dealt from it.
+ * The Cupertino palette, in the order calendars are dealt from it.
  *
  * Deliberately NOT Home Assistant's `--color-1` … `--color-54`. Those are a data-viz
  * ramp meant to stay distinguishable across fifty series; these are the eight system

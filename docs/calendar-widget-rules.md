@@ -60,8 +60,8 @@ point of the line is that those did not fit.
 2. Anything that has finished is dropped; anything running now stays. Only a real end
    time can retire a row, so an overdue reminder stays up for the rest of its day.
 3. Inside a day: all-day first, then by start time. Reminders and events share one
-   stream — `Weigh in 10:30` comes before `Lessons 12:00`, and it is not shunted into
-   a section of its own.
+   stream — `Pick up dry cleaning 10:30` comes before `Language class 12:00`, and it is
+   not shunted into a section of its own.
 4. Sections are calendar days. **A day with nothing in it disappears entirely**,
    heading and all: if today is Friday and Saturday is empty, the next heading is
    `SUNDAY, 26 JUL`, not an empty Saturday.
@@ -222,12 +222,13 @@ row in it, in order. Tomorrow is three more rows in every case.
 | all-day + 1 event with a location | `1+3` | `1+2+2+2` | — everything fitted                        |
 
 The fifth row is the seventh screenshot, and it is worth reading twice: the location
-`Dworzec PKP` on the second event is what cost tomorrow two of its three rows. Greedy
-locations are paid for in events (§6), and the indicator is how the widget admits it.
+`Focha 4, Warsawa` on the second event is what cost tomorrow two of its three rows.
+Greedy locations are paid for in events (§6), and the indicator is how the widget admits
+it.
 
 The sixth is the eighth screenshot, and it is the same trade read the other way: the
 all-day entry costs one row instead of two, and that saved row is exactly what pays for
-`Bydgoszcz Główna` underneath the event below it. The same day in **small** comes to
+`Warsawa Główna` underneath the event below it. The same day in **small** comes to
 `1 + 3` — two items _and_ a location inside four rows.
 
 ## 9. Still open

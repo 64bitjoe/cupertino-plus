@@ -58,7 +58,7 @@ const laterDays = (now: Date, offset = 1): Draft[] => [
   {
     kind: 'event',
     title: 'Market run',
-    location: 'Hala Targowa, Piaskowa 17',
+    location: 'Podwale 5, Warsawa',
     start: on(now, offset, 10),
     end: on(now, offset, 12),
     color: HOME,
@@ -77,7 +77,7 @@ const laterDays = (now: Date, offset = 1): Draft[] => [
     end: on(now, offset, 19, 15),
     color: SPORT,
   },
-  { kind: 'reminder', title: 'Renew passport', start: on(now, offset + 2, 9), color: LIST },
+  { kind: 'reminder', title: 'Renew library card', start: on(now, offset + 2, 9), color: LIST },
 ]
 
 const scenarios: Record<string, (now: Date) => Draft[]> = {
@@ -89,7 +89,7 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
       {
         kind: 'event',
         title: 'Lunch with Anna',
-        location: 'City Fit, Kruszwicka 1',
+        location: 'Gdańska 12, Warsawa',
         start: after(base, 2),
         end: after(base, 3),
         color: HOME,
@@ -108,8 +108,8 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
     return [
       {
         kind: 'event',
-        title: 'Test',
-        location: 'Długa 36, Poznań',
+        title: 'Design review',
+        location: 'Długa 36, Warsawa',
         start: base,
         end: after(base, 1),
         color: WORK,
@@ -124,13 +124,13 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
     return [
       {
         kind: 'event',
-        title: 'Test',
-        location: 'Długa 36, Poznań',
+        title: 'Design review',
+        location: 'Długa 36, Warsawa',
         start: base,
         end: after(base, 1),
         color: WORK,
       },
-      { kind: 'event', title: 'Test 1', start: after(base, 2), end: after(base, 3), color: WORK },
+      { kind: 'event', title: 'Standup', start: after(base, 2), end: after(base, 3), color: WORK },
       ...laterDays(now),
     ]
   },
@@ -139,9 +139,9 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   'three-events': now => {
     const base = soon(now)
     return [
-      { kind: 'event', title: 'Test', start: base, end: after(base, 1), color: WORK },
-      { kind: 'event', title: 'Test 1', start: after(base, 2), end: after(base, 3), color: WORK },
-      { kind: 'event', title: 'Test 2', start: after(base, 4), end: after(base, 5), color: WORK },
+      { kind: 'event', title: 'Design review', start: base, end: after(base, 1), color: WORK },
+      { kind: 'event', title: 'Standup', start: after(base, 2), end: after(base, 3), color: WORK },
+      { kind: 'event', title: 'Retro', start: after(base, 4), end: after(base, 5), color: WORK },
       ...laterDays(now),
     ]
   },
@@ -156,22 +156,28 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
     return [
       {
         kind: 'event',
-        title: 'Test',
-        location: 'Długa 36, Poznań',
+        title: 'Design review',
+        location: 'Długa 36, Warsawa',
         start: base,
         end: after(base, 1),
         color: WORK,
       },
       {
         kind: 'event',
-        title: 'Test 1',
-        location: 'Dworzec PKP',
+        title: 'Sprint planning',
+        location: 'Focha 4, Warsawa',
         start: after(base, 2),
         end: after(base, 3),
         color: WORK,
       },
-      { kind: 'reminder', title: 'Weigh in', start: on(now, 1, 10, 30), color: LIST },
-      { kind: 'event', title: 'Lessons', start: on(now, 1, 12), end: on(now, 1, 13), color: WORK },
+      { kind: 'reminder', title: 'Pick up dry cleaning', start: on(now, 1, 10, 30), color: LIST },
+      {
+        kind: 'event',
+        title: 'Language class',
+        start: on(now, 1, 12),
+        end: on(now, 1, 13),
+        color: WORK,
+      },
       {
         kind: 'event',
         title: 'Training',
@@ -186,8 +192,14 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   reminders: now => {
     const base = soon(now)
     return [
-      { kind: 'reminder', title: 'Weigh in', start: base, color: LIST },
-      { kind: 'event', title: 'Lessons', start: after(base, 2), end: after(base, 3), color: WORK },
+      { kind: 'reminder', title: 'Pick up dry cleaning', start: base, color: LIST },
+      {
+        kind: 'event',
+        title: 'Language class',
+        start: after(base, 2),
+        end: after(base, 3),
+        color: WORK,
+      },
       { kind: 'reminder', title: 'Water the plants', start: after(base, 5), color: LIST },
       ...laterDays(now),
     ]
@@ -202,17 +214,23 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   'all-day': now => {
     const base = soon(now)
     return [
-      { kind: 'event', title: 'All day test', allDay: true, start: midnight(now, 0), color: WORK },
+      { kind: 'event', title: 'Poznań trip', allDay: true, start: midnight(now, 0), color: HOME },
       {
         kind: 'event',
-        title: 'Test',
-        location: 'Bydgoszcz Główna',
+        title: 'Train to Poznań',
+        location: 'Warsawa Główna',
         start: base,
         end: after(base, 1),
+        color: HOME,
+      },
+      { kind: 'reminder', title: 'Pick up dry cleaning', start: on(now, 1, 10, 30), color: LIST },
+      {
+        kind: 'event',
+        title: 'Language class',
+        start: on(now, 1, 12),
+        end: on(now, 1, 13),
         color: WORK,
       },
-      { kind: 'reminder', title: 'Weigh in', start: on(now, 1, 10, 30), color: LIST },
-      { kind: 'event', title: 'Lessons', start: on(now, 1, 12), end: on(now, 1, 13), color: WORK },
       {
         kind: 'event',
         title: 'Training',
@@ -227,7 +245,7 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   'all-day-busy': now => {
     const base = soon(now)
     return [
-      { kind: 'event', title: 'Kraków trip', allDay: true, start: midnight(now, 0), color: HOME },
+      { kind: 'event', title: 'Poznań trip', allDay: true, start: midnight(now, 0), color: HOME },
       { kind: 'event', title: 'Standup', start: base, end: after(base, 1), color: WORK },
       { kind: 'event', title: 'Retro', start: after(base, 3), end: after(base, 4), color: WORK },
       ...laterDays(now),

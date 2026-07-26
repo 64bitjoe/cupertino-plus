@@ -71,7 +71,7 @@ describe('the reference screenshots', () => {
     // exactly enough for the location beneath `Test`.
     const flow = [
       allDay('All day test'),
-      row('Test', 'Bydgoszcz Główna'),
+      row('Test', 'Warsawa Główna'),
       TOMORROW,
       ...REST_OF_TOMORROW,
     ]
@@ -83,7 +83,7 @@ describe('the reference screenshots', () => {
     // And in small, where today is all there is: two items *and* a location, which two
     // timed events could never have managed.
     const columns = packFlow(
-      [allDay('All day test'), row('Test', 'Bydgoszcz Główna')],
+      [allDay('All day test'), row('Test', 'Warsawa Główna')],
       [4],
       'small',
     )
@@ -94,7 +94,12 @@ describe('the reference screenshots', () => {
   it('a spare row at the bottom becomes the count of what is missing', () => {
     // Two greedy locations today: the left column takes one, the right takes the other
     // and has a row over at the end of tomorrow's first event.
-    const flow = [row('A', 'Długa 36'), row('B', 'Dworzec PKP'), TOMORROW, ...REST_OF_TOMORROW]
+    const flow = [
+      row('A', 'Długa 36, Warsawa'),
+      row('B', 'Focha 4, Warsawa'),
+      TOMORROW,
+      ...REST_OF_TOMORROW,
+    ]
     expect(costs(flow, [4, 7], 'medium')).toEqual([[3], [3, 1, 2, 1]])
     expect(titles(flow, [4, 7], 'medium')).toEqual([['A'], ['B', 'TOMORROW', 'T1', '2 more']])
   })
@@ -108,12 +113,12 @@ describe('the reference screenshots', () => {
   })
 
   it('one event with a location: it expands and eats the left column', () => {
-    const flow = [row('A', 'Długa 36'), TOMORROW, ...REST_OF_TOMORROW]
+    const flow = [row('A', 'Długa 36, Warsawa'), TOMORROW, ...REST_OF_TOMORROW]
     expect(costs(flow, [4, 7], 'medium')).toEqual([[3], [1, 2, 2, 2]])
   })
 
   it('a location wins even when it pushes the next event across', () => {
-    const flow = [row('A', 'Długa 36'), row('B'), TOMORROW, ...REST_OF_TOMORROW]
+    const flow = [row('A', 'Długa 36, Warsawa'), row('B'), TOMORROW, ...REST_OF_TOMORROW]
     expect(costs(flow, [4, 7], 'medium')).toEqual([[3], [2, 1, 2, 2]])
     expect(titles(flow, [4, 7], 'medium')[1]).toEqual(['B', 'TOMORROW', 'T1', 'T2'])
   })
@@ -154,7 +159,7 @@ describe('medium — packing rules', () => {
 
   it('never expands an all-day entry, however much room and location it has', () => {
     // Greedy medium would take a third row for any other event carrying a location.
-    const columns = packFlow([allDay('A', 'Bydgoszcz Główna')], [4, 7], 'medium')
+    const columns = packFlow([allDay('A', 'Warsawa Główna')], [4, 7], 'medium')
     expect(columns[0]!.rows.map(r => r.cost)).toEqual([COST.allday])
     expect(columns[0]!.rows[0]!.expanded).toBe(false)
   })
@@ -189,7 +194,7 @@ describe('medium — packing rules', () => {
     const reminder: FlowNode = {
       type: 'item',
       key: 'r',
-      item: { ...item('Weigh in', 'Bathroom'), kind: 'reminder' },
+      item: { ...item('Pick up dry cleaning', 'Gdańska 12, Warsawa'), kind: 'reminder' },
     }
     expect(costs([reminder], [4, 7], 'medium')).toEqual([[2], []])
   })
@@ -316,11 +321,11 @@ describe('the tail indicator', () => {
 
 describe('small — count first, locations out of the slack', () => {
   it('shows the location of a lone event', () => {
-    expect(costs([row('A', 'Długa 36')], [4], 'small')).toEqual([[COST.expanded]])
+    expect(costs([row('A', 'Długa 36, Warsawa')], [4], 'small')).toEqual([[COST.expanded]])
   })
 
   it('shows no location at all once two events fill the budget', () => {
-    const columns = packFlow([row('A', 'Długa 36'), row('B')], [4], 'small')
+    const columns = packFlow([row('A', 'Długa 36, Warsawa'), row('B')], [4], 'small')
     expect(columns[0]!.rows.map(r => r.cost)).toEqual([2, 2])
     expect(columns[0]!.rows.some(r => r.expanded)).toBe(false)
   })

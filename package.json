@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "iOS-flavoured widget cards for Home Assistant dashboards",
+  "description": "Phone-style widget cards for Home Assistant dashboards",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",

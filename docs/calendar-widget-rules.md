@@ -25,15 +25,15 @@ Two sizes, matching the two Apple offers on a home screen:
 }
 ```
 
-**Event** — a thin coloured bar down the left, a background of the calendar colour at
-low alpha, the title in the calendar colour (lifted towards white on a dark theme),
-the time in the same colour, weaker.
+**Event** — a thin bar down the left, a chip behind the whole row, the title, and the
+time. Four things in the calendar's colour and no two of them the same shade of it; the
+palette below is how the four come out of the one colour Home Assistant holds.
 
 **Reminder** — a neutral grey background, an empty circle in the list's colour, muted
 text. Reminders never show a location.
 
-**All-day event** — the tint of an event, but the bar gives way to a filled circle with
-a calendar knocked out of it, in the calendar colour, and then the title on one line
+**All-day event** — the chip of an event, but the bar gives way to a filled circle with
+a calendar knocked out of it, in the bar's colour, and then the title on one line
 with an ellipsis. Nothing else: no time, no location, no expanded form. The badge has to
 carry the meaning on its own, because there is no second line left to say "all day" on.
 The circle is set concentric with the rounded end of the chip and 2px smaller in radius,
@@ -53,6 +53,116 @@ taken in it.
 not an item: a thin bar in the calendar colour, grey text at a normal weight, and
 **no tinted background**, unlike an event. A tint would read as one more event, when the
 point of the line is that those did not fit.
+
+### The palette
+
+Home Assistant holds one colour per calendar — the hex the `google` integration seeds, the
+token its colour picker writes, or the palette entry `source.ts` deals a calendar that has
+neither. The widget needs four out of that one: the bar, the title, the time, and the chip
+behind them. Twice over, because a dark theme is not a light one with the numbers nudged.
+
+The derivation is in OKLCH, and the hue is the channel that never moves. Only `L` and `C`
+do, per role, so the four read as one colour at four strengths rather than as four
+colours. Written against `L₀` and `C₀`, the calendar's own lightness and chroma:
+
+| Role  | Light                                        | Dark                          |
+| ----- | -------------------------------------------- | ----------------------------- |
+| bar   | `L₀`, `C₀` — the base exactly                | `L = max(L₀, 0.68)`, `C₀`     |
+| title | `L₀ − 0.29` held in [0.26, 0.48], `0.52 C₀`  | the bar's colour, exactly     |
+| time  | `L₀ − 0.135` held in [0.38, 0.62], `0.66 C₀` | `L = L_bar − 0.11`, `0.85 C₀` |
+| chip  | `L = 0.97`, `0.08 C₀`                        | `L = 0.28`, `0.25 C₀`         |
+
+The stylesheet calls the bar's colour `--item-accent`, three other things having a use for
+it: the reminder circle, the all-day badge, and the bar on `2 more events`.
+
+The asymmetry between the two columns is the substance of the table rather than an artefact
+of writing it down. In light every role has a lightness of its own, the bar is the base
+untouched, and the title sits 0.29 below it — most of the way to the dark end, and far more
+than a text colour usually travels from the thing it belongs to. In dark two roles share
+one: the bar and the title are the same lifted colour, and it is the time that steps 0.11
+below them.
+
+Two guards sit over the table, and neither is arithmetic the card does at runtime: the
+browser owns one, and the constants above have the other pre-solved.
+
+**The gamut.** Moving `L` at a fixed `C` walks colours out of sRGB, so `C` has to come back
+down until the result can be drawn — at the same lightness and the same hue, which is the
+whole reason for working in this space. The browser does it, `oklch()` being gamut-mapped
+when it is painted, and it is not a formality: lifting `--cw-blue` to the dark bar's floor
+of 0.68 costs it 0.034 of the 0.218 of chroma it had, and indigo 0.032 of 0.191. At the
+light chip's 0.97 there is so little room left that even 8% of blue's chroma is 0.003 over
+the edge.
+
+**The contrast.** `|L_title − L_chip| ≥ 0.38`, or the title moves further from the chip.
+The constants above are chosen so that it never has to, and the sum is worth keeping
+because it is what pins two of them. Light: the title tops out at 0.48 against a chip at
+0.97, so the narrowest it comes is 0.49. Dark: 0.68 − 0.28 = 0.40 — and that floor of 0.68
+_is_ this guard solved, since 0.28 + 0.38 = 0.66 and the floor clears it by 0.02 and by
+nothing else. Move the dark chip up or the bar's floor down and this is the line that has
+to be redone.
+
+### The values, and where they come from
+
+Two calendars of a real installation: `#EC8834` at L 0.721 C 0.154 H 56, and `#C830DC` at
+L 0.615 C 0.259 H 323. What the stylesheet paints for them, read back out of a screenshot
+rather than computed — the CSS is the implementation, so a number worked out beside it
+would be checking the arithmetic twice and the rendering not at all:
+
+| Base      | Theme | Bar       | Title     | Time      | Chip      |
+| --------- | ----- | --------- | --------- | --------- | --------- |
+| `#EC8834` | light | `#EC8834` | `#714320` | `#AA6B3C` | `#FCF3ED` |
+| `#EC8834` | dark  | `#EC8834` | as bar    | `#BD6C27` | `#372416` |
+| `#C830DC` | light | `#C830DC` | `#520F5B` | `#883194` | `#FCF1FE` |
+| `#C830DC` | dark  | `#DE4BF2` | as bar    | `#B037C1` | `#381D3B` |
+
+And the same eight roles sampled off screenshots of the widget this copies:
+
+| Base      | Theme | Bar       | Title     | Time      | Chip      |
+| --------- | ----- | --------- | --------- | --------- | --------- |
+| `#EC8834` | light | `#EC8C34` | `#704418` | `#AC7034` | `#FDF6EC` |
+| `#EC8834` | dark  | `#F09034` | `#F09034` | `#C47430` | `#362714` |
+| `#C830DC` | light | `#C830DC` | `#54185C` | `#84308C` | `#F9EFFA` |
+| `#C830DC` | dark  | `#E43CF4` | `#E43CF4` | `#B034C0` | `#371E3C` |
+
+The recipe is a reading of the second table, so the first agreeing with it is the check and
+not the news. The two are within 0.013 of lightness everywhere except the orange calendar's
+dark rows, where the sample runs 0.019 to 0.024 lighter — and that same screenshot reads
+its light bar 0.007 above a base the rule says it is _exactly_, so most of the gap is in
+the sampling rather than in the recipe. That the dark title is the dark bar is the second
+table's own finding as much as anything here: in both calendars those two cells are the
+same value twice.
+
+**The dark chip is why this is done in OKLCH at all.** The rest of the table could be had
+with `color-mix` towards white and towards the surface, which is what the card did before
+and what one reading of the screenshots suggests: a chip is the base at low alpha over the
+widget's background. It cannot be. The orange calendar's dark chip is `#362714` on a widget
+sitting on `#1C1C1E`, so its blue channel has to come out _below_ the surface's, and no
+amount of any colour laid over a surface takes a channel below it. A lightness of its own
+is the only way to say it.
+
+### What the calendar does not colour
+
+Not everything on the card is tinted, and the two rows that barely are take the bar's
+colour and nothing else from the table:
+
+- **Grey text** — section headings, `2 more events`, both empty lines — is
+  `--cw-label-secondary`: Home Assistant's `--secondary-text-color` wherever the theme has
+  one, and the system's secondary label where it does not. The fallback is what the
+  screenshots were sampled at, `#8A8A8E` over a white card and `#98989F` over a `#1C1C1E`
+  one against a sample of `#9C9CA0`; Home Assistant's own default light theme draws these
+  at `#727272` instead, and is welcome to. What matters is the one thing neither of them
+  is: a heading tinted by whichever calendar the day happened to belong to would read as
+  an event of that calendar, and the furniture being grey is what leaves a chip something
+  to mean.
+- **A reminder** keeps `--cw-fill` behind it and spends the list's colour on its circle
+  alone, in the bar's shade of it, so it lifts on a dark theme with everything else. A
+  reminder is a thing you tick off rather than a span of the day, and the circle is the
+  whole of that.
+- **`2 more events`** is grey text on no background at all, with its bar in the colour of
+  the calendar whose event was the first one not to fit (§5).
+- **The all-day badge** is that same bar colour, filled, with the calendar knocked out of
+  it in white — not the title's, because the badge stands in for the bar and it is the bar
+  it has to agree with.
 
 ## 2. Selection and order
 
@@ -134,11 +244,18 @@ The unit is one line of text inside the card.
 | medium, right column | 7      |
 
 A node goes in the current column if it fits there whole; otherwise the next column
-takes it. A heading never ends up alone at the bottom of a column: if its first row will
-not follow it there, the whole section moves on. What that reservation costs depends on
-what the first row is — two rows for a timed event, one for an all-day entry — so a
-heading and an all-day entry can move into a gap that a heading and a timed event could
-not.
+takes it. A heading is a node like any other and holds nothing back for what follows it: it
+is drawn wherever its one row fits, and if its first event will not fit under it, that event
+starts the next column while the heading finishes this one. One guard, applied at the end: a
+heading that came out the last row drawn anywhere is taken back off the card, because what
+it heads is nothing — not even a count, which would have gone under it had there been a row
+to put one on.
+
+This is a rule the screenshots settled against the reservation it replaces, which moved a
+whole section on unless its first row could follow the heading in the same column. That cost
+the widget headings it was perfectly able to draw: `WEDNESDAY, 29 JUL` over `1 more event`,
+with not one of that day's events on screen, is the shape the reservation forbade and the
+widget does. §9 has what it costs to state the rule this simply.
 
 ### The tail
 
@@ -163,16 +280,18 @@ it buys one, cheapest first:
 
 What it will not buy is its own section's last visible row. If what sits above the event it
 would evict is a heading, or there is nothing above it at all, the event stays and the
-widget says nothing: `TOMORROW` heading nothing but a count announces its own absence, a
-column holding a count and no calendar is worse than a quiet one, and in both cases the
-section has nothing on screen for an `N` to be the rest _of_.
+widget says nothing. The second of those would leave a column holding a count and no
+calendar, which is worse than a quiet one. The first is not about the shape that comes out
+but about the price: `TOMORROW` over nothing but a count is a legitimate row when a spare
+one paid for it, and tomorrow's one readable event — its title, its time — is too much to
+pay for the same row when it is not going spare.
 
-That second half is a rule about the column and not only about the trade, so it holds where
-the count would have come free as well: a column too short to have fitted an event — one row,
-which the 3-row footprint reaches at 110% and up — says nothing rather than standing the
-count on its own. Otherwise the size would contradict itself as it shrank, three rows
-drawing the event and the count, two keeping the event quietly, and one dropping the event
-to announce it.
+The count-and-no-calendar half is a rule about the column and not only about the trade, so
+it holds where the count would have come free as well: a column too short to have fitted an
+event — one row, which the 3-row footprint reaches at 110% and up — says nothing rather
+than standing the count on its own. Otherwise the size would contradict itself as it
+shrank, three rows drawing the event and the count, two keeping the event quietly, and one
+dropping the event to announce it.
 
 **This is the one place the card knowingly departs from the widget it copies.** Apple adds
 the indicator out of whatever is left over and never takes a row back, which is why
@@ -282,7 +401,7 @@ row in it, in order. Tomorrow is three more rows in every case.
 | --------------------------------- | ----- | --------- | ---------------------------------- |
 | 3 events, no locations            | `2+2` | `2+1+2+1` | full column: an event buys the row |
 | 2 events                          | `2+2` | `1+2+2+2` | — everything fitted                |
-| 1 event with a location           | `3`   | `1+2+2+2` | — everything fitted                |
+| 1 event with a location           | `3+1` | `2+2+2`   | — everything fitted                |
 | 2 events, a location on the first | `3`   | `2+1+2+1` | full column: an event buys the row |
 | 2 events, a location on both      | `3`   | `3+1+2+1` | that last `1` is `2 more events`   |
 | all-day + 1 event with a location | `1+3` | `1+2+2+2` | — everything fitted                |
@@ -291,6 +410,11 @@ The first and fourth rows are the two the screenshots disagree with, and §5 say
 came out at `2+1+2+2` there and let tomorrow's third event vanish, where this card ends the
 column on `2 more events` — the event that had been drawn last is the one that paid for it.
 Both are still cut mid-tomorrow, so both counts are tomorrow's own.
+
+The third row is the one the heading rule moved, and the `1` at the end of that left column
+is `TOMORROW`: the location takes three of the four rows, and the row it leaves over is
+enough for a heading that no longer has to arrive with its first event. §9 is where that
+disagrees with a screenshot.
 
 The fifth row is the seventh screenshot, and it is worth reading twice: the location
 `Focha 4, Warsawa` on the second event is what cost tomorrow two of its three rows.
@@ -304,9 +428,10 @@ all-day entry costs one row instead of two, and that saved row is exactly what p
 
 ## 9. Still open
 
-No screenshot settles these, so they are decided rather than known. Each is one edit —
-the trade in `addMoreRow`, the wording in `moreLabel` — and the current answer is
-whichever keeps the rule simplest to state.
+No screenshot settles the first two, so they are decided rather than known; the third has
+two screenshots that settle it opposite ways. Each is one edit — the trade in `addMoreRow`,
+the wording in `moreLabel`, the room `packFlow` asks for before it draws a heading — and
+the current answer is whichever keeps the rule simplest to state.
 
 - **What to call them.** Always `events`, even when everything hidden is a reminder.
   `2 more items` would be truthful and is uglier.
@@ -315,6 +440,19 @@ whichever keeps the rule simplest to state.
   two events, so the third one costs the second one. The alternative is to buy the row
   only where it is free — a location line, or slack — and go quiet on a full column, which
   is what Apple does and what this card did until the count stopped over-reporting.
+
+- **What a heading has to arrive with.** Nothing, per §5 — and that is the one rule here
+  where two screenshots cannot both be right. `WEDNESDAY, 29 JUL` over `1 more event` says a
+  heading is drawn with no event of its own under it; §8's third row says a heading passed
+  over a spare row at the foot of the left column and started the right one instead. A middle
+  rule fits both: hold back the heading's row and one more for _anything at all_, a count
+  included, rather than for the first event's own cost. It is written down rather than
+  adopted because the reservation it revives is the part that was wrong — the cost of the
+  first row is what made a heading's placement depend on what kind of event followed it —
+  and because a rule ending in one guard at the end of packing is a rule the tests can state
+  in one line. The screenshot it gives up is the cheaper of the two to be wrong about: a
+  heading one column early is a heading the reader still finds, where a heading the widget
+  declined to draw is a day that silently stopped existing.
 
 How far `N` reaches used to be open here as well. It is settled: the section the row is
 drawn inside, and nothing beyond the next heading.

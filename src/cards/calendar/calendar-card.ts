@@ -89,7 +89,7 @@ const GLYPH = 'translate(10 10) scale(0.5556) translate(-12 -11)'
  */
 const ALL_DAY_BADGE = html`
   <svg class="badge" viewBox="0 0 20 20" aria-hidden="true">
-    <circle cx="10" cy="10" r="10" fill="var(--item-color)" />
+    <circle cx="10" cy="10" r="10" fill="var(--item-accent)" />
     <path d=${mdiCalendarMonth} transform=${GLYPH} fill="#fff" />
   </svg>
 `
@@ -197,6 +197,51 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         color: var(--cw-label-secondary);
       }
 
+      /* ---- What a calendar's colour is worth -------------------------------- */
+
+      /* Four roles out of the one hex Home Assistant holds for a calendar — bar, title,
+         time, chip background — and the hue is the one thing that never moves. Only L and
+         C do, which is what makes the four read as one colour at four strengths.
+         docs/calendar-widget-rules.md §1 has the table, the guards and the values these
+         were checked against.
+
+         In CSS rather than in TypeScript because of what the input can be: Home
+         Assistant's colour picker writes a token, so --item-color is as often
+         var(--red-color) as it is a hex out of the registry, and only the cascade can say
+         what a theme's token is worth. Deriving it in source.ts would mean either
+         resolving that through getComputedStyle on every render or refusing the tokens,
+         and a card that ignored the user's own theme to keep its arithmetic in one
+         language would be taking the wrong thing seriously.
+
+         It hands the sRGB clamp to the browser too, which is not a theoretical tidiness:
+         oklch() is gamut-mapped at paint, and lifting --cw-blue to the dark floor below
+         costs it 0.034 of chroma it has nowhere else to put. */
+      .row,
+      .more {
+        --item-accent: oklch(from var(--item-color) l c h);
+        --item-title: oklch(
+          from var(--item-color) clamp(0.26, calc(l - 0.29), 0.48) calc(c * 0.52) h
+        );
+        --item-time: oklch(
+          from var(--item-color) clamp(0.38, calc(l - 0.135), 0.62) calc(c * 0.66) h
+        );
+        --item-bg: oklch(from var(--item-color) 0.97 calc(c * 0.08) h);
+      }
+
+      /* Dark is not light with the numbers nudged, and two of these say so. The bar takes
+         the title's job as well — one lifted colour for both, where the light theme drops
+         the title 0.29 below the bar — and the chip background is a lightness of its own
+         rather than the base at low alpha over the surface. It cannot be that: an orange
+         event's chip comes out #362714 against a widget on #1C1C1E, so its blue channel
+         has to go BELOW the surface's, which no tint of a colour laid over it can do. */
+      :host([dark]) .row,
+      :host([dark]) .more {
+        --item-accent: oklch(from var(--item-color) max(l, 0.68) c h);
+        --item-title: var(--item-accent);
+        --item-time: oklch(from var(--item-color) calc(max(l, 0.68) - 0.11) calc(c * 0.85) h);
+        --item-bg: oklch(from var(--item-color) 0.28 calc(c * 0.25) h);
+      }
+
       /* Title line (22px) + time line (20px) + this padding = the 56px that layout.ts
          calls COMPACT_PX and prices two budget rows at. */
       .row {
@@ -210,13 +255,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       }
 
       .row.event {
-        --item-text: var(--item-color);
-        background: color-mix(in srgb, var(--item-color) 14%, transparent);
-      }
-
-      /* A saturated calendar colour goes muddy on a dark surface; lift it instead. */
-      :host([dark]) .row.event {
-        --item-text: color-mix(in srgb, var(--item-color) 74%, white);
+        background: var(--item-bg);
       }
 
       .row.reminder {
@@ -256,7 +295,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         flex: none;
         width: calc(3px * var(--cw-scale));
         border-radius: var(--cw-radius-pill);
-        background: var(--item-color);
+        background: var(--item-accent);
       }
 
       /* A reminder is a thing you tick off, so it gets a tickable-looking circle. */
@@ -266,7 +305,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         width: calc(13px * var(--cw-scale));
         height: calc(13px * var(--cw-scale));
         border-radius: 50%;
-        border: calc(1.5px * var(--cw-scale)) solid var(--item-color);
+        border: calc(1.5px * var(--cw-scale)) solid var(--item-accent);
       }
 
       .body {
@@ -286,12 +325,15 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       }
 
       .row.event .title {
-        color: var(--item-text);
+        color: var(--item-title);
       }
 
+      /* The location rides with the time rather than with the title: it is the same size
+         and the same afterthought, and a third weight between the two would read as a
+         third kind of information. */
       .row.event .location,
       .row.event .time {
-        color: color-mix(in srgb, var(--item-text) 72%, transparent);
+        color: var(--item-time);
       }
 
       .row.reminder .title {

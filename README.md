@@ -64,7 +64,7 @@ room in becomes `2 more events`.
     </td>
     <td align="center" valign="top">
       <img src="docs/images/calendar-dark.png" width="420"
-           alt="A medium calendar card on a dark theme: Design review today, then a SUNDAY, JUL 26 heading over Market run and Coffee with Marta">
+           alt="A medium calendar card on a dark theme: Design review today with a SUNDAY, JUL 26 heading under it, and Market run, Coffee with Marta and Training in the right column">
       <br />
       <sub><b>Dark theme.</b> It follows the one you picked in Home Assistant. Tomorrow is
       empty here, so it is skipped — and the heading becomes a date, because

@@ -211,7 +211,7 @@ Both cards are split so that the rules can be read and tested without a browser:
 
 ```
 cards/calendar/
-  calendar-card.ts         the element: measure the box, draw what the two below decide
+  calendar-card.ts         the element: measure the box, draw it, derive the event palette
   calendar-card-editor.ts  its own two rows; Scale is added by the base editor
   flow.ts                  what to show and in what order — one stream of rows
   layout.ts                how much of that stream fits, in columns of a row budget

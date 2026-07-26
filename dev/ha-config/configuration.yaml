@@ -26,5 +26,22 @@ lovelace:
   resources:
     # ./dist is bind-mounted to /config/www/cupertino-widgets by docker-compose,
     # so `pnpm watch` output is served straight from here.
-    - url: /local/cupertino-widgets/cupertino-widgets.js
+    #
+    # The `?v=` is load-bearing, and a hard reload is not a substitute for bumping it.
+    # Two caches sit in front of this file and cover for each other: Home Assistant
+    # serves /local/ with `Cache-Control: public, max-age=2678400` (31 days), and the
+    # frontend's service worker catches everything else in a StaleWhileRevalidate
+    # "file-cache" (its last route is `registerRoute(/\/.*/, …)`). A shift-reload
+    # bypasses the service worker for the document but not for its subresources, so the
+    # SW keeps answering from its copy, and the revalidation it fires in the background
+    # is itself served by the 31-day HTTP entry. Changing the URL misses both.
+    #
+    # Bump this when the browser will not let go of an old bundle, then:
+    #   pnpm ha:up
+    # NOT `docker compose restart`: that keeps the existing container, and on Docker
+    # Desktop its bind mount of ./dist comes back stale — the container ends up seeing an
+    # empty directory and serving 404 for a bundle that is sitting right there on the
+    # host. `ha:up` force-recreates, which re-resolves the mount. Same failure the README
+    # warns about for `rm -rf dist`, reached by a different route.
+    - url: /local/cupertino-widgets/cupertino-widgets.js?v=3
       type: module

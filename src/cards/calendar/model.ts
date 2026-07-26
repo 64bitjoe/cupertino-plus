@@ -1,17 +1,15 @@
 /**
  * What the calendar widget draws, independent of where it came from.
  *
- * The layout engine (`flow.ts`, `layout.ts`) only ever sees `CalendarItem`, so the
- * data source stays a swappable seam: today it is `demo-data.ts`, next it will be the
- * `calendar/event/subscribe` websocket (see `docs/ha-api-notes.md`) plus `todo`
- * entities for reminders.
+ * The layout engine (`flow.ts`, `layout.ts`) only ever sees `CalendarItem`, so the data
+ * source stays a swappable seam. Two produce these today: `source.ts`, from the
+ * `calendar/event/subscribe` websocket, and `demo-data.ts`, for the harness and the card
+ * picker. The mapping and the protocol behind it are documented on `source.ts`, which is
+ * the only file in the card that knows Home Assistant exists.
  *
- * Mapping notes for when that lands:
- *  - a Home Assistant calendar event has `summary` / `location` / `start` / `end`,
- *    where an all-day event carries plain `YYYY-MM-DD` dates and `end` is exclusive;
- *  - a `todo` item has `due` and no duration — that is exactly `kind: 'reminder'`;
- *  - `color` is resolved per calendar entity, the way the frontend's own helper does
- *    it: the registry colour if the user set one, else a palette colour by index.
+ * Still to come: `todo` entities, which is where `kind: 'reminder'` will come from — a
+ * to-do item has a `due` and no duration, which is exactly the shape below. Nothing
+ * produces one yet, so the reminder rows are reachable only from the fixtures.
  */
 
 export type CalendarItemKind = 'event' | 'reminder'

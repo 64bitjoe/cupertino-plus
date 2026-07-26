@@ -11,28 +11,39 @@ declare global {
 const REPO_URL = 'https://github.com/sabbaken/cupertino-widgets'
 
 /**
- * Register one card with both the custom-element registry and the dashboard card
- * picker.
+ * Define one custom element, tolerating a bundle that has already been loaded once.
  *
  * We define elements here rather than with Lit's `@customElement`, because a
  * duplicate `customElements.define` throws and kills the whole bundle — and a
  * duplicate load is easy to hit in the wild (HACS resource plus a leftover manual
  * one, or an old cached copy). Skipping is the friendlier failure.
+ *
+ * Returns whether this call is the one that defined the tag, so a caller with more to
+ * register — a card, which also wants a card-picker entry — can skip that too.
+ */
+export function defineElement(tag: string, ctor: CustomElementConstructor): boolean {
+  if (customElements.get(tag)) {
+    console.warn(
+      `[cupertino-widgets] <${tag}> is already defined — skipping. ` +
+        'The bundle is probably loaded twice; check your dashboard resources.',
+    )
+    return false
+  }
+
+  customElements.define(tag, ctor)
+  return true
+}
+
+/**
+ * Register one card with both the custom-element registry and the dashboard card
+ * picker.
  */
 export function registerCard(
   tag: string,
   ctor: CustomElementConstructor,
   entry: Omit<CustomCardEntry, 'type'>,
 ): void {
-  if (customElements.get(tag)) {
-    console.warn(
-      `[cupertino-widgets] <${tag}> is already defined — skipping. ` +
-        'The bundle is probably loaded twice; check your dashboard resources.',
-    )
-    return
-  }
-
-  customElements.define(tag, ctor)
+  if (!defineElement(tag, ctor)) return
 
   const cards = (window.customCards ??= [])
   cards.push({

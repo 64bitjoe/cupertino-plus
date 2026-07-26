@@ -213,6 +213,16 @@ function expandFromSlack(column: LayoutColumn | undefined): void {
 /** Must match `--cw-inset`, the padding inside the card. */
 const INSET = 16
 
+/**
+ * The border `ha-card` draws, top and bottom.
+ *
+ * Home Assistant's own card carries `border-width: var(--ha-card-border-width, 1px)` and
+ * is `box-sizing: border-box`, so those two pixels come out of the height the card was
+ * measured at rather than being added to it. Two pixels is one clipped descender on a
+ * column packed exactly full, which is precisely the case the budget exists to prevent.
+ */
+const BORDER = 1
+
 /** Must match `--cw-flow-gap`, the space between two rows. */
 const GAP = 6
 
@@ -248,7 +258,7 @@ export interface Geometry {
  * Apple's own widget uses.
  */
 export const geometryFor = (mode: LayoutMode, height: number, todayEmpty: boolean): Geometry => {
-  const content = Math.max(0, height - 2 * INSET)
+  const content = Math.max(0, height - 2 * INSET - 2 * BORDER)
   const beside = rowsIn(content)
   const below = rowsIn(content - DATE_BLOCK)
 

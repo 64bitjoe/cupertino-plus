@@ -99,6 +99,147 @@ hass.callWS({ type: 'calendar/event/delete', entity_id, uid, recurrence_id, recu
 
 A subscription means push updates — no polling loop needed. Big UX win for a widget.
 
+### The subscribe REQUEST is strict, and takes ONE entity
+
+```python
+# components/calendar/__init__.py — handle_calendar_event_subscribe
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "calendar/event/subscribe",
+        vol.Required("entity_id"): cv.entity_domain(DOMAIN),
+        vol.Required("start"): cv.datetime,
+        vol.Required("end"): cv.datetime,
+    }
+)
+```
+
+- Four keys, and the schema is `vol.PREVENT_EXTRA`: a fifth is rejected with
+  `invalid_format`. There are no optional keys.
+- `cv.entity_domain` wraps `cv.entities_domain` and then demands exactly one, so **a list
+  of two is refused** — _"Expected exactly 1 entity, got 2"_. A one-element list is
+  accepted and coerced to the bare string. So N calendars means N subscriptions, which is
+  what the frontend does (`hui-calendar-card` keys `_unsubs` by entity id).
+- `start >= end` is refused in the handler with `invalid_format`, _"Start must be before
+  end"_. There is **no cap on the window size** — a 100-year span passes.
+- A non-existent entity is `not_found`; in JS that **rejects the `subscribeMessage`
+  promise** with the raw `{code, message}`. An entity that merely went `unavailable` does
+  NOT reject: `get_entity` is a state-independent dict lookup.
+
+### The PUSH payload (verified — this is the part no tutorial gets right)
+
+```python
+connection.send_message(websocket_api.event_message(subscription_id, {"events": events}))
+```
+
+`subscribeMessage`'s callback receives the `event` value, so what a card sees is:
+
+```ts
+{ events: CalendarEventPayload[] | null }
+```
+
+- An **object with one key**, not a bare list.
+- `events: null` is how a **failed fetch** arrives — on the same subscription, not as an
+  error frame. `_async_update_listener` catches `HomeAssistantError` and calls
+  `listener(None)`. HA's own card tests `msg.events === null` and shows
+  `ui.components.calendar.event_retrieval_error`. `msg.events.map(…)` is a crash.
+- Every push is a **full snapshot** of that calendar's window, never a delta. HA's card
+  drops all prior events for the calendar and re-appends.
+- The result ack is sent **before** the first snapshot (the fetch is wrapped in
+  `hass.async_create_task`), so there is nothing to await for data.
+- Events are **not clipped** to the window — a platform returns anything _overlapping_ it,
+  so a returned `start` may precede the requested one. Clipping is the client's job.
+- Re-push is debounced 1 s and fires on every state write; with `SCAN_INTERVAL = 60` and
+  `should_poll` defaulting true, that is roughly once a minute, plus each event boundary.
+  Turning off "Enable polling for updates" on the config entry removes the heartbeat.
+
+One event is `CalendarEvent.as_dict()`:
+
+```python
+def _event_dict_factory(obj):          # note: value.isoformat(), NOT as_local
+    result = {}
+    for name, value in obj:
+        if isinstance(value, (datetime.datetime, datetime.date)):
+            result[name] = value.isoformat()
+        elif value is not None:
+            result[name] = str(value)
+    return result
+```
+
+```jsonc
+// timed
+{"start":"2026-07-26T09:30:00+02:00","end":"2026-07-26T10:30:00+02:00","summary":"Standup","uid":"a1","all_day":false}
+// all-day — bare dates, and `end` is EXCLUSIVE
+{"start":"2026-07-27","end":"2026-07-29","summary":"Trip","all_day":true}
+```
+
+- `start`, `end`, `summary`, `all_day` are always there. `description`, `location`, `uid`,
+  `recurrence_id`, `rrule` are **omitted entirely** when unset — absent, not `null`.
+- `start` / `end` are **plain ISO strings**. The nested `{"dateTime": …}` / `{"date": …}`
+  form is the REST endpoint's (`_api_event_dict_factory`), and the frontend never calls it
+  — `grep -c "api/calendars" frontend_latest/*.js` is 0. Do not write one parser for both.
+- All-day is a date-only `start` **and** `all_day: true`, the same fact twice.
+  Interestingly the frontend reads neither flag: it hands the raw string to FullCalendar,
+  which infers all-day from the absence of a time portion.
+- **`end` is exclusive for all-day.** `strings.json` says so ("The date the all-day event
+  should end (exclusive)") and `CalendarEvent.__post_init__` rewrites a same-day all-day
+  event to end the next day. The frontend's event editor proves it from the other side:
+  it reads `addDays(new Date(dtend + "T00:00:00"), -1)` and writes `addDays(dtend, 1)`.
+- The offset is **not normalised** — `isoformat()` emits whatever the integration built.
+  `demo` and `local_calendar` carry the HA local offset; a UTC-based integration sends
+  `+00:00`. So a card must not assume the offset matches `hass.config.time_zone`.
+  Naive datetimes cannot occur (`CALENDAR_EVENT_SCHEMA` rejects them).
+
+### Per-calendar colour is NOT on `hass.entities`
+
+`hass.entities` is the DISPLAY registry, decoded in `connection-mixin.ts` from
+`config/entity_registry/list_for_display` into exactly twelve fields — `entity_id`,
+`device_id`, `area_id`, `labels`, `translation_key`, `platform`, `entity_category`,
+`has_entity_name`, `name`, `icon`, `hidden`, `display_precision`. **No `options`.** So the
+zero-config helper sketched above cannot get the colour from `hass`; its third argument is
+the full registry, which HA's panel and card both subscribe to separately.
+
+The full registry is `config/entity_registry/list` (a flat array) — but there is a scoped
+alternative, which is what this library uses:
+
+```ts
+hass.callWS({ type: 'config/entity_registry/get_entries', entity_ids: [...] })
+// -> { [entity_id]: entry | null }    entry.options.calendar.color
+```
+
+Neither is admin-gated; only `update` and `remove` carry `@require_admin`. `null` comes
+back for an entity with no registry entry at all — which every `demo` and YAML calendar
+is, since they have no unique id, so those can never have a colour set.
+
+`options.calendar.color` is a plain string two levels deep. It is a **named token** when
+the colour picker wrote it (its options are `Array.from(THEME_COLORS)`, 25 of them), and a
+`#RRGGBB` when an integration seeded it — `CalendarEntity.get_initial_entity_options()`
+validates `initial_color` through `cv.color_hex`, and `google` is the one integration that
+sets it. `computeCssColor` turns a token into the string `var(--<token>-color)` and passes
+anything else through.
+
+`isValidColor` is broader than it looks — three accept paths, and the last one needs a DOM:
+
+```js
+if (THEME_COLORS.has(v)) return true
+if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(v)) return true
+try {
+  const s = new Option().style
+  s.color = v
+  return s.color !== ''
+} catch {
+  return false
+}
+```
+
+Note the three text tokens (`primary-text`, `secondary-text`, `disabled`) are mapped by
+`computeCssVariable` but **rejected** by this, so a calendar carrying one falls through to
+the index palette.
+
+The fallback palette is not hex in JS — `getColorByIndex(index, style)` is
+`style.getPropertyValue(\`--color-${index % 54 + 1}\`)`, reading 54 custom properties
+defined once in `color.globals.ts`'s `html {}`block, with no dark override.`--color-54`duplicates`--color-1`, so it is 53 distinct colours. `--graph-color-N`is
+never defined by the shipped theme, so`getGraphColorByIndex` always falls through.
+
 ### Zero-config calendar discovery + colors — HA's own helper, deminified
 
 ```js
@@ -129,6 +270,177 @@ Exactly the zero-config default we want: enumerate `calendar.*`, skip unavailabl
 registry-hidden entities, honour the user's per-calendar colour from the entity registry,
 else assign from a palette by index. Also confirms `hass.entities` (entity registry) is
 available to custom cards.
+
+## Visual editors (VERIFIED — and the received wisdom here is stale)
+
+A card gets a visual editor by answering `static getConfigElement()`. Without one,
+Home Assistant shows `ui.errors.config.visual_editor_not_supported` — _"Visual editor
+not supported"_ — and a raw YAML box.
+
+That costs more than the fields. `hui-card-element-editor` renders its tab strip inside
+`renderConfigElement()`, which `hui-element-editor` only calls in the **GUI branch**; no
+config element means `GUImode` is forced false, so the user also loses the
+**Visibility** and **Layout** tabs, which are otherwise rendered by the host and have
+nothing to do with our card:
+
+```js
+// hui-card-element-editor
+const tabs = ['config']
+if (this.showVisibilityTab) tabs.push('visibility')
+if (this._showLayoutTab) tabs.push('layout')
+if (tabs.length === 1) return super.renderConfigElement() // no tab bar
+```
+
+`_showLayoutTab` additionally needs a `sectionConfig`, which only `hui-section` passes —
+so the Layout tab exists in the sections layout and not in masonry or panel views.
+
+Do **not** read that as "so `size` is the sizing control in the other views". It is not a
+control there at all. `getGridOptions()` has exactly three call sites in the whole
+bundle — `hui-view-footer`, `hui-section`, and `hui-card.getElementGridOptions()`, which
+only those two consume — so `columns`, the one field our two presets disagree on, is
+never read outside the sections grid. Masonry asks a card only for `computeCardSize()`,
+and uses the answer to pick the shortest column rather than to size anything; panel view
+asks for nothing and sizes with CSS. Both our presets are `rows: 4`, so `getCardSize()`
+is 5 and `heightFor()` is 248px either way, and the rendered layout comes from the
+measured width — the masonry column's, identical for both.
+
+`size` therefore does its work in exactly the view that also has the Layout tab: it is
+the footprint the card arrives with, and the `min_columns` clamp on how far it can be
+dragged down. Worth having in the editor for that, not as a substitute for a tab the
+other views do not need.
+
+### The contract for the element
+
+Read out of `hui-element-editor`, not out of documentation:
+
+```js
+// loadConfigElement — runs once; only a change of config.type replaces the element
+const el = await elClass.getConfigElement()      // static, awaited, may return a promise
+el.hass = this.hass                              // hass FIRST
+if ('lovelace' in el) el.lovelace = this.lovelace
+el.context = this.context
+el.addEventListener('config-changed', ev => this._handleUIConfigChanged(ev))
+// _updateConfigElement — then, and again on EVERY later change, including our own
+el.setConfig(this.value)
+
+_handleUIConfigChanged(ev) {
+  ev.stopPropagation()
+  if (!this.GUImode) return
+  const config = ev.detail.config
+  Object.keys(config).forEach(k => config[k] === undefined && delete config[k])
+  this.value = config
+}
+```
+
+Consequences:
+
+1. `config-changed` carries the **whole** config in `detail.config`. Note _where_ the
+   listener goes: on the config element itself, so the handler runs at the target and
+   neither `bubbles` nor `composed` is actually required. Set them anyway — HA's own
+   `fireEvent` does, and it costs nothing to survive a host that listens further up.
+2. Only `undefined` values are stripped. An `entities: []` lands in the user's YAML —
+   hence `applyFormData` in `core/card-editor.ts`.
+3. Throwing out of `setConfig` is the supported way to say "I cannot edit this": the
+   host wraps it in a `GUISupportError`, shows the message as a warning, and drops to
+   YAML. A plain `Error` is a warning; only a superstruct `StructError` (or a failure to
+   resolve the element) is the red _Configuration error_.
+4. Custom types resolve through `customElements.whenDefined(tag)` with a hard **2000 ms**
+   timeout, after which the editor shows `Custom element not found: <tag>`.
+5. `GUImode-changed` is fired **by** the host, not by us. A config element never needs it.
+
+There is a second path — `static getConfigForm()` returning `{schema, assertConfig,
+computeLabel, computeHelper}`, which HA renders with its own `hui-form-editor`. We do
+not use it: its schema cannot depend on the config, and it writes the form value into
+the config verbatim, empty arrays and all.
+
+### `ha-form` is already loaded — no `loadCardHelpers` dance needed
+
+The widely-copied trick of calling `window.loadCardHelpers()` and forcing a built-in
+card's editor open, just to get `ha-form` defined, is not needed on 2026.7. `ha-form`
+(module 55682) and `ha-selector` (module 45118) both ride in chunk **85407**, and that
+chunk is in the `lovelace` panel's own initial group:
+
+```js
+lovelace: () => Promise.all([e(4801), ..., e(85407), ...])
+```
+
+So by the time any card editor renders, both are defined. Worth re-checking on a bump —
+the edit-card dialog itself (`[45776, 70808, 28451]`) does **not** carry them, and
+neither does HA's own calendar-card-editor chunk, so the panel group is the only thing
+holding this up:
+
+```bash
+# -i is required: without it docker does not forward the heredoc to python's stdin.
+docker exec -i cupertino-widgets-ha python3 - <<'PY'
+import re, glob, os
+D = "/usr/local/lib/python3.14/site-packages/hass_frontend/frontend_latest"
+files = [p for p in glob.glob(D + "/*.js") if not p.endswith((".map", ".br", ".gz"))]
+app = next(p for p in files if os.path.basename(p).startswith("app."))
+group = re.search(r"lovelace:\(\)=>Promise\.all\(\[(.*?)\]\)", open(app).read(), re.S).group(1)
+panel = set(re.findall(r"e\((\d+)\)", group))
+for tag in ("ha-form", "ha-selector"):
+    owns = {os.path.basename(p).split(".")[0] for p in files
+            if f'EM)("{tag}")' in open(p, errors="ignore").read()}
+    print(tag, sorted(panel & owns) or "NOT LOADED WITH THE PANEL")
+PY
+```
+
+`ha-select-box` and `ha-entities-picker` are not in that group, but they ride along in
+the chunks `ha-selector` lazily loads for the `select` and `entity` selectors, so they
+need no help either.
+
+### `ha-form` itself
+
+Thirteen properties, all `attribute: false` except `narrow` and `disabled`. The ones
+that matter:
+
+- **`.data`, not `.value`.** Each row reads `data[schema.name]`.
+- `value-changed` carries `{ value: <the whole merged data object> }`. `ha-form`
+  intercepts each child's `value-changed`, stops it, merges `{[name]: value}` into its
+  data and re-fires the lot.
+- `computeLabel(schema, data)`, `computeHelper(schema)`, `computeError(error, schema)`,
+  `computeWarning`, `localizeValue(key)`.
+- `error` / `warning` are objects keyed by field name; the key `base` renders a
+  top-level `ha-alert`.
+- A node with a `selector` goes to `ha-selector`; a node with a `type` goes to
+  `ha-form-${type}`, lazily imported in `willUpdate`. Eleven of those exist —
+  `grid`, `expandable`, `select`, `string`, `boolean`, … — and none need importing.
+
+### Selectors
+
+`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Two we use:
+
+```js
+{ entity: { filter: { domain: 'calendar' }, multiple: true } }
+{ select: { mode: 'box', box_max_columns: 2, options: [{ value, label, description }] } }
+```
+
+- `filter` is the current spelling. A top-level `{ entity: { domain } }` still works, but
+  only because `ha-selector` migrates it — and the migration lifts `domain`,
+  `integration` and `device_class` only, **silently dropping** a `supported_features`
+  sitting beside them. `include_domains` is not a thing here at all.
+- `filter` may be an array — clauses are ORed, keys inside a clause ANDed, and
+  `domain` / `device_class` / `unit_of_measurement` each also accept an array.
+- `multiple: true` renders `ha-entities-picker` and emits `string[]`. Removing the last
+  entity emits `[]`, never `undefined`. Reordering is opt-in with `reorder: true`.
+- The picker lists everything in `hass.states` that matches; it does **not** hide
+  registry-hidden or unavailable entities.
+- `select` mode, when omitted, is decided by the option count: under six renders `list`
+  (radios), six or more `dropdown`. `box` — tiles with an optional `description` line —
+  is never chosen for you. An older frontend that does not know `box` falls through to
+  the dropdown rather than breaking.
+
+Home Assistant's own calendar card editor is a useful reference but not a model: it
+predates the entity selector and still hand-renders an `<ha-entities-picker>` beside its
+`ha-form`, with the label in a bare `<h3>`.
+
+### Strings
+
+`hass.localize(key)` returns `''` for a key it does not have, so `localize(k) || fallback`
+is the right shape. `ui.panel.lovelace.editor.card.calendar.calendar_entities`
+("Calendar entities") is translated into every language HA ships and lives in the
+lazily-loaded `lovelace` translation fragment — which is loaded whenever an editor is
+open, so a card editor can borrow it.
 
 ## Theming — HA has a real design-token system now
 

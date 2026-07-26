@@ -1,6 +1,6 @@
 # Calendar widget: the layout rules
 
-Reconstructed from Apple's own Calendar widget and checked against seven screenshots of
+Reconstructed from Apple's own Calendar widget and checked against eight screenshots of
 it. This is the specification the card implements; the code follows it section by
 section, and `src/cards/calendar/*.test.ts` pins the worked examples at the bottom.
 
@@ -132,20 +132,33 @@ takes its heading with it, and `2 more events` that meant "one event and one Thu
 would be a lie. Singular is `1 more event`.
 
 In the small size the indicator competes with §6's locations for the same leftover rows,
-and wins: at four rows it is moot — two events fill the column exactly — but a card
-dragged taller can spare a row, and "count wins" is about how much of the day you know
-about, not how much of it is drawn.
+and wins: "count wins" is about how much of the day you know about, not how much of it is
+drawn. Two timed events fill four rows exactly and leave nothing to argue over, but an
+all-day entry costs one row instead of two, so `1 + 2` leaves the row that decides it —
+which is why this is a live contest at the default height, not only on a card dragged
+taller.
 
 ### Where those numbers come from here
 
 Apple can hardcode 4 and 7 because an iPhone widget is always the same number of
 points tall. A Home Assistant card is whatever the user dragged it to, so `layout.ts`
 measures instead. A row is priced at 31px — half of a compact row's 56px plus the 6px
-gap beneath it, which is the dearest the four kinds of row get per row, so no mix of
-them can overflow. The right column fits `floor((content + 6) / 31)` of those; the left
-one is short by the 84px date block above it. At the default card height of 248px that
-works out to exactly 4 and 7, and a card dragged taller shows more rows rather than
-leaving a blank strip at the bottom.
+gap beneath it, which is the dearest any kind of row gets per row, so no mix of them can
+overflow. The right column fits `floor((content + 6) / 31)` of those; the left one is
+short by the 84px date block above it. At the default card height of 248px that works out
+to exactly 4 and 7, and a card dragged taller shows more rows rather than leaving a blank
+strip at the bottom.
+
+Two pixels of that arithmetic are easy to lose, and losing either one clips a descender
+off the last row of a column packed exactly full:
+
+- `content` is the card's measured height less the 16px inset **and less the 1px border
+  `ha-card` draws top and bottom** — it is `box-sizing: border-box`, so the border comes
+  out of the height, not on top of it.
+- a compact row is 56px only while the AM/PM keeps out of the line box. A smaller font in
+  the same line gets a larger half-leading and hangs below the strut, which made the time
+  line 22px instead of 20 and the row 58px on any 12-hour clock; the `.meridiem` rule
+  zeroes its line-height to take the box back out of the sum.
 
 ## 6. When a location shows
 
@@ -215,5 +228,6 @@ whichever keeps the rule simplest to state.
   sections the flow had started — and say nothing about the rest.
 - **What to call them.** Always `events`, even when everything hidden is a reminder.
   `2 more items` would be truthful and is uglier.
-- **Whether the small size gets one at all.** It does; see §5. At the default four rows
-  it can practically never happen.
+- **Whether the small size gets one at all.** It does; see §5. An all-day entry costing
+  one row is what makes it reachable at the default four rows — `1 + 2` and the indicator
+  in the row left over.

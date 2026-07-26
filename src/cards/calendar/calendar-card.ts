@@ -1,14 +1,25 @@
-import { css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
+import {
+  css,
+  html,
+  nothing,
+  type CSSResultGroup,
+  type PropertyValues,
+  type TemplateResult,
+} from 'lit'
 import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { registerCard } from '../../core/register'
+import type { LovelaceCardEditor } from '../../core/types/ha'
+import { CALENDAR_EDITOR_TAG } from './calendar-card-editor'
 import { timePreferences } from './datetime'
 import { DEFAULT_DEMO_SCENARIO, demoItems } from './demo-data'
-import { buildFlow } from './flow'
+import { LOOKAHEAD_DAYS, buildFlow } from './flow'
 import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
 import type { FormatContext, ItemTime, TimeToken } from './format'
 import { geometryFor, packFlow, type LayoutColumn, type LayoutRow } from './layout'
+import type { CalendarItem } from './model'
+import { CalendarFeed, calendarsFor, subscriptionWindow } from './source'
 
 export const CALENDAR_CARD_TAG = 'cupertino-widgets-calendar'
 
@@ -16,8 +27,12 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
   /** Calendar entities to show. Empty/absent means "every calendar", decided at render. */
   entities?: string[]
   /**
-   * TEMPORARY — which fixture from `demo-data.ts` to draw while the card has no data
-   * source. Goes away with the websocket subscription.
+   * Which fixture from `demo-data.ts` to draw INSTEAD of the user's calendars.
+   *
+   * For the dev harness and for the card picker, which have no calendars worth drawing
+   * between them. Absent — which is what every real dashboard has — means live data, and
+   * it has to: this key defaulting to a fixture is exactly how the card came to show
+   * strangers' lunch plans in a real Home Assistant.
    */
   demo_scenario?: string
 }
@@ -136,9 +151,9 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
          A caption, not a card. It borrows the event rail to say which calendar you are
          missing, and pointedly not the tint behind it — a tinted row would read as one
          more event, when the whole point of the line is that those did not fit. The
-         10px of padding lines its bar up with the bars of the rows above; the 22px it
-         comes to is the second of the two one-row heights layout.ts prices ROW against
-         (a heading is 20px), so this must stay short. */
+         10px of padding lines its bar up with the bars of the rows above, and the 22px it
+         comes to is one of the three one-row heights layout.ts prices ROW against — a
+         heading is 20px, an all-day chip 24px — so this must stay short. */
       .more {
         flex: none;
         min-width: 0;
@@ -244,11 +259,21 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
         color: var(--cw-label-secondary);
       }
 
-      /* AM/PM rides smaller than the digits, the way iOS sets it. */
+      /* AM/PM rides smaller than the digits, the way iOS sets it.
+
+         The zero line-height is load-bearing, not decoration. A smaller font in the same
+         line box gets a bigger half-leading, so its inline box hangs below the parent's
+         strut and grows the line: the time line measures 22px with an AM/PM in it and
+         20px without, which made a compact row 58px on a 12-hour clock and 56px on a
+         24-hour one. layout.ts prices the row budget off that 56px, so the meridiem was
+         quietly buying two pixels the budget had not sold it. Zeroing the line-height
+         takes this box out of the line-box calculation and leaves the glyphs exactly
+         where they were. */
       .meridiem {
         font-size: 0.82em;
         font-weight: 600;
         letter-spacing: 0.01em;
+        line-height: 0;
       }
 
       /* Secondary, not tertiary: this line is the card's entire message on a quiet
@@ -271,6 +296,23 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
   }
 
   /**
+   * The visual editor, which is worth more than the two fields inside it.
+   *
+   * `hui-element-editor` renders its tab strip only inside the GUI branch, so a card
+   * that does not answer this gets no **Visibility** tab and no **Layout** tab either —
+   * the user is handed a raw YAML box and nothing else.
+   *
+   * Home Assistant awaits this, so a plain element is as good as a promise. There is no
+   * waiting on the other side though — the deadline it does enforce is on resolving the
+   * *card* tag out of `custom:…`, long before this runs, and whatever comes back here is
+   * used as-is. So the editor tag has to be defined already: it is, because importing
+   * this module imports the one that defines it.
+   */
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement(CALENDAR_EDITOR_TAG) as LovelaceCardEditor
+  }
+
+  /**
    * The clock the card is drawn against.
    *
    * Kept in state and advanced on the minute, because half the rules are about now:
@@ -282,15 +324,93 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
   private _tick: ReturnType<typeof setTimeout> | undefined
 
+  /**
+   * The rows Home Assistant has pushed, from every subscribed calendar at once.
+   *
+   * A `@state()` field written by a callback, the same shape as `_now`, and it needs no
+   * help from `watchedEntities()` to be seen: `shouldUpdate` waves through anything that
+   * is not solely a `hass` swap, and this is not one.
+   */
+  @state() private _items: readonly CalendarItem[] = []
+
+  private readonly _feed = new CalendarFeed(items => {
+    this._items = items
+  })
+
+  /**
+   * Whether this card is drawing fixtures rather than the user's calendars.
+   *
+   * Two cases, and the second is the interesting one. The harness asks by name. The card
+   * PICKER does not ask at all — `registerCard` sets `preview: true` so the picker draws
+   * a live card, and the stub config it draws carries no `entities`, which means "every
+   * calendar". Left alone that would open a subscription per calendar in the
+   * installation every time the tile scrolls into view, to show a thumbnail. Fixtures
+   * cost nothing and are a better advertisement anyway.
+   */
+  private get _fixtures(): string | undefined {
+    if (this._config?.demo_scenario !== undefined) return this._config.demo_scenario
+    return this.preview ? DEFAULT_DEMO_SCENARIO : undefined
+  }
+
   public override connectedCallback(): void {
     super.connectedCallback()
     this._scheduleTick()
+    // A move in the DOM disconnects and reconnects the card without changing a single
+    // reactive property, so no update runs and `willUpdate` never fires. This is the
+    // only hook that sees it.
+    void this._reconcileFeed()
   }
 
   public override disconnectedCallback(): void {
     clearTimeout(this._tick)
     this._tick = undefined
+    this._feed.stop()
     super.disconnectedCallback()
+  }
+
+  protected override willUpdate(changed: PropertyValues): void {
+    super.willUpdate(changed)
+    // `_now` is in here for the midnight rollover: the subscription window is keyed on
+    // the day, so ticking through midnight is what moves it on. Every other tick finds
+    // the key unchanged and costs nothing.
+    if (changed.has('hass') || changed.has('_config') || changed.has('_now')) {
+      void this._reconcileFeed()
+    }
+  }
+
+  /**
+   * Entity ids whose state changes have to reach this card.
+   *
+   * Overridden for the zero-config case, where the card follows whatever calendars exist
+   * and a filter that let a bare `hass` swap through unnoticed would never find out
+   * about a new one. Derived from `hass` on every call rather than cached, because that
+   * is what puts a newly-appeared calendar in the list at the moment its state first
+   * differs from `undefined`.
+   *
+   * A calendar that goes away is the one case this cannot catch — it drops out of the
+   * list before anything compares it. `hass` swaps often enough for another reason that
+   * this has never been visible, and a subscription to a deleted entity is closed by
+   * Home Assistant regardless.
+   */
+  protected override watchedEntities(): string[] {
+    return calendarsFor(this._config?.entities, this.hass)
+  }
+
+  private async _reconcileFeed(): Promise<void> {
+    if (!this.isConnected) return
+
+    const hass = this.hass
+    if (this._fixtures !== undefined || !hass?.connection) {
+      this._feed.stop()
+      return
+    }
+
+    await this._feed.reconcile(
+      hass,
+      calendarsFor(this._config?.entities, hass),
+      subscriptionWindow(this._now, LOOKAHEAD_DAYS),
+      this._timeZone,
+    )
   }
 
   /** Wakes on the minute rather than every 60s, so the card and the clock agree. */
@@ -390,7 +510,8 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     const ctx: FormatContext = { locale, timeZone: this._timeZone, hour12 }
 
     const mode = this.cwLayout
-    const items = demoItems(this._config.demo_scenario ?? DEFAULT_DEMO_SCENARIO, now)
+    const fixtures = this._fixtures
+    const items = fixtures === undefined ? this._items : demoItems(fixtures, now)
 
     // Small is today and nothing else, however busy tomorrow looks.
     const flow = buildFlow(items, { now, ctx, todayOnly: mode === 'small' })

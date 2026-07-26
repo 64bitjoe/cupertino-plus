@@ -115,6 +115,99 @@ export interface LovelaceGridOptions {
   max_rows?: number
 }
 
+// ---- The visual editor -----------------------------------------------------
+
+/**
+ * One clause of an entity selector's filter.
+ *
+ * Keys within a clause are ANDed; a filter given as an array is ORed across its
+ * clauses. `domain`, `device_class` and `unit_of_measurement` each also accept an
+ * array, which is an OR of its own. Only the keys we use are modelled.
+ */
+export interface EntityFilter {
+  domain?: string | string[]
+  device_class?: string | string[]
+}
+
+export interface EntitySelector {
+  entity: {
+    filter?: EntityFilter | EntityFilter[]
+    /**
+     * Turns the picker into a list of pickers. The value it reports is then a
+     * `string[]` — and, once the user removes the last entity, an empty array rather
+     * than `undefined`. See `applyFormData` in `core/card-editor.ts`.
+     */
+    multiple?: boolean
+    /** Drag handles on a multiple picker. Off unless asked for. */
+    reorder?: boolean
+  }
+}
+
+export interface SelectOption {
+  value: string
+  label: string
+  /** A second line under the label. Only `box` mode draws it. */
+  description?: string
+}
+
+export interface SelectSelector {
+  select: {
+    options: SelectOption[]
+    /**
+     * Omit it and the option count decides: under six renders `list` (radio buttons),
+     * six or more `dropdown`. `box` — labelled tiles — is never chosen for you.
+     */
+    mode?: 'dropdown' | 'list' | 'box'
+    /** `box` mode only. */
+    box_max_columns?: number
+    multiple?: boolean
+  }
+}
+
+/**
+ * A selector, as `ha-selector` reads it.
+ *
+ * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful —
+ * hence a union rather than a bag of optional keys. The shipped build knows 57 of
+ * these; these are the two our editors ask for.
+ */
+export type Selector = EntitySelector | SelectSelector
+
+/**
+ * One row of an `ha-form`.
+ *
+ * `ha-form` also takes nodes carrying a `type` instead of a `selector` — `grid`,
+ * `expandable` and nine others, whose elements it lazily imports when it sees them —
+ * but a selector node is the only shape our editors need.
+ */
+export interface HaFormSchema {
+  name: string
+  selector: Selector
+  /** Purely presentational here: `ha-form` marks the field, it does not enforce it. */
+  required?: boolean
+}
+
+/**
+ * The element a card's `static getConfigElement()` hands back.
+ *
+ * The contract, read out of `hui-element-editor` in the 2026.7.4 frontend rather than
+ * from documentation, is written up on `CupertinoCardEditor`.
+ */
+export interface LovelaceCardEditor extends HTMLElement {
+  hass?: HomeAssistant
+  setConfig(config: LovelaceCardConfig): void
+}
+
+/**
+ * The static side of a card class — what Home Assistant reaches for on the constructor
+ * rather than on the element. `hui-card-element-editor` looks up exactly this, so the
+ * dev harness can drive the same path the dashboard does.
+ */
+export interface LovelaceCardConstructor {
+  getConfigElement?(): LovelaceCardEditor | Promise<LovelaceCardEditor>
+  getStubConfig?(): LovelaceCardConfig
+}
+
 export interface LovelaceCard extends HTMLElement {
   hass?: HomeAssistant
   /** Set by Home Assistant when the card is rendered inside the card picker. */

@@ -445,19 +445,27 @@ describe('geometry', () => {
   })
 
   /**
-   * The budget is only worth anything if a full column actually fits in the box. The
-   * rendered heights below are what the card's CSS produces; the tallest way to spend
-   * N rows is on compact rows, which are the dearest per row, and — for an odd budget —
-   * on the taller of the two nodes that cost one row.
+   * The budget is only worth anything if a full column actually fits in the box.
+   *
+   * The numbers below are measured, not assumed — every one of them is a rendered height
+   * out of the card's own CSS, taken through the dev harness at a device pixel ratio of
+   * 1, which is the unkindest rounding. Two of them are the reason this test exists at
+   * all: the box is 2px shorter than the card, because `ha-card` draws a border and is
+   * `box-sizing: border-box`, and a compact row is 56px only while the AM/PM inside it
+   * keeps its hands off the line box (see the `.meridiem` rule).
+   *
+   * The tallest way to spend N rows is on compact rows, which are the dearest per row,
+   * and — for an odd budget — on the tallest of the nodes that cost a single row.
    */
   it('never budgets more rows than the column can draw, at any height', () => {
     const INSET = 16
+    const BORDER = 1
     const DATE_BLOCK = 84
     const GAP = 6
     const COMPACT = 56
     /**
-     * The tallest node that costs a single row: an all-day chip, 22px of title inside
-     * 1px of padding. A `2 more events` is 22px, a heading 20px.
+     * The tallest of the three one-row nodes: an all-day chip, 22px of title inside 1px
+     * of padding. A `2 more events` is 22px, a heading 20px.
      */
     const ONE_ROW = 24
 
@@ -469,8 +477,8 @@ describe('geometry', () => {
       return compacts * COMPACT + single * ONE_ROW + (nodes - 1) * GAP
     }
 
-    for (let height = 100; height <= 800; height += 2) {
-      const content = height - 2 * INSET
+    for (let height = 100; height <= 800; height += 1) {
+      const content = height - 2 * INSET - 2 * BORDER
       const [left, right] = geometryFor('medium', height, false).budgets
       expect(tallestRendering(right!)).toBeLessThanOrEqual(content)
       expect(tallestRendering(left!)).toBeLessThanOrEqual(Math.max(0, content - DATE_BLOCK))

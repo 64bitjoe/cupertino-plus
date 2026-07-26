@@ -156,6 +156,55 @@ describe('headings', () => {
   })
 })
 
+describe('a today that is over', () => {
+  const over = event('This morning', '2026-07-24T09:00:00+02:00', '2026-07-24T10:00:00+02:00')
+  const tomorrow = event('Tomorrow item', '2026-07-25T10:00:00+02:00', '2026-07-25T11:00:00+02:00')
+
+  it('tells a finished today from a free one', () => {
+    expect(buildFlow([over, tomorrow], { now: NOW, ctx })).toMatchObject({
+      todayEmpty: true,
+      todayDone: true,
+    })
+    expect(buildFlow([tomorrow], { now: NOW, ctx })).toMatchObject({
+      todayEmpty: true,
+      todayDone: false,
+    })
+  })
+
+  it('is never claimed while today still has something left', () => {
+    const later = event('This evening', '2026-07-24T19:00:00+02:00', '2026-07-24T20:00:00+02:00')
+    expect(buildFlow([over, later], { now: NOW, ctx })).toMatchObject({
+      todayEmpty: false,
+      todayDone: false,
+    })
+  })
+
+  it('holds in the small size, which never sees tomorrow at all', () => {
+    const flow = buildFlow([over, tomorrow], { now: NOW, ctx, todayOnly: true })
+    expect(flow).toMatchObject({ todayEmpty: true, todayDone: true })
+  })
+
+  it('counts something that started yesterday and ended this morning', () => {
+    const overnight = event('Night shift', '2026-07-23T22:00:00+02:00', '2026-07-24T06:00:00+02:00')
+    expect(buildFlow([overnight], { now: NOW, ctx }).todayDone).toBe(true)
+  })
+
+  it('does not count yesterday, whose end is only exclusively today', () => {
+    // An all-day entry for yesterday ends at midnight, which is a moment that belongs to
+    // today on the clock and to yesterday on the calendar.
+    const yesterday = event('Yesterday', '2026-07-23T00:00:00+02:00', '2026-07-24T00:00:00+02:00')
+    expect(buildFlow([yesterday], { now: NOW, ctx }).todayDone).toBe(false)
+  })
+
+  it('follows the display timezone, like everything else here', () => {
+    // 01:00 on the 24th in Warsaw is still the 23rd in UTC, so the same event ends a
+    // Warsaw today and a UTC yesterday.
+    const early = event('Small hours', '2026-07-24T00:30:00+02:00', '2026-07-24T01:00:00+02:00')
+    expect(buildFlow([early], { now: NOW, ctx }).todayDone).toBe(true)
+    expect(buildFlow([early], { now: NOW, ctx: { ...ctx, timeZone: 'UTC' } }).todayDone).toBe(false)
+  })
+})
+
 describe('small', () => {
   it('never leaves today', () => {
     const items = [

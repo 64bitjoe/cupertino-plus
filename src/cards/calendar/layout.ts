@@ -354,7 +354,7 @@ export const geometryFor = (
   const below = rowsIn(content - DATE_BLOCK)
 
   if (mode === 'small') return { budgets: [below] }
-  // Nothing today means no left column to fill: the flow starts on the right, under
-  // a `No Events Today` line.
+  // Nothing left today means no left column to fill: the flow starts on the right, under
+  // the `No (More) Events Today` line.
   return { budgets: [todayEmpty ? 0 : below, beside] }
 }

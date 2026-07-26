@@ -141,6 +141,7 @@ export const LIVE_DATA = 'live'
 const SCENARIO_LABELS: Record<string, string> = {
   default: 'A normal day',
   'today-empty': 'Nothing on today',
+  'today-done': 'Today is over',
   'one-event': 'A single event',
   'two-events': 'Two events',
   'three-events': 'Three events',

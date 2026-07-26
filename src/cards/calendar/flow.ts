@@ -6,7 +6,8 @@
  * The rules, in order:
  *
  *  1. today and forwards only, out to `LOOKAHEAD_DAYS`;
- *  2. anything already finished is dropped, anything running now stays;
+ *  2. anything already finished is dropped, anything running now stays — though a
+ *     finished item is still counted, so a day that is over can say so;
  *  3. inside a day: all-day first, then by start time — reminders and events share
  *     one stream rather than being separated;
  *  4. days with nothing in them vanish completely, headings and all, so an empty
@@ -38,15 +39,38 @@ export interface FlowOptions {
 export interface Flow {
   nodes: FlowNode[]
   /**
-   * Today has nothing in it. The widget says so out loud rather than silently
+   * Today has nothing left in it. The widget says so out loud rather than silently
    * starting with tomorrow, which would read as though tomorrow were today.
    */
   todayEmpty: boolean
+  /**
+   * Today is empty because it is *over*, not because it was ever free — everything on
+   * it has already finished. Only ever true alongside `todayEmpty`, and the whole of
+   * the difference between `No Events Today` and `No More Events Today`: the first one,
+   * read at six in the evening of a day with three meetings behind it, says the card
+   * lost them rather than that the day is done.
+   */
+  todayDone: boolean
 }
 
 interface Placed {
   item: CalendarItem
   day: number
+}
+
+/**
+ * Whether an item that is already over was one of *today's*.
+ *
+ * The end is exclusive, here as it is on the wire: Home Assistant's all-day events end
+ * at the following midnight, so reading the end inclusively would count yesterday's trip
+ * among today's events and put `No More Events Today` on a genuinely free day. `start`
+ * floors it for the zero-length case, where a stroke-of-midnight event would otherwise
+ * be dated to the day before.
+ */
+const finishedOn = (item: CalendarItem, day: number, timeZone?: string): boolean => {
+  if (!item.end) return false
+  const last = Math.max(item.start.getTime(), item.end.getTime() - 1)
+  return dayNumber(new Date(last), timeZone) === day
 }
 
 export function buildFlow(items: readonly CalendarItem[], options: FlowOptions): Flow {
@@ -55,8 +79,14 @@ export function buildFlow(items: readonly CalendarItem[], options: FlowOptions):
   const horizon = today + horizonDays
 
   const placed: Placed[] = []
+  // Only interesting when nothing is left: it is what tells an empty today from a
+  // finished one.
+  let anyFinishedToday = false
   for (const item of items) {
-    if (isOver(item, now)) continue
+    if (isOver(item, now)) {
+      anyFinishedToday ||= finishedOn(item, today, ctx.timeZone)
+      continue
+    }
 
     const startDay = dayNumber(item.start, ctx.timeZone)
     // Something with a duration that began before today and has not ended is still
@@ -96,5 +126,6 @@ export function buildFlow(items: readonly CalendarItem[], options: FlowOptions):
     nodes.push({ type: 'item', key: item.id, item })
   }
 
-  return { nodes, todayEmpty: placed.length === 0 || placed[0].day !== today }
+  const todayEmpty = placed.length === 0 || placed[0].day !== today
+  return { nodes, todayEmpty, todayDone: todayEmpty && anyFinishedToday }
 }

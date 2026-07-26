@@ -1,9 +1,10 @@
 /**
  * TEMPORARY — goes away with the websocket subscription.
  *
- * Hand-built days that exercise every branch of the layout: an empty today, a skipped
- * empty tomorrow, locations that fit and locations that do not, reminders mixed into
- * the same stream as events, an all-day entry, and a tail that runs out of column.
+ * Hand-built days that exercise every branch of the layout: an empty today and a
+ * finished one, a skipped empty tomorrow, locations that fit and locations that do not,
+ * reminders mixed into the same stream as events, an all-day entry, and a tail that runs
+ * out of column.
  *
  * Times for *today* are anchored to the current clock rather than written out, so the
  * card still has something to show at four in the afternoon. Later days use plain
@@ -43,6 +44,19 @@ const soon = (now: Date): Date => {
 }
 
 const after = (base: Date, hours: number): Date => new Date(base.getTime() + hours * HOUR)
+
+/**
+ * `hours` before now, floored at this morning's midnight.
+ *
+ * A scenario about what has already happened today has nothing to say if the harness is
+ * opened at half past midnight and its events land on yesterday, where the day filter
+ * eats them and the card claims today was free.
+ */
+const earlier = (now: Date, hours: number): Date => {
+  const wanted = new Date(now.getTime() - hours * HOUR)
+  const start = midnight(now, 0)
+  return wanted < start ? start : wanted
+}
 
 type Draft = Omit<CalendarItem, 'id'>
 
@@ -101,6 +115,20 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
 
   /** `No Events Today` on the left, the flow starting on the right. */
   'today-empty': now => laterDays(now),
+
+  /** The other empty today: it had events, they are all behind us — `No More Events Today`. */
+  'today-done': now => [
+    { kind: 'event', title: 'Standup', start: earlier(now, 4), end: earlier(now, 3), color: WORK },
+    {
+      kind: 'event',
+      title: 'Design review',
+      location: 'Długa 36, Warsawa',
+      start: earlier(now, 2),
+      end: earlier(now, 1),
+      color: WORK,
+    },
+    ...laterDays(now),
+  ],
 
   /** One event, so its location fits even in the small size. */
   'one-event': now => {

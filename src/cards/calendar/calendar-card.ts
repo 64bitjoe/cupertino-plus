@@ -47,10 +47,16 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
 }
 
 /**
- * Not localised yet: Home Assistant has no string for this and the widget it is
- * copying says exactly this. One place to change when a translation layer exists.
+ * Not localised yet: Home Assistant has no string for either and the widget being copied
+ * says exactly these. One place to change when a translation layer exists.
+ *
+ * Two of them, because "nothing left" and "nothing at all" are different days and a
+ * widget that cannot tell them apart is one the user has to check the calendar behind.
+ * `No Events Today` at seven in the evening, after a day of meetings, reads as data
+ * missing rather than as a day finished.
  */
 const NO_EVENTS_TODAY = 'No Events Today'
+const NO_MORE_EVENTS_TODAY = 'No More Events Today'
 
 /**
  * How the MDI glyph is centred in the badge.
@@ -562,6 +568,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     const { budgets } = geometryFor(mode, this.boxHeight, flow.todayEmpty, this.scaleFactor)
     const columns = packFlow(flow.nodes, budgets, mode)
     const date = widgetDate(now, ctx)
+    const emptyLabel = flow.todayDone ? NO_MORE_EVENTS_TODAY : NO_EVENTS_TODAY
 
     return html`
       <ha-card class="cw-pressable">
@@ -573,7 +580,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
             </div>
             ${
               flow.todayEmpty
-                ? html`<div class="empty">${NO_EVENTS_TODAY}</div>`
+                ? html`<div class="empty">${emptyLabel}</div>`
                 : this._renderColumn(columns[0], ctx)
             }
           </div>

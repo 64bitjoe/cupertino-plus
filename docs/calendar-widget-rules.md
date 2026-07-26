@@ -89,7 +89,7 @@ colour, and follow the locale's own day/month order (`JUL 26` in en-US).
 
 ## 4. What each size shows
 
-**Small** — today. If today is empty: `No Events Today`. Other days never appear, not
+**Small** — today. If today is empty: the empty line, below. Other days never appear, not
 even when today is empty and tomorrow is full.
 
 **Medium** — two columns holding one vertical flow that spills from the left column
@@ -98,8 +98,22 @@ into the right:
 - left: the date block, and the start of the flow beneath it;
 - right: the same flow continuing — the rest of today first, **with no heading**, then
   the next day's heading and its rows;
-- if today is empty, the left column reads `No Events Today` under the date and the
-  flow starts at the top of the right column.
+- if today is empty, the left column reads the empty line under the date and the flow
+  starts at the top of the right column.
+
+**The empty line** has two forms, and which one is shown is the difference between a
+free day and a finished one:
+
+| Today                                 | Line                   |
+| ------------------------------------- | ---------------------- |
+| nothing on it, and nothing was        | `No Events Today`      |
+| had something, all of it already over | `No More Events Today` |
+
+"Already over" is §2's own rule read backwards: a row is retired only by a real end
+time, so the same events that drop out of the flow during the day are what turn the line
+into `No More Events Today` once the last of them ends. An entry with no end time never
+retires and so never produces it, and the end is exclusive — an all-day entry for
+yesterday ends at today's midnight and is still yesterday's.
 
 ## 5. The height budget
 

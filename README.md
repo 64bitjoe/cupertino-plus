@@ -134,8 +134,8 @@ Everything between and around them works too — that is the whole point of meas
 instead of reading a preset. A card dragged taller fills the extra height with more rows
 rather than leaving it blank, and one dragged narrow folds to a single column. But those two
 are the proportions the content was laid out for. A new card arrives full width and 4 rows
-tall, and can be dragged down to 4 columns by 3 rows — which is the date and a couple of
-events, and where turning `scale` down earns its keep.
+tall, and can be dragged down to 4 columns by 3 rows — a square that short holds the date and
+the next event and nothing else, so it is one to leave at 100% or below.
 
 **`scale` is the other question.** The footprint settles how much room the card has; `scale`
 settles how large what goes in it is drawn — the type at 80% or 130% of the size above,

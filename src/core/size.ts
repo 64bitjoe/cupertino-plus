@@ -52,11 +52,18 @@ export const columnsToPx = (columns: number, sectionWidth: number): number => {
  * The column floor is what makes the other layout reachable: 4 columns comes to ~150px,
  * well under the threshold below, so a user who wants the square can simply drag to it.
  *
- * The row floor is 3, one short of the default, and it is a promise rather than a
- * suggestion: whatever cell the Layout tab hands us at that height, the card has to draw
- * itself inside it. Three rows is 184px, which is the date block and one event beside it
- * at 100% and three at 80% — thin, but a widget rather than a ruin, and `scale` is what
- * makes it worth offering. Below that the date block alone eats the box.
+ * The row floor is 3, one short of the default, and what it promises is only that the card
+ * fits: whatever cell the Layout tab hands us at that height, the card draws itself inside
+ * it rather than over the card below — which is `_applyMinHeight` in `base-card.ts`, and
+ * was the whole of why 4 rows used to look like the shortest a card could be.
+ *
+ * What three rows *holds* is the other question, and it is the row budget's answer rather
+ * than this file's. 184px at 100% is one event under the date and two beside it in the wide
+ * layout, one event and nothing else in the square; at 80% both columns gain a row, and at
+ * 130% the date block takes the short column on its own. Thin at either end, and a widget
+ * rather than a ruin only because `scale` exists to be turned down — which is why the floor
+ * is worth offering and not a height to trust blindly. Below three the date block alone eats
+ * the box at any scale.
  *
  * `max_columns` is deliberately absent. There is nothing to protect against — the flow
  * pours into two columns and the row budget follows the height, so a card dragged wider

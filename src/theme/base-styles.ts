@@ -35,7 +35,8 @@ export const baseStyles = css`
     /* Fill the grid cell in the sections layout... */
     height: 100%;
     /* ...and still have a height in the legacy masonry layout, where the cell is
-       content-sized. Set once by the base card from the default footprint. */
+       content-sized. Set by the base card from the default footprint, clamped to the box
+       the card was measured in -- see _applyMinHeight. */
     min-height: var(--cw-min-height, auto);
     box-sizing: border-box;
     display: flex;

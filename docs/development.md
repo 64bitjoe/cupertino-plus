@@ -200,15 +200,15 @@ The calendar card is split so that the rules can be read and tested without a br
 
 ```
 cards/calendar/
-  calendar-card.ts      the element: measure the box, draw what the two below decide
-  calendar-card-editor.ts   its own two rows; Scale is added by the base editor
-  flow.ts               what to show and in what order — one stream of rows
-  layout.ts             how much of that stream fits, in columns of a row budget
-  format.ts             times, section headings, the date block
-  datetime.ts           day arithmetic in the display timezone
-  model.ts              the item shape every data source has to produce
-  source.ts             the Home Assistant end: subscriptions, colours, wire mapping
-  demo-data.ts          fixtures for the showcase, never for a dashboard
+  calendar-card.ts         the element: measure the box, draw what the two below decide
+  calendar-card-editor.ts  its own two rows; Scale is added by the base editor
+  flow.ts                  what to show and in what order — one stream of rows
+  layout.ts                how much of that stream fits, in columns of a row budget
+  format.ts                times, section headings, the date block
+  datetime.ts              day arithmetic in the display timezone
+  model.ts                 the item shape every data source has to produce
+  source.ts                the Home Assistant end: subscriptions, colours, wire mapping
+  demo-data.ts             fixtures for the showcase, never for a dashboard
 ```
 
 Cards read `--cw-*` tokens, never Home Assistant variables directly. `theme/tokens.ts`

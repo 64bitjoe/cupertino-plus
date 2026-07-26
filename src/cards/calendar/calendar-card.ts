@@ -292,11 +292,11 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    * card.
    */
   public static getStubConfig(): CalendarCardConfig {
-    return { type: `custom:${CALENDAR_CARD_TAG}`, size: 'medium' }
+    return { type: `custom:${CALENDAR_CARD_TAG}` }
   }
 
   /**
-   * The visual editor, which is worth more than the two fields inside it.
+   * The visual editor, which is worth more than the one field inside it.
    *
    * `hui-element-editor` renders its tab strip only inside the GUI branch, so a card
    * that does not answer this gets no **Visibility** tab and no **Layout** tab either —

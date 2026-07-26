@@ -11,4 +11,4 @@ import './cards/calendar/calendar-card'
 printBanner()
 
 export { CALENDAR_CARD_TAG } from './cards/calendar/calendar-card'
-export type { WidgetSize } from './core/size'
+export type { WidgetLayout } from './core/size'

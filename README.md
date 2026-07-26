@@ -19,17 +19,20 @@ frontend APIs rather than carrying compatibility shims.
 | Battery levels                      | planned      |
 | To-do lists                         | planned      |
 
-Two sizes, the two Apple offers on a home screen, laid out to match its widget
-proportions on Home Assistant's 12-column sections grid:
+**There is no size option.** Resize the card the normal way — the **Layout** tab in the
+dashboard editor — and it works out which of Apple's two widget shapes fits the box you
+gave it:
 
-| `size`   | grid   | rendered | shows                     |
-| -------- | ------ | -------- | ------------------------- |
-| `small`  | 6 × 4  | ~246×248 | today                     |
-| `medium` | 12 × 4 | ~500×248 | today and what follows it |
+| measured width | layout | shows                     |
+| -------------- | ------ | ------------------------- |
+| under 340px    | small  | today                     |
+| 340px and up   | medium | today and what follows it |
 
-`size` only sets the _starting_ footprint. Resizing a card by hand in the dashboard
-editor always wins: the layout follows the card's measured width, and a card dragged
-taller fills the extra height with more rows rather than leaving it blank.
+In a section of the usual ~500px that lands at roughly 8 columns and below for the
+square, 9 and above for the 2:1. A card dragged taller fills the extra height with more
+rows rather than leaving it blank, and one dragged narrow folds to a single column of
+content. A freshly added card arrives full width by 4 rows and can be dragged down to
+4 × 3.
 
 What the calendar card decides to show, and in what order, is written down in
 [`docs/calendar-widget-rules.md`](docs/calendar-widget-rules.md) — empty days
@@ -54,14 +57,13 @@ HACS registers the dashboard resource for you.
 ## Usage
 
 Add the card from the dashboard's card picker and configure it there — it has a visual
-editor, so there is no YAML to write. Two controls: the footprint, and which calendars
-feed it.
+editor, so there is no YAML to write. One control: which calendars feed it. The size is
+the Layout tab's job, not ours.
 
 The equivalent YAML, if you prefer it:
 
 ```yaml
 type: custom:cupertino-widgets-calendar
-size: small # small | medium. Optional; defaults to medium
 entities: # optional; leave it out for every calendar
   - calendar.work
   - calendar.personal
@@ -69,8 +71,9 @@ entities: # optional; leave it out for every calendar
 
 | Option     | Default        | Meaning                                                         |
 | ---------- | -------------- | --------------------------------------------------------------- |
-| `size`     | `medium`       | Starting footprint. See the table above.                        |
 | `entities` | every calendar | Which `calendar.*` entities to draw. Omit it rather than empty. |
+
+Plus `grid_options`, which is Home Assistant's own and is what the Layout tab writes.
 
 Each calendar is subscribed separately over `calendar/event/subscribe`, so the card
 follows Home Assistant rather than polling it. Colours come from the colour set on the
@@ -88,8 +91,8 @@ pnpm dev          # dev harness at http://localhost:5173 — no Home Assistant n
 pnpm test         # the layout rules, as unit tests
 ```
 
-The harness renders every card against a mock `hass` object, at both preset sizes plus
-a drag-resizable box. Its controls exist to make the layout rules visible: **Data**
+The harness renders every card against a mock `hass` object, at four footprints either
+side of the layout threshold plus a drag-resizable box. Its controls exist to make the layout rules visible: **Data**
 picks either `live (websocket)`, which makes the card resolve `entities` and subscribe to
 the mock's calendars exactly as it would in Home Assistant, or one of the fixtures built
 to hit every layout branch (an empty today, a skipped empty tomorrow, locations that fit
@@ -118,21 +121,43 @@ output is served without any copy step: `./dist` is mounted into the container's
 
 ```bash
 pnpm ha:up        # http://localhost:8123 — create an account on first run
-pnpm watch        # rebuild dist/ on change
+pnpm verify       # build, bust the cache, restart — the one command to trust
 ```
 
-Then hard-reload the browser (⌘⇧R). A reload is unavoidable: a custom element cannot be
-redefined in a page that already registered it. That is why the harness above, not this,
-is the loop you should live in.
+**`pnpm verify` is the answer to "am I looking at my change?"** It builds, bumps the `?v=`
+on the resource URL, and force-recreates the container. Nothing else is reliable, and it is
+worth knowing why, because the failure mode is not "stale" — it is _one build behind_,
+which reads as flaky rather than as cached.
 
-When even a hard reload keeps serving an old bundle, bump the `?v=` on the resource URL
-in `dev/ha-config/configuration.yaml` and run `pnpm ha:up`. Two caches sit in front of
-that file and cover for each other: Home Assistant serves `/local/` with
-`Cache-Control: public, max-age=2678400`, and the frontend's service worker catches
-everything unmatched in a StaleWhileRevalidate `file-cache`. A shift-reload bypasses the
-service worker for the document but not for its subresources, so the worker keeps
-answering from its own copy — and the revalidation it fires behind you is served by the
-month-old HTTP entry. Changing the URL misses both.
+Two caches sit in front of that file and cover for each other:
+
+- Home Assistant serves `/local/` with `Cache-Control: public, max-age=2678400`. 31 days.
+- The frontend's service worker ends its route table with a catch-all that `/local/` falls
+  into: `registerRoute(/\/.*/, new StaleWhileRevalidate({ cacheName: 'file-cache',
+  plugins: [new ExpirationPlugin({ maxAgeSeconds: 86400 })] }))`. Stale-while-revalidate
+  answers from cache and refreshes behind you, so a reload shows the **previous** build and
+  the current one appears on the reload after that.
+
+A hard reload (⌘⇧R) does not rescue you, and the reason is specific: Home Assistant loads
+a dashboard resource by appending a `<script type="module">` at runtime — `loadModule` in
+the bundle is `url => appendScript('script', url, 'module')`. A force-reload takes the
+service worker off the navigation and the subresources the parser found in the HTML; it has
+no bearing on a fetch a script issues afterwards. So the worker answers the bundle from its
+own copy, and the revalidation it fires behind you is served by the month-old HTTP entry.
+
+Changing the URL misses both caches — they key on the full URL including the query, since
+that catch-all route sets no `ignoreSearch`. A reload of some kind is unavoidable
+regardless: a custom element cannot be redefined in a page that already registered it.
+Which is the real argument for the harness above being the loop you live in, and this one
+being the loop you finish in.
+
+If you would rather stay in the browser: DevTools → Application → Service Workers →
+**Bypass for network**, plus **Disable cache** on the Network tab. Both only hold while
+DevTools is open.
+
+```bash
+pnpm watch        # rebuild dist/ on change, if you want the file fresh without restarting
+```
 
 ```bash
 pnpm ha:logs      # follow the container log
@@ -160,7 +185,7 @@ src/
     base-card.ts        hass/config contract, sizing, dark mode, re-render filter
     card-editor.ts      the visual-editor half of that contract, over ha-form
     register.ts         collision-safe element definition + card-picker entry
-    size.ts             size presets and the sections-grid geometry they derive from
+    size.ts             the sections-grid geometry, and which layout a measured box gets
     types/ha.ts         the slice of the Home Assistant API we depend on
   theme/
     tokens.ts           --cw-* tokens, bridged onto Home Assistant theme variables

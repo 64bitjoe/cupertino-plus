@@ -4,13 +4,12 @@ import { property, state } from 'lit/decorators.js'
 import { baseStyles } from '../theme/base-styles'
 import { tokens } from '../theme/tokens'
 import {
-  DEFAULT_SIZE,
-  cardSizeFor,
-  gridOptionsFor,
-  heightFor,
+  DEFAULT_HEIGHT,
+  DEFAULT_LAYOUT,
+  cardSize,
+  gridOptions,
   layoutFromBox,
-  resolveSize,
-  type WidgetSize,
+  type WidgetLayout,
 } from './size'
 import type {
   HomeAssistant,
@@ -19,16 +18,20 @@ import type {
   LovelaceGridOptions,
 } from './types/ha'
 
-export interface CupertinoCardConfig extends LovelaceCardConfig {
-  /** Widget footprint. Anything unrecognised falls back to the default. */
-  size?: WidgetSize
-}
+/**
+ * Nothing here yet, and that is deliberate.
+ *
+ * It held a `size` preset until the Layout tab was found to do the same job properly.
+ * Kept as the shared base so a card's own config still names one type, and so the next
+ * genuinely cross-card option has somewhere to go.
+ */
+export type CupertinoCardConfig = LovelaceCardConfig
 
 /**
  * Shared behaviour for every card in the library:
  *
  *  - the `hass` / `setConfig` contract Home Assistant expects
- *  - sizing: `size` config -> grid defaults, plus a measured `cw-layout` attribute
+ *  - sizing: grid defaults for Home Assistant, plus a measured `cw-layout` attribute
  *  - `dark` reflected from the active Home Assistant theme
  *  - a re-render filter, so a card does not repaint on every unrelated state change
  *
@@ -71,7 +74,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * `:host([cw-layout=…])` rule would stop matching.
    */
   @property({ reflect: true, attribute: 'cw-layout' })
-  protected cwLayout: WidgetSize = DEFAULT_SIZE
+  protected cwLayout: WidgetLayout = DEFAULT_LAYOUT
 
   /**
    * Set by Home Assistant to the view's layout type. We do not use it yet, but it is
@@ -88,21 +91,16 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
 
   private _resizeObserver?: ResizeObserver
 
-  /** The configured size, before measurement talks us out of it. */
-  protected get configuredSize(): WidgetSize {
-    return resolveSize(this._config?.size)
-  }
-
   /**
    * How tall the card actually is, in px.
    *
    * Cards that fit content to their box (the calendar's row budgets) read this rather
-   * than assuming the preset height, because the user's `grid_options` win. Until the
-   * first measurement lands it answers with the configured size's height, so the very
-   * first paint is already right in the common case.
+   * than assuming a height, because the footprint is the user's to choose. Until the
+   * first measurement lands it answers with the default footprint's height, so the very
+   * first paint is already right for a card nobody has resized.
    */
   protected get boxHeight(): number {
-    return this._measuredHeight || heightFor(this.configuredSize)
+    return this._measuredHeight || DEFAULT_HEIGHT
   }
 
   public setConfig(config: C): void {
@@ -118,27 +116,31 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    *
    * `setConfig` runs again whenever the card is edited — and a config edit does not
    * resize anything, so the ResizeObserver will not fire to put things right. Reading
-   * back the last measured width instead of resetting to the configured size is what
-   * stops an edit from leaving a narrow card rendering the two-column layout.
+   * back the last measured width instead of resetting to the default is what stops an
+   * edit from leaving a narrow card rendering the two-column layout for a frame.
    */
   private _applyLayout(): void {
-    this.cwLayout = this._measuredWidth ? layoutFromBox(this._measuredWidth) : this.configuredSize
+    this.cwLayout = this._measuredWidth ? layoutFromBox(this._measuredWidth) : DEFAULT_LAYOUT
   }
 
   // ---- Sizing -------------------------------------------------------------
 
   public getGridOptions(): LovelaceGridOptions {
-    return gridOptionsFor(this.configuredSize)
+    return gridOptions()
   }
 
   public getCardSize(): number {
-    return cardSizeFor(this.configuredSize)
+    return cardSize()
   }
 
   // ---- Lifecycle ----------------------------------------------------------
 
   public override connectedCallback(): void {
     super.connectedCallback()
+    // A floor for the masonry layout, whose cell imposes no height at all. Constant, so
+    // it is set once here rather than chased through the update cycle; `base-styles.ts`
+    // explains why it is a floor and not a height.
+    this.style.setProperty('--cw-min-height', `${DEFAULT_HEIGHT}px`)
     this._resizeObserver ??= new ResizeObserver(entries => {
       const box = entries[0]?.contentRect
       // Width 0 means we are not laid out yet; measuring then would flip the card to
@@ -161,11 +163,6 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   protected override willUpdate(changed: PropertyValues): void {
     if (changed.has('hass')) {
       this.dark = this.hass?.themes?.darkMode ?? false
-    }
-    if (changed.has('_config')) {
-      // Gives the card a height in the masonry layout, where the cell does not
-      // impose one. Derived from the *configured* size, so it is stable.
-      this.style.setProperty('--cw-min-height', `${heightFor(this.configuredSize)}px`)
     }
   }
 

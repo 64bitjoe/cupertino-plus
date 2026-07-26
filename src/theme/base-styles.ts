@@ -13,13 +13,13 @@ export const baseStyles = css`
     /* Fills the grid cell. In the sections layout that cell is a block box of definite
        height -- the 2026.7 frontend gives it
        .card.fit-rows { height: calc(rows * (56px + 8px) - 8px) } -- and our element is
-       a plain block child of it, so without this a card dragged taller than its
-       configured size would sit at its own content height inside a taller cell. In the
-       masonry layout the parent has no definite height, so this resolves to auto and
+       a plain block child of it, so without this a card dragged taller than the default
+       footprint would sit at its own content height inside a taller cell. In the masonry
+       layout the parent has no definite height, so this resolves to auto and
        --cw-min-height takes over. */
     height: 100%;
     /* Which also means --cw-min-height must not win against a cell the user dragged
-       *shorter* than the configured size: the card would spill out of it, and the row
+       *shorter* than the default footprint: the card would spill out of it, and the row
        budget -- computed from the measured box -- would stop describing what is drawn.
        A percentage max-height is exactly the clamp we want, because it resolves to
        none in the masonry layout, where there is no cell to obey. */
@@ -34,8 +34,7 @@ export const baseStyles = css`
     /* Fill the grid cell in the sections layout... */
     height: 100%;
     /* ...and still have a height in the legacy masonry layout, where the cell is
-       content-sized. Set per configured size by the base card, which also keeps the
-       measured height stable enough that layout switching cannot oscillate. */
+       content-sized. Set once by the base card from the default footprint. */
     min-height: var(--cw-min-height, auto);
     box-sizing: border-box;
     display: flex;

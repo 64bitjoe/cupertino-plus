@@ -81,12 +81,13 @@ const UNAVAILABLE = 'unavailable'
 /**
  * The calendars the config asked for, tolerating whatever hand-written YAML holds.
  *
- * `resolveSize`'s precedent: the config is not typechecked on its way in. A bare
- * `entities:` parses to `null`, `entities: calendar.work` to a string, and the editor
- * itself can only promise a `string[]` for configs it wrote. Anything that comes to
- * nothing answers `undefined` rather than `[]`, because those two mean opposite things
- * here — no key means "every calendar", and an empty list would mean "no calendars",
- * which is not a thing anybody asks a calendar widget for.
+ * A config is not typechecked on its way in, and this is the card's only one, so it is
+ * the one place that has to be forgiving. A bare `entities:` parses to `null`,
+ * `entities: calendar.work` to a string, and the editor can only promise a `string[]` for
+ * configs it wrote itself. Anything that comes to nothing answers `undefined` rather than
+ * `[]`, because those two mean opposite things here — no key means "every calendar", and
+ * an empty list would mean "no calendars", which is not a thing anybody asks a calendar
+ * widget for.
  */
 export const configuredCalendars = (value: unknown): string[] | undefined => {
   const list = Array.isArray(value) ? value : [value]

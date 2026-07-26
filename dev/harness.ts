@@ -3,14 +3,7 @@ import './harness.css'
 
 import { CALENDAR_CARD_TAG } from '../src/index'
 import { DEFAULT_DEMO_SCENARIO, DEMO_SCENARIOS } from '../src/cards/calendar/demo-data'
-import {
-  WIDGET_SIZES,
-  columnsToPx,
-  gridOptionsFor,
-  resolveSize,
-  rowsToPx,
-  type WidgetSize,
-} from '../src/core/size'
+import { columnsToPx, gridOptions, layoutFromBox, rowsToPx } from '../src/core/size'
 import type {
   FrontendLocaleData,
   LovelaceCard,
@@ -24,9 +17,9 @@ import { createMockHass } from './mock-hass'
 defineHaStubs()
 
 /**
- * `base` is what the slot itself pins down — a preset size, or the config the editor is
- * currently producing. The scenario is folded in on top, so the Data control keeps
- * working for every card on the page.
+ * `base` is what the slot itself pins down — nothing, for the boxed footprints, or the
+ * config the editor is currently producing. The scenario is folded in on top, so the Data
+ * control keeps working for every card on the page.
  */
 const cards: { card: LovelaceCard; base: () => Partial<LovelaceCardConfig> }[] = []
 let dark = false
@@ -74,41 +67,62 @@ function applyHass(): void {
   for (const editor of editors) editor.hass = hass
 }
 
-// ---- Preset sizes, boxed exactly as the sections grid would box them ----------
+// ---- Footprints, boxed exactly as the sections grid would box them ------------
+
+/**
+ * Two footprints worth looking at side by side.
+ *
+ * NOT presets — the card has none any more, and neither does its config. These are just
+ * the narrow and wide ends of what the Layout tab lets a user drag to, picked to land
+ * either side of `layoutFromBox`'s threshold. The card is given no config at all here, so
+ * what it draws is decided purely by the box it was put in, which is the point being
+ * demonstrated. Drag the Section width slider and watch the left one flip.
+ */
+const FOOTPRINTS = [
+  { columns: 4, rows: 4 },
+  { columns: 6, rows: 4 },
+  { columns: 9, rows: 4 },
+  { columns: 12, rows: 4 },
+] as const
 
 const presets = document.createElement('section')
-const presetSlots: { slot: HTMLElement; label: HTMLElement; size: WidgetSize }[] = []
+const presetSlots: {
+  slot: HTMLElement
+  label: HTMLElement
+  columns: number
+  rows: number
+}[] = []
 
 {
   const heading = document.createElement('h2')
-  heading.textContent = 'Preset sizes'
+  heading.textContent = 'Footprints — the layout follows the box'
   const grid = document.createElement('div')
   grid.className = 'section'
 
-  for (const size of WIDGET_SIZES) {
+  for (const { columns, rows } of FOOTPRINTS) {
     const wrapper = document.createElement('div')
     const label = document.createElement('div')
     label.className = 'slot-label'
     const slot = document.createElement('div')
-    slot.append(makeCard(() => ({ size })))
+    slot.append(makeCard())
     wrapper.append(slot, label)
     grid.append(wrapper)
-    presetSlots.push({ slot, label, size })
+    presetSlots.push({ slot, label, columns, rows })
   }
 
   presets.append(heading, grid)
 }
 
 function layoutPresets(): void {
-  for (const { slot, label, size } of presetSlots) {
-    const options = gridOptionsFor(size)
-    const columns = options.columns as number
-    const rows = options.rows as number
+  for (const { slot, label, columns, rows } of presetSlots) {
     const width = Math.round(columnsToPx(columns, sectionWidth))
     const height = rowsToPx(rows)
     slot.style.width = `${width}px`
     slot.style.height = `${height}px`
-    label.textContent = `${size} — ${columns}×${rows} cols·rows → ${width}×${height}px`
+    // `layoutFromBox` is pure, so the harness can state the answer rather than wait for
+    // the card to reflect it — which also makes the threshold visible as the slider moves.
+    label.textContent =
+      `${columns}×${rows} cols·rows → ${width}×${height}px → ` + `layout="${layoutFromBox(width)}"`
   }
 }
 
@@ -182,10 +196,9 @@ let layoutEditorPreview = (): void => {}
 
     let edited: LovelaceCardConfig = stub
 
-    // Boxed the way the sections grid would box the size that was picked. A dashboard
-    // does this for the user; without it the size control would look like it does
-    // nothing, because the card's layout follows its measured width and the slot's
-    // width would never move.
+    // Boxed the way the sections grid would box a newly added card. A dashboard does
+    // this for the user, and without it the preview would sit at its content width and
+    // the card's measured layout would mean nothing.
     const slot = document.createElement('div')
     const slotLabel = document.createElement('div')
     slotLabel.className = 'slot-label'
@@ -193,14 +206,15 @@ let layoutEditorPreview = (): void => {}
     preview.append(makeCard(() => edited))
     slot.append(preview, slotLabel)
 
+    // Boxed at the footprint a freshly added card arrives with, since that is what the
+    // editor is editing: the card has no size of its own to read back.
     layoutEditorPreview = (): void => {
-      const size = resolveSize(edited.size)
-      const options = gridOptionsFor(size)
+      const options = gridOptions()
       const width = Math.round(columnsToPx(options.columns as number, sectionWidth))
       const height = rowsToPx(options.rows as number)
       preview.style.width = `${width}px`
       preview.style.height = `${height}px`
-      slotLabel.textContent = `${size} — ${width}×${height}px`
+      slotLabel.textContent = `default footprint — ${width}×${height}px → layout="${layoutFromBox(width)}"`
     }
 
     const draw = (): void => {

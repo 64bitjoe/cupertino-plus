@@ -48,8 +48,8 @@ Consequences that drive our architecture:
    back-compat branch — we implement `getGridOptions()` only.
 2. **User config wins.** `config.grid_options` is spread _after_ ours, so whatever
    the user drags in the sections UI overrides our returned columns/rows.
-   => the card must render from its ACTUAL measured size, not from its configured
-   `size`. `getGridOptions()` only supplies good _defaults_ + min/max clamps.
+   => the card must render from its ACTUAL measured box, never from anything it asked
+   for. `getGridOptions()` only supplies a good _default_ + min/max clamps.
 3. `getCardSize()` is still used for the legacy masonry layout — ship both.
 
 Grid is **12 columns**. Confirmed by real cards in the bundle:
@@ -326,20 +326,23 @@ if (tabs.length === 1) return super.renderConfigElement() // no tab bar
 `_showLayoutTab` additionally needs a `sectionConfig`, which only `hui-section` passes —
 so the Layout tab exists in the sections layout and not in masonry or panel views.
 
-Do **not** read that as "so `size` is the sizing control in the other views". It is not a
-control there at all. `getGridOptions()` has exactly three call sites in the whole
-bundle — `hui-view-footer`, `hui-section`, and `hui-card.getElementGridOptions()`, which
-only those two consume — so `columns`, the one field our two presets disagree on, is
-never read outside the sections grid. Masonry asks a card only for `computeCardSize()`,
-and uses the answer to pick the shortest column rather than to size anything; panel view
-asks for nothing and sizes with CSS. Both our presets are `rows: 4`, so `getCardSize()`
-is 5 and `heightFor()` is 248px either way, and the rendered layout comes from the
-measured width — the masonry column's, identical for both.
+This is what killed our own `size` preset, so it is worth following through. The
+temptation is to read the missing tab as "so a `size` option is the sizing control in the
+other views". It is not a control there at all. `getGridOptions()` has exactly three call
+sites in the whole bundle — `hui-view-footer`, `hui-section`, and
+`hui-card.getElementGridOptions()`, which only those two consume — so `columns` is never
+read outside the sections grid. Masonry asks a card only for `computeCardSize()`, and uses
+the answer to pick the shortest column rather than to size anything; panel view asks for
+nothing and sizes with CSS. Our footprint is `rows: 4`, so `getCardSize()` is 5 and the
+fallback height is 248px, and the rendered layout comes from the measured width — the
+masonry column's.
 
-`size` therefore does its work in exactly the view that also has the Layout tab: it is
-the footprint the card arrives with, and the `min_columns` clamp on how far it can be
-dragged down. Worth having in the editor for that, not as a substitute for a tab the
-other views do not need.
+So a `size` config key could only ever have done two things, both of them in the one view
+that already has the Layout tab: set the footprint the card arrives with, and set the
+`min_columns` clamp on how far it can be dragged. Neither is worth a control, because the
+tab does the first better (any footprint, dragged, live) and wins outright over it
+anyway — `config.grid_options` is spread after ours. A card that renders from its measured
+box needs one default footprint and a floor, not a menu. See `core/size.ts`.
 
 ### The contract for the element
 

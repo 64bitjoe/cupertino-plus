@@ -1,10 +1,31 @@
 import type { LovelaceGridOptions } from './types/ha'
 
-export const WIDGET_SIZES = ['small', 'medium'] as const
-export type WidgetSize = (typeof WIDGET_SIZES)[number]
+/**
+ * The two shapes the content comes in, and the geometry for choosing between them.
+ *
+ * Note what is NOT here: a configured size. There used to be a `size: small | medium`
+ * config key with a preset each, and it earned its keep for about as long as it took to
+ * notice that the sections layout already has a **Layout** tab which does the same job
+ * better — any footprint, dragged, with a live preview. The card was measuring its own
+ * box and picking a layout from that regardless, so the preset was never what decided
+ * how the card looked; it only decided where the card started. Two controls for one
+ * outcome, and the editor had to carry a helper line apologising for it ("The Layout tab
+ * is overriding this").
+ *
+ * So: Home Assistant owns the footprint, this file owns the arithmetic, and the layout
+ * is a consequence of the box rather than a thing the user is asked about twice.
+ */
+export const WIDGET_LAYOUTS = ['small', 'medium'] as const
+export type WidgetLayout = (typeof WIDGET_LAYOUTS)[number]
 
-/** Zero-config default: the 2:1 shape reads well in every dashboard width. */
-export const DEFAULT_SIZE: WidgetSize = 'medium'
+/**
+ * What to draw before the box has been measured.
+ *
+ * Not a preference — a first frame. `medium` because the default footprint below is the
+ * wide one, so this is the answer the measurement is about to confirm in the common case,
+ * and a card that guessed `small` would visibly reflow on arrival.
+ */
+export const DEFAULT_LAYOUT: WidgetLayout = 'medium'
 
 /**
  * Geometry of Home Assistant's sections grid, read out of the shipped frontend:
@@ -24,46 +45,54 @@ export const columnsToPx = (columns: number, sectionWidth: number): number => {
 }
 
 /**
- * Size presets chosen so that, in a section of the usual ~500px, the cards land on
- * Apple's widget proportions:
+ * The footprint a card arrives with, and how far it may be dragged.
  *
- *   small   6 x 4  -> ~246 x 248  square
- *   medium 12 x 4  -> ~500 x 248  2:1
+ * Full width by 4 rows, which in a section of the usual ~500px is about 500×248 — the 2:1
+ * shape Apple's medium widget has, and the one that reads well at any dashboard width.
+ * The floor is what makes the other layout reachable: 4 columns comes to ~150px, well
+ * under the threshold below, so a user who wants the square can simply drag to it.
  *
- * The two sizes Apple's own home screen offers, and the two the calendar layout is
- * designed around: small is today, medium is today plus what comes after it.
+ * `max_columns` is deliberately absent. There is nothing to protect against — the flow
+ * pours into two columns and the row budget follows the height, so a card dragged wider
+ * just gets roomier.
  *
- * These are only defaults. Home Assistant spreads the user's `grid_options` *after*
- * whatever we return, so a card dragged to another size keeps the user's dimensions —
- * which is why layout is driven by measurement (see `layoutFromBox`) rather than by
- * the configured size.
+ * These are only defaults, and the wording matters: `hui-card` spreads the user's
+ * `grid_options` AFTER whatever this returns, so anything dragged in the Layout tab wins
+ * outright. Which is the point.
  */
-const GRID_OPTIONS: Record<WidgetSize, LovelaceGridOptions> = {
-  small: { columns: 6, rows: 4, min_columns: 4, min_rows: 3 },
-  medium: { columns: 12, rows: 4, min_columns: 6, min_rows: 3 },
-}
+const DEFAULT_COLUMNS = 12
+const DEFAULT_ROWS = 4
 
-export const gridOptionsFor = (size: WidgetSize): LovelaceGridOptions => ({ ...GRID_OPTIONS[size] })
-
-/** Legacy masonry sizing, expressed in HA's ~50px units. */
-export const cardSizeFor = (size: WidgetSize): number =>
-  Math.round(rowsToPx(GRID_OPTIONS[size].rows as number) / 50)
-
-export const isWidgetSize = (value: unknown): value is WidgetSize =>
-  typeof value === 'string' && (WIDGET_SIZES as readonly string[]).includes(value)
-
-export const resolveSize = (value: unknown): WidgetSize =>
-  isWidgetSize(value) ? value : DEFAULT_SIZE
-
-/** Default rendered height of a size, used until the card has been measured. */
-export const heightFor = (size: WidgetSize): number => rowsToPx(GRID_OPTIONS[size].rows as number)
+export const gridOptions = (): LovelaceGridOptions => ({
+  columns: DEFAULT_COLUMNS,
+  rows: DEFAULT_ROWS,
+  min_columns: 4,
+  min_rows: 3,
+})
 
 /**
- * Which layout to actually render, given the box the card ended up with.
+ * Legacy masonry sizing, in Home Assistant's ~50px units.
  *
- * Only width decides: the two layouts differ in how many columns of content they
- * hold, not in how tall they are. Height feeds the row budgets instead, so a card
- * dragged taller shows more rows rather than switching layout. The threshold sits
- * halfway between the two presets.
+ * Constant because masonry never asks how wide a card wants to be — it uses this only to
+ * pick the shortest column to drop the card into.
  */
-export const layoutFromBox = (width: number): WidgetSize => (width < 340 ? 'small' : 'medium')
+export const cardSize = (): number => Math.round(rowsToPx(DEFAULT_ROWS) / 50)
+
+/**
+ * Height to assume until the ResizeObserver has reported, and the floor a card keeps in
+ * the masonry layout, where the cell imposes no height of its own.
+ */
+export const DEFAULT_HEIGHT = rowsToPx(DEFAULT_ROWS)
+
+/**
+ * Which layout to render, given the box the card actually ended up in.
+ *
+ * Only width decides. The two layouts differ in how many columns of content they hold,
+ * not in how tall they are — height feeds the row budgets instead, so a card dragged
+ * taller shows more rows rather than changing shape.
+ *
+ * 340px is a little under half the ~500px a full-width card gets in a typical section,
+ * so the flip lands at roughly 9 of the 12 columns. That is about right: two columns of
+ * event rows need real width before they stop truncating every title.
+ */
+export const layoutFromBox = (width: number): WidgetLayout => (width < 340 ? 'small' : 'medium')

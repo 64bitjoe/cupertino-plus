@@ -24,6 +24,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "ha:up": "mkdir -p dist && docker compose up -d --force-recreate",
+    "verify": "pnpm build && node dev/bump-resource.mjs && pnpm ha:up",
     "ha:down": "docker compose down",
     "ha:logs": "docker compose logs -f homeassistant",
     "ha:reset": "docker compose down -v"

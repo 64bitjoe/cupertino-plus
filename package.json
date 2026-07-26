@@ -31,6 +31,7 @@
     "ha:reset": "docker compose down -v"
   },
   "dependencies": {
+    "@mdi/js": "^7.4.47",
     "lit": "^3.3.3"
   },
   "devDependencies": {

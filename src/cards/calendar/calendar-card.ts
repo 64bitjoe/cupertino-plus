@@ -1,3 +1,4 @@
+import { mdiCalendarMonth } from '@mdi/js'
 import {
   css,
   html,
@@ -44,25 +45,37 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
 const NO_EVENTS_TODAY = 'No Events Today'
 
 /**
- * The all-day badge: a filled rounded square with a calendar knocked out of it.
+ * How the MDI glyph is centred in the badge.
+ *
+ * `mdiCalendarMonth` inks x 3–21 and y 1–21, so (12, 11) is its centre and 18 is its
+ * width. The scale lands it 10 units wide on a badge whose viewBox is 1:1 with CSS
+ * pixels, so the calendar draws 10px however wide the disc around it gets. That is a
+ * fixed size and not a fraction of the badge: it is set by what survives being drawn at
+ * this size, and the disc is sized by the chip it caps.
+ */
+const GLYPH = 'translate(10 10) scale(0.5556) translate(-12 -11)'
+
+/**
+ * The all-day badge: a filled circle with a calendar knocked out of it.
  *
  * It replaces the colour bar, and it has to, because an all-day row has nothing else
- * left to identify it by — no time under the title, no location. Drawn inline rather
- * than as an `<ha-icon>`: the row is priced in pixels by `layout.ts`, and an icon that
- * arrives a frame late out of Home Assistant's icon registry would be measured at the
- * wrong height. The dev harness has no registry at all.
+ * left to identify it by — no time under the title, no location.
+ *
+ * The path comes from `@mdi/js` — the same icon set Home Assistant draws the rest of
+ * the dashboard from, so the badge belongs to the surrounding UI rather than to this
+ * card. It is a bare path string and tree-shakes down to that one string, which is why
+ * the package can be a dependency without the bundle noticing.
+ *
+ * Inlined rather than handed to `<ha-icon>` though, and that part is not incidental:
+ * the row is priced in pixels by `layout.ts`, and an icon arriving a frame late out of
+ * HA's icon registry would be measured at the wrong height. The dev harness has no
+ * registry at all — `dev/ha-stubs.ts` does not stub one — so `<ha-icon>` there is an
+ * empty box, and the README screenshots are taken in that harness.
  */
 const ALL_DAY_BADGE = html`
-  <svg class="badge" viewBox="0 0 16 16" aria-hidden="true">
-    <rect width="16" height="16" rx="4.5" fill="var(--item-color)" />
-    <g fill="#fff">
-      <rect x="4.35" y="2.2" width="1.3" height="2.4" rx="0.65" />
-      <rect x="10.35" y="2.2" width="1.3" height="2.4" rx="0.65" />
-      <rect x="3" y="6.3" width="10" height="1.3" rx="0.65" />
-      <circle cx="4.9" cy="10.5" r="0.95" />
-      <circle cx="8" cy="10.5" r="0.95" />
-      <circle cx="11.1" cy="10.5" r="0.95" />
-    </g>
+  <svg class="badge" viewBox="0 0 20 20" aria-hidden="true">
+    <circle cx="10" cy="10" r="10" fill="var(--item-color)" />
+    <path d=${mdiCalendarMonth} transform=${GLYPH} fill="#fff" />
   </svg>
 `
 
@@ -195,16 +208,27 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
          under the title, so the chip closes up around the one line it has. 22px of title
          inside 1px of padding is the 24px that layout.ts prices a single budget row at
          (its ROW, less the gap) — this is the tallest one-row node there is, so it must
-         not grow. */
+         not grow.
+
+         The 2px on the left is the badge's inset, not a spacing step. A 24px chip with
+         a 12px inner radius ends in a semicircle of r=12; the badge is r=10 on the same
+         centre, so it clears the chip by 2px right around that arc rather than only at
+         the sides. It is the smallest inset that still reads as one shape nested in
+         another — flush, the two rims merge into a single edge and the badge stops
+         looking like a badge. Both radii and both insets move together or not at all. */
       .row.allday {
         align-items: center;
-        padding: 1px 10px;
+        padding: 1px 10px 1px 2px;
       }
 
+      /* 20px inside a 24px chip, so the badge clears the chip's edge by 2px on every
+         side — the row's own 1px of padding plus the 1px that centring 20 in 22 leaves
+         over. Nothing here forces the vertical gap; it falls out of those two, which is
+         why the width and the row's padding have to move together. */
       .badge {
         flex: none;
-        width: 16px;
-        height: 16px;
+        width: 20px;
+        height: 20px;
       }
 
       /* The colour bar that says which calendar an event belongs to. */

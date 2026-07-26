@@ -32,11 +32,22 @@ the time in the same colour, weaker.
 **Reminder** — a neutral grey background, an empty circle in the list's colour, muted
 text. Reminders never show a location.
 
-**All-day event** — the tint of an event, but the bar gives way to a filled rounded
-square with a calendar knocked out of it, in the calendar colour, and then the title on
-one line with an ellipsis. Nothing else: no time, no location, no expanded form. The
-badge has to carry the meaning on its own, because there is no second line left to say
-"all day" on.
+**All-day event** — the tint of an event, but the bar gives way to a filled circle with
+a calendar knocked out of it, in the calendar colour, and then the title on one line
+with an ellipsis. Nothing else: no time, no location, no expanded form. The badge has to
+carry the meaning on its own, because there is no second line left to say "all day" on.
+The circle is set concentric with the rounded end of the chip and 2px smaller in radius,
+so it clears the chip by the same 2px right around that arc — not on the 10px rail inset
+the other rows use, and not flush either: flush, the two rims merge into one edge and
+the badge stops reading as a badge. The chip is 24px with a 12px radius, so the badge is
+20px with a 10px one, and the row still measures the 24px §4 prices it at.
+
+The calendar is `mdiCalendarMonth`, taken from `@mdi/js` as a path string and inlined.
+That is Home Assistant's own icon set, so the badge matches the icons around it on the
+dashboard, but it is deliberately not an `<ha-icon>`: rows are priced in pixels here
+(§4), and an icon that resolves a frame late out of HA's registry would be measured at
+the wrong height. The dev harness has no registry at all, and the screenshots below are
+taken in it.
 
 **`2 more events`** — the tail indicator, and the one row the flow can end on that is
 not an item: a thin bar in the calendar colour, grey text at a normal weight, and

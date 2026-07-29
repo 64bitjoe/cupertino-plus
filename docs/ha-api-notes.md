@@ -464,14 +464,63 @@ that matter:
   `ha-form-${type}`, lazily imported in `willUpdate`. Eleven of those exist —
   `grid`, `expandable`, `select`, `string`, `boolean`, … — and none need importing.
 
+### A node's `name` is what decides whether its data nests
+
+The one line to know, because it is the whole contract for a form with groups in it:
+
+```js
+// ha-form: the value handed to each row
+const p = (data, item) => (data ? (!item.name || item.flatten ? data : data[item.name]) : void 0)
+// ...and its answer, merged back
+const o =
+  !schema.name || ('flatten' in schema && schema.flatten)
+    ? ev.detail.value
+    : { [schema.name]: ev.detail.value }
+this.data = { ...this.data, ...o }
+```
+
+So a **named** `expandable` nests: the rows inside it read and write an object of their own,
+and the form's data gains one key per panel rather than one per field. `flatten: true` opts
+out, which is what Home Assistant's own badge and heading-entity editors do — they group
+`name`/`icon`/`color` under a **Content** panel that still writes flat config keys. The
+battery card wants the nesting instead: a panel is one device's config, and keeping it whole
+is what lets one device be written back without disturbing its neighbours.
+
+`ha-form-expandable` itself takes `title`, `icon`, `iconPath`, `expanded` and `headingLevel`,
+renders `schema.title || computeLabel(schema)` as the summary, and hands `computeLabel` /
+`computeHelper` straight down to the nested `ha-form` — so one `computeLabel` answers for the
+rows inside every panel, and the panel is the only thing saying which one they belong to. It
+does **not** forward `context` (it declares no such property), which is only worth knowing
+because of the next paragraph.
+
+`context` is how a selector is told about a value from elsewhere in the same form:
+
+```js
+_generateContext(schema) {
+  if (!schema.context && !this.context) return
+  const ctx = { ...this.context }
+  for (const [key, field] of Object.entries(schema.context ?? {})) ctx[key] = this.data[field]
+  return ctx
+}
+```
+
+Each key is what the selector reads, each value the name of the row to read it from — so
+`{name: 'icon', selector: {icon: {}}, context: {icon_entity: 'entity'}}` shows the entity's
+own icon in the picker, and `{selector: {entity_name: {}}, context: {entity: 'entity'}}` its
+own name. Resolution is against **that** form's data, so inside a nested panel the field
+names are the panel's own. This library passes explicit placeholders instead — see
+`IconSelector` in `core/types/ha.ts` for the one case where HA's answer is wrong for us.
+
 ### Selectors
 
-`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Three we use:
+`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Five we use:
 
 ```js
 { entity: { filter: { domain: 'calendar' }, multiple: true } }
 { select: { mode: 'box', box_max_columns: 2, options: [{ value, label, description }] } }
 { number: { min: 80, max: 130, step: 5, mode: 'slider', unit_of_measurement: '%' } }
+{ icon: { placeholder: 'mdi:watch' } }
+{ text: { placeholder: 'Watch battery' } }
 ```
 
 - `filter` is the current spelling. A top-level `{ entity: { domain } }` still works, but
@@ -510,6 +559,36 @@ that matter:
 - Its chunk is **not** in the `lovelace` panel group (the check above prints `False` for
   6749), so it arrives with the lazy import `ha-selector` does when it first sees the
   selector — same as `ha-select-box` and `ha-entities-picker`, and it needs no help either.
+- `icon` renders `ha-icon-picker`, a searchable combo box over the whole set. Its
+  `placeholder` **wins over** the icon it would work out for itself from
+  `context.icon_entity`, which is what makes it usable for a battery sensor: HA's own state
+  icon for one is computed from the level, so its guess is `mdi:battery-70` where this
+  library draws `mdi:battery`.
+- `text` renders `ha-input`, and reports **`undefined`** rather than `''` for a field that
+  has been emptied — as long as the row is not `required`. That is what lets an override
+  disappear from a config instead of sitting in it blank.
+
+### The list-of-objects selector — considered, and not used
+
+`{ object: { fields, multiple, label_field, description_field, translation_key } }` is HA's
+current answer to a list whose rows carry more than an id, and it is what its own heading
+badges and markdown buttons use. Given `fields` it draws a sortable `ha-md-list` — drag
+handle, pencil, bin, an **Add** button — and edits one row in a modal `dialog-form` built
+from those fields; without `fields` it falls back to a raw `ha-yaml-editor`. Worth knowing:
+
+- `fields` is `{[name]: {selector, required?, label?, description?}}`, and the per-field
+  `label`/`description` are read directly, so no translation key is needed.
+- the item's headline is `label_field` formatted **through that field's own selector** — an
+  entity id comes out as `hass.formatEntityName(...)`, i.e. the friendly name — and with no
+  `label_field` it joins every set field with `·`.
+- `dialog-form` seeds its data with the whole item and submits `this._data`, so keys the
+  `fields` do not mention survive an edit rather than being dropped.
+- but its `_schema` maps only `{name, selector, required}` and **drops `context`**, so the
+  placeholder trick above is not available inside the dialog.
+
+The battery card kept its multiple entity picker instead: four batteries in four clicks is
+the common case, and the object selector would have charged a modal per device for it. See
+the note on `CupertinoBatteryCardEditor`.
 
 Home Assistant's own calendar card editor is a useful reference but not a model: it
 predates the entity selector and still hand-renders an `<ha-entities-picker>` beside its

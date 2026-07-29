@@ -67,6 +67,16 @@ Everything else is "not charging", including a `charging_entity` that does not e
 absent bolt is a widget that has not been told; a bolt on a device sitting on a desk is a
 widget that is wrong.
 
+**None of the three is YAML-only.** The editor draws a panel per configured device — titled
+and iconed with what the card is drawing for it — carrying the icon, the charging sensor and
+the name, and greys the inherited value into each field as its placeholder. That last part is
+the rule rather than a flourish: the placeholder is the answer to "what happens if I leave
+this empty", so it is read off the same expression the card keeps it with, which is why the
+icon field offers `mdi:battery` and not the `mdi:battery-70` Home Assistant computes for the
+same sensor. The one thing the editor cannot reach is a battery percentage published without
+the `battery` device class, which is what the picker's filter costs and is stated where the
+filter is.
+
 ## 2. The ring
 
 - A track the full way round, and an arc over it from **twelve o'clock, clockwise**, whose

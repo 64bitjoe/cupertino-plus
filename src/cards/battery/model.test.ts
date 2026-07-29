@@ -4,10 +4,12 @@ import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 import {
   deviceConfigs,
   entityIds,
-  mergeDeviceRows,
+  inheritedIcon,
+  inheritedName,
   readDevice,
   readDevices,
   watchedIds,
+  writeDeviceRows,
 } from './model'
 
 const entity = (
@@ -94,12 +96,20 @@ describe('the entities a card has to be woken for', () => {
 
 /**
  * The half of the visual editor a test can reach without a browser, and the half where the
- * damage would be done: `ha-entities-picker` reports a list of ids, so the config's own extras
- * have to be put back afterwards or opening the editor silently strips them.
+ * damage would be done. `ha-entities-picker` reports a list of ids and nothing else, so the
+ * editor shows it the ids and puts the rest of each row in a panel of its own; these two
+ * functions are the way out and the way back.
  */
-describe('a round trip through the entity picker', () => {
+describe('a round trip through the editor', () => {
   const TABLET = 'sensor.tablet_battery'
+  const WATCH = 'sensor.watch_battery'
   const CHARGER = 'binary_sensor.tablet_charging'
+
+  /** What the panels reported, as the editor hands it over: a lookup by entity id. */
+  const panels =
+    (rows: Record<string, unknown>) =>
+    (entity: string): unknown =>
+      rows[entity]
 
   it('shows the picker the ids and nothing else', () => {
     expect(entityIds([PHONE, { entity: TABLET, charging_entity: CHARGER }])).toEqual([
@@ -108,25 +118,39 @@ describe('a round trip through the entity picker', () => {
     ])
   })
 
-  it('gives an override back to the row it belonged to', () => {
-    const before = [PHONE, { entity: TABLET, charging_entity: CHARGER }]
-    expect(mergeDeviceRows(before, [PHONE, TABLET])).toEqual(before)
+  it('writes what a panel reported into the row it belongs to', () => {
+    expect(
+      writeDeviceRows([PHONE, TABLET], panels({ [TABLET]: { charging_entity: CHARGER } })),
+    ).toEqual([PHONE, { entity: TABLET, charging_entity: CHARGER }])
   })
 
+  it('carries every field a panel offers', () => {
+    expect(
+      writeDeviceRows(
+        [TABLET],
+        panels({ [TABLET]: { icon: 'mdi:tablet', name: 'Tablet', charging_entity: CHARGER } }),
+      ),
+    ).toEqual([{ entity: TABLET, icon: 'mdi:tablet', name: 'Tablet', charging_entity: CHARGER }])
+  })
+
+  /** The picker is the authority on which devices there are and in what order. */
   it('follows the picker when a row is reordered, added or removed', () => {
-    const before = [PHONE, { entity: TABLET, charging_entity: CHARGER }]
-    expect(mergeDeviceRows(before, [TABLET, PHONE])).toEqual([
-      { entity: TABLET, charging_entity: CHARGER },
-      PHONE,
-    ])
-    expect(mergeDeviceRows(before, [TABLET])).toEqual([
-      { entity: TABLET, charging_entity: CHARGER },
-    ])
-    expect(mergeDeviceRows(before, [PHONE, TABLET, 'sensor.watch_battery'])).toEqual([
-      PHONE,
-      { entity: TABLET, charging_entity: CHARGER },
-      'sensor.watch_battery',
-    ])
+    const overrides = panels({ [TABLET]: { charging_entity: CHARGER } })
+    const tablet = { entity: TABLET, charging_entity: CHARGER }
+
+    expect(writeDeviceRows([TABLET, PHONE], overrides)).toEqual([tablet, PHONE])
+    expect(writeDeviceRows([TABLET], overrides)).toEqual([tablet])
+    expect(writeDeviceRows([PHONE, TABLET, WATCH], overrides)).toEqual([PHONE, tablet, WATCH])
+  })
+
+  /**
+   * The bug that keying panels by position would have caused, stated as a test: removing the
+   * first of three devices shifts the other two up, and the second device must not inherit
+   * the first one's charging sensor on the way.
+   */
+  it('keeps a panel with its own device when an earlier one is removed', () => {
+    const overrides = panels({ [PHONE]: { icon: 'mdi:cellphone' } })
+    expect(writeDeviceRows([WATCH, TABLET], overrides)).toEqual([WATCH, TABLET])
   })
 
   /**
@@ -134,8 +158,51 @@ describe('a round trip through the entity picker', () => {
    * through a list of plain strings on every keystroke of an edit.
    */
   it('does not churn a config of plain ids into objects', () => {
-    expect(mergeDeviceRows([{ entity: PHONE }], [PHONE])).toEqual([PHONE])
-    expect(mergeDeviceRows(undefined, [PHONE])).toEqual([PHONE])
+    expect(writeDeviceRows([PHONE], panels({}))).toEqual([PHONE])
+    expect(writeDeviceRows([PHONE], panels({ [PHONE]: {} }))).toEqual([PHONE])
+    expect(writeDeviceRows([{ entity: PHONE }], panels({}))).toEqual([PHONE])
+  })
+
+  /**
+   * A field the user emptied. `icon: ''` would shadow the entity's own icon with nothing, so
+   * an emptied override has to leave the config rather than sit in it blank.
+   */
+  it('drops a field that was cleared rather than writing it empty', () => {
+    expect(
+      writeDeviceRows([PHONE], panels({ [PHONE]: { icon: '', name: '', charging_entity: '' } })),
+    ).toEqual([PHONE])
+    expect(writeDeviceRows([PHONE], panels({ [PHONE]: { icon: undefined } }))).toEqual([PHONE])
+  })
+})
+
+/**
+ * The two values the editor greys into its Icon and Name fields. A placeholder is a promise
+ * about what happens when the field is left empty, so these are read off the same expressions
+ * `readDevice` keeps it with — see the pair of tests on its own fallbacks below.
+ */
+describe('what a device inherits when the config overrides nothing', () => {
+  it('answers the entity’s own name and icon', () => {
+    const hass = withStates(
+      entity(PHONE, '72', { friendly_name: 'Phone battery', icon: 'mdi:cellphone' }),
+    )
+    expect(inheritedName(hass, PHONE)).toBe('Phone battery')
+    expect(inheritedIcon(hass, PHONE)).toBe('mdi:cellphone')
+  })
+
+  it('answers the id and a battery glyph when the entity says neither', () => {
+    const hass = withStates(entity(PHONE, '72'))
+    expect(inheritedName(hass, PHONE)).toBe(PHONE)
+    expect(inheritedIcon(hass, PHONE)).toBe('mdi:battery')
+  })
+
+  /**
+   * Not `mdi:battery-70`. Home Assistant computes a battery sensor's own state icon from its
+   * level, so the editor cannot borrow that one: it would offer a placeholder the card would
+   * not honour, and the level is what the ring is for.
+   */
+  it('answers the unknown glyph for an entity with no reading behind it', () => {
+    expect(inheritedIcon(withStates(), PHONE)).toBe('mdi:battery-unknown')
+    expect(inheritedIcon(undefined, PHONE)).toBe('mdi:battery-unknown')
   })
 })
 

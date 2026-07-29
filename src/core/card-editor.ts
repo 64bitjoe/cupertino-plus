@@ -60,6 +60,10 @@ export const formData = (
   const data: Record<string, unknown> = { ...defaults, ...config }
 
   for (const node of schema) {
+    // An expandable carries no value of its own — the rows inside it read out of the
+    // object under its name, and `ha-form` does that splitting itself.
+    if (!('selector' in node)) continue
+
     const multiple = isMultiple(node.selector)
     const value = data[node.name]
     // `isBlank`, not `!== undefined`: a bare `entities:` in the YAML parses to `null`,
@@ -203,10 +207,16 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * `{ entity, charging_entity, name, icon }` objects, and `ha-entities-picker` reports a
    * list of ids and nothing else — so a form that showed the config verbatim would hand the
    * picker objects it maps over as strings, and an editor that wrote its answer back
-   * verbatim would delete every override the moment anybody opened the visual editor. Home
-   * Assistant's own entities card answers this with a bespoke editor element instead of a
-   * selector; two hooks are the cheaper half of that, and they keep the plumbing in one
-   * place rather than in each card that grows a list.
+   * verbatim would delete every override the moment anybody opened the visual editor. What
+   * it does instead is show the picker the ids and put the rest of each row in a panel of
+   * its own, then reassemble the two here. Home Assistant's own entities card answers the
+   * same problem with a bespoke editor element in place of a selector; two hooks are the
+   * cheaper half of that, and they keep the plumbing in one place rather than in each card
+   * that grows a list.
+   *
+   * A `fromForm` whose form carries fields of the editor's own invention — a panel per row,
+   * say — has to keep them out of `applyFormData`, which cannot tell them from config keys
+   * and would write them into the user's YAML.
    */
   protected toForm(config: C): Record<string, unknown> {
     return config

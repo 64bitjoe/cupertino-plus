@@ -179,28 +179,80 @@ export interface NumberSelector {
   }
 }
 
+/** An `mdi:` name, chosen from a searchable list of the whole set. */
+export interface IconSelector {
+  icon: {
+    /**
+     * Greyed into the empty field, and never written to the config.
+     *
+     * `ha-selector-icon` prefers this over the icon it would otherwise work out for
+     * itself, which is the reason to pass one: its own guess comes from Home Assistant's
+     * state icon, and for a `device_class: battery` sensor that is computed from the level
+     * — so it would offer `mdi:battery-70` where this card actually draws `mdi:battery`.
+     * A placeholder is a promise about what happens when the field is left empty, so it
+     * has to be made by whoever keeps it.
+     */
+    placeholder?: string
+  }
+}
+
+/** A line of text. `ha-selector-text` reports `undefined` — not `''` — when it is emptied. */
+export interface TextSelector {
+  text: {
+    /** Same arrangement as the icon selector's: a suggestion, not a value. */
+    placeholder?: string
+  }
+}
+
 /**
  * A selector, as `ha-selector` reads it.
  *
  * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful —
  * hence a union rather than a bag of optional keys. The shipped build knows 57 of
- * these; these are the three our editors ask for.
+ * these; these are the five our editors ask for.
  */
-export type Selector = EntitySelector | SelectSelector | NumberSelector
+export type Selector =
+  EntitySelector | SelectSelector | NumberSelector | IconSelector | TextSelector
 
-/**
- * One row of an `ha-form`.
- *
- * `ha-form` also takes nodes carrying a `type` instead of a `selector` — `grid`,
- * `expandable` and nine others, whose elements it lazily imports when it sees them —
- * but a selector node is the only shape our editors need.
- */
-export interface HaFormSchema {
+/** A row that carries a value of its own. */
+export interface HaFormSelectorSchema {
   name: string
   selector: Selector
   /** Purely presentational here: `ha-form` marks the field, it does not enforce it. */
   required?: boolean
 }
+
+/**
+ * A collapsible group of rows, lazily imported by `ha-form` when it sees the `type`.
+ *
+ * `name` is load-bearing and easy to misread. `ha-form` hands every node `data[node.name]`
+ * and merges its answer back under the same key, so a named expandable **nests**: its rows
+ * read and write an object of their own, and `data` gains one key per panel rather than one
+ * per field. (`flatten: true` opts out of that, which is what Home Assistant's own badge
+ * editors do with theirs. This library wants the nesting — a panel per device is a device's
+ * config, and keeping it whole is what lets one be written back without disturbing the
+ * others.) Verified in the 2026.7.4 bundle rather than taken from documentation.
+ */
+export interface HaFormExpandableSchema {
+  type: 'expandable'
+  name: string
+  /** The summary line. `computeLabel(schema)` answers for it when this is absent. */
+  title?: string
+  /** An `mdi:` name, drawn before the title. */
+  icon?: string
+  /** Open on the first render. Off unless asked for. */
+  expanded?: boolean
+  schema: readonly HaFormSchema[]
+}
+
+/**
+ * One row of an `ha-form`.
+ *
+ * `ha-form` takes nodes carrying a `type` instead of a `selector` — `grid`, `expandable`
+ * and nine others — and dispatches to `ha-form-${type}`. Only `expandable` is modelled:
+ * anything reading a schema has to narrow with `'selector' in node` first.
+ */
+export type HaFormSchema = HaFormSelectorSchema | HaFormExpandableSchema
 
 /**
  * The element a card's `static getConfigElement()` hands back.

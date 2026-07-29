@@ -185,11 +185,15 @@ change.
 
 ### The batteries
 
-Two fields: **Devices** and **Scale**. This is the one card that draws nothing useful before it
-is configured — it says `No Devices` — because an installation's battery sensors are every
-remote, every valve and every door contact, and no order over them would be the one you meant.
-The picker lists the sensors carrying Home Assistant's `battery` device class, and you can drag
-them into the order you want the rings in.
+**Devices**, then a panel per device, then **Scale**. This is the one card that draws nothing
+useful before it is configured — it says `No Devices` — because an installation's battery
+sensors are every remote, every valve and every door contact, and no order over them would be
+the one you meant. The picker lists the sensors carrying Home Assistant's `battery` device
+class, and you can drag them into the order you want the rings in.
+
+Each device you pick gets a panel of its own underneath, holding the three things Home
+Assistant cannot work out for you: its **icon**, its **charging sensor** and its **name**. Each
+field shows what the card will draw if you leave it empty, so nothing here needs YAML.
 
 ```yaml
 type: custom:cupertino-widgets-battery
@@ -219,10 +223,10 @@ in; until then four is the design rather than a shortfall, and the wide card in 
 not stack a stub row under a full one.
 
 **Worth setting `icon`.** Home Assistant computes a battery sensor's icon from its level, so
-without one you get a battery glyph inside a battery ring, six times over. The picker cannot
-set it — nor `charging_entity`, nor `name` — because Home Assistant's entity picker reports a
-list of ids and nothing else; those three are YAML, and the visual editor keeps them when you
-reorder or add a device rather than writing over them.
+without one you get a battery glyph inside a battery ring, six times over. It is the first
+field in a device's panel, and the one thing on this card that says _which_ device a ring is.
+The only sensor the picker cannot offer you is a battery percentage published without the
+`battery` device class — that one still works, it just has to be named in YAML.
 
 **Charging is detected without help** where the sensor says so itself — `is_charging` or
 `battery_state` on its attributes, which is what many integrations publish. `charging_entity`

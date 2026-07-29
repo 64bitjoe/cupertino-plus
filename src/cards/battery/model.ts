@@ -112,31 +112,34 @@ export const entityIds = (value: unknown): string[] =>
   deviceConfigs(value).map(config => config.entity)
 
 /**
- * The ids a picker reported, folded into the rows the config already had.
+ * The rows the config should carry after an edit: the ids the picker reported, in the order
+ * it reported them, each dressed with whatever its own panel in the editor says about it.
  *
  * Here rather than in the editor because it is a rule about the config rather than about a
- * form, and because it is the one part of the editor that can be tested without a browser.
- * What it protects against is an editor that is destructive rather than merely limited:
- * `ha-entities-picker` cannot report a `charging_entity`, so an editor that wrote its answer
- * back verbatim would delete every override in the config the moment somebody opened the
- * visual editor to look at it — and a card whose bolts stopped appearing after a visit to
- * the editor would be very hard to connect back to the editor.
+ * form, and because it is the one part of the editor a test can reach without a browser.
+ * The picker is the authority on *which* devices and in *what order* — a row is built from
+ * the id it reported, never from a panel that happens to still be in the form's data — and
+ * the panel is the authority on everything else.
  *
- * Only a row carrying something the picker cannot say is kept as an object. An
- * `{ entity: … }` and its bare id mean the same thing, so writing the object form back over
- * a list of plain strings would churn the user's YAML for nothing.
+ * Two things it is careful about, both of them about not churning somebody's YAML:
+ *
+ *  - an `{ entity: … }` and its bare id mean the same thing, so a row with nothing to add
+ *    is written back as the plain string it arrived as;
+ *  - the panel's answer goes through `deviceConfig`, so a field the user emptied is dropped
+ *    rather than written as `icon: ''` — which would shadow the entity's own icon with
+ *    nothing.
  */
-export const mergeDeviceRows = (
-  previous: unknown,
+export const writeDeviceRows = (
   reported: unknown,
-): (string | BatteryDeviceConfig)[] => {
-  const overrides = new Map(
-    deviceConfigs(previous)
-      .filter(config => Object.keys(config).length > 1)
-      .map(config => [config.entity, config] as const),
-  )
-  return deviceConfigs(reported).map(config => overrides.get(config.entity) ?? config.entity)
-}
+  panelFor: (entity: string) => unknown,
+): (string | BatteryDeviceConfig)[] =>
+  deviceConfigs(reported).map(({ entity }) => {
+    const panel = panelFor(entity)
+    // The id is the picker's and only the picker's — a panel is asked what to add to a row,
+    // never which row it is. Spread first so it cannot answer the second question either.
+    const row = deviceConfig({ ...(typeof panel === 'object' ? panel : {}), entity })
+    return row === undefined || Object.keys(row).length === 1 ? entity : row
+  })
 
 /**
  * Every entity id the card's rendering depends on.
@@ -193,6 +196,24 @@ export const readCharging = (
   return String(attributes.battery_state ?? '').toLowerCase() === 'charging'
 }
 
+/**
+ * What the card would call this entity, and what glyph it would give it, if the config
+ * overrode neither.
+ *
+ * Exported because the editor shows exactly these two as the placeholders in the two fields
+ * that override them — a placeholder is a promise about what happens when the field is left
+ * empty, so it has to be read off the same expression that keeps the promise. The entity id
+ * as the last resort for the name rather than an empty string: it is what the user typed,
+ * so it is the one name that always identifies the row they meant.
+ */
+export const inheritedName = (hass: HomeAssistant | undefined, entity: string): string =>
+  hass?.states[entity]?.attributes.friendly_name ?? entity
+
+export const inheritedIcon = (hass: HomeAssistant | undefined, entity: string): string => {
+  const state = hass?.states[entity]
+  return state?.attributes.icon ?? fallbackIcon(state)
+}
+
 export const readDevice = (
   hass: HomeAssistant | undefined,
   config: BatteryDeviceConfig,
@@ -201,10 +222,8 @@ export const readDevice = (
 
   return {
     id: config.entity,
-    // The entity id as the last resort rather than an empty string: it is what the user
-    // typed, so it is the one name that always identifies the row they meant.
-    name: config.name ?? state?.attributes.friendly_name ?? config.entity,
-    icon: config.icon ?? state?.attributes.icon ?? fallbackIcon(state),
+    name: config.name ?? inheritedName(hass, config.entity),
+    icon: config.icon ?? inheritedIcon(hass, config.entity),
     level: readLevel(state),
     charging: readCharging(hass, config, state),
   }

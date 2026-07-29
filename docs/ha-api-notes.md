@@ -482,9 +482,14 @@ this.data = { ...this.data, ...o }
 So a **named** `expandable` nests: the rows inside it read and write an object of their own,
 and the form's data gains one key per panel rather than one per field. `flatten: true` opts
 out, which is what Home Assistant's own badge and heading-entity editors do — they group
-`name`/`icon`/`color` under a **Content** panel that still writes flat config keys. The
-battery card wants the nesting instead: a panel is one device's config, and keeping it whole
-is what lets one device be written back without disturbing its neighbours.
+`name`/`icon`/`color` under a **Content** panel that still writes flat config keys.
+
+Worth knowing and, in the end, not what the battery card uses. Its device list was built on
+named `expandable` nodes first, one per configured device, with a multiple entity picker above
+them for adding and reordering — and the thing that sank it is that **nothing in `ha-form` can
+hang a drag handle or a delete button off a panel**. The panels could describe the devices but
+could never _be_ the list, so the list stayed a separate picker and one device sat in two
+controls. See `cards/battery/device-list-editor.ts`, which owns its panels instead.
 
 `ha-form-expandable` itself takes `title`, `icon`, `iconPath`, `expanded` and `headingLevel`,
 renders `schema.title || computeLabel(schema)` as the summary, and hands `computeLabel` /
@@ -586,9 +591,74 @@ from those fields; without `fields` it falls back to a raw `ha-yaml-editor`. Wor
 - but its `_schema` maps only `{name, selector, required}` and **drops `context`**, so the
   placeholder trick above is not available inside the dialog.
 
-The battery card kept its multiple entity picker instead: four batteries in four clicks is
-the common case, and the object selector would have charged a modal per device for it. See
-the note on `CupertinoBatteryCardEditor`.
+The battery card hand-rolls the same list instead, for the one reason that survives all of
+this: its rows expand **in place**. A modal is a fine way to edit a row of six settings and a
+poor way to change one icon, and the placeholder that says which icon you are overriding
+cannot be shown inside the dialog anyway.
+
+### What a hand-rolled list editor may render
+
+`hui-entities-card-row-editor` is the shape to copy — `ha-sortable` around a wrapper, an
+`item-moved` event carrying two indices, an empty picker as the add control, and clearing a
+row's entity as the way to delete it. What it costs to copy is knowing which elements exist
+by the time an editor is open. Checked with the panel-group script from the `ha-form` section,
+substituting each tag:
+
+| in the `lovelace` panel group                                                                       | **not** in it                                                                         |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `ha-form`, `ha-selector`, `ha-icon`, `ha-svg-icon`, `ha-icon-button`, `ha-alert`, `ha-md-list-item` | `ha-button`, `ha-entity-picker`, `ha-icon-picker`, `ha-entities-picker`, `ha-md-list` |
+| `ha-sortable`, `ha-expansion-panel`                                                                 |                                                                                       |
+
+The right-hand column is the trap, because an undefined custom element renders as **nothing at
+all** — no error, no box, just a gap that reads as a bug in your own file. `ha-entity-picker`
+and `ha-icon-picker` are reached the safe way, through an `ha-form` row whose selector asks for
+them, so `ha-selector` does the lazy import it exists to do. `ha-button` has no such route,
+which is one more reason the battery card's add control is a picker rather than a button.
+
+`ha-sortable` (chunk 88519), deminified where it matters:
+
+```js
+createRenderRoot() { return this }                        // light DOM: the rows stay yours
+async _createSortable() {
+  const container = this.children[0]                      // its FIRST child, not itself
+  if (!container) return
+  const Sortable = (await import(/* 10294, 75781 */)).default
+  this._sortable = new Sortable(container, { handle: this.handleSelector, ... })
+}
+_handleUpdate = e => fireEvent(this, 'item-moved', { newIndex: e.newIndex, oldIndex: e.oldIndex })
+_handleChoose = e => { this.rollback && (e.item.placeholder = document.createComment('sort-placeholder'), e.item.after(e.item.placeholder)) }
+_handleEnd = async e => { fireEvent(this, 'drag-end'); this.rollback && e.item.placeholder && (e.item.placeholder.replaceWith(e.item), delete e.item.placeholder) }
+```
+
+Three consequences. It needs a **wrapper element** to make sortable — its own children are
+the container, not the items. `rollback` defaults **true**, so it undoes its own DOM move on
+drop and the re-render is what actually reorders: the list is data-driven, and a handler that
+tried to move the DOM itself would fight it. And sortablejs arrives lazily, so the first drag
+of a session has a chunk to fetch.
+
+`ha-expansion-panel`'s summary, for anyone hanging chrome off one:
+
+```js
+<div class="top">
+  <div id="summary" @click=${toggle} @keydown=${toggle} role="button" tabindex="0">
+    ${leftChevron ? chevron : nothing}
+    <slot name="leading-icon"></slot>
+    <slot name="header"><div class="header">${this.header}<slot class="secondary" name="secondary">${this.secondary}</slot></div></slot>
+    <slot name="event"></slot>
+    ${leftChevron ? nothing : chevron}
+    <slot name="icons"></slot>
+  </div>
+</div>
+<div class="container ${expanded}">${this._showContent ? html`<slot></slot>` : ''}</div>
+```
+
+- `header` and `secondary` are **properties** that fill the default content of the `header`
+  slot, so a two-line summary needs no markup of its own.
+- `icons` is a trailing slot **inside** `#summary` — where a per-panel action button goes.
+- and it is inside the click target, so a button there must `preventDefault()`: the toggle
+  opens with `if (e.defaultPrevented) return`, which is the only thing standing between a
+  delete button and a panel that opens as its row is removed.
+- `expanded-changed` reports a user toggle; `expanded` is a property you may also set.
 
 Home Assistant's own calendar card editor is a useful reference but not a model: it
 predates the entity selector and still hand-renders an `<ha-entities-picker>` beside its

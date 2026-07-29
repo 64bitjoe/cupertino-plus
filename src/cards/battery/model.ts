@@ -112,34 +112,55 @@ export const entityIds = (value: unknown): string[] =>
   deviceConfigs(value).map(config => config.entity)
 
 /**
- * The rows the config should carry after an edit: the ids the picker reported, in the order
- * it reported them, each dressed with whatever its own panel in the editor says about it.
+ * One row as the config should carry it, or `undefined` when there is no device in it.
+ *
+ * Two things it is careful about, both of them about not churning somebody's YAML. An
+ * `{ entity: … }` and its bare id mean the same thing, so a row with nothing to add is
+ * written as the plain string — a config of four ids must not turn into four objects
+ * because somebody opened the editor. And it goes through `deviceConfig`, so a field the
+ * user emptied is dropped rather than written as `icon: ''`, which would shadow the
+ * entity's own icon with nothing.
+ *
+ * `undefined` is what an editor row with no entity chosen comes to. That is deliberate and
+ * it is Home Assistant's own reading of the gesture — clearing the entity on a row of its
+ * entities card deletes the row — because a device with no sensor behind it is not a device
+ * the card could draw.
+ */
+export const deviceRow = (row: unknown): string | BatteryDeviceConfig | undefined => {
+  const config = deviceConfig(row)
+  if (config === undefined) return undefined
+  return Object.keys(config).length === 1 ? config.entity : config
+}
+
+/**
+ * A whole list on its way back into the config.
  *
  * Here rather than in the editor because it is a rule about the config rather than about a
- * form, and because it is the one part of the editor a test can reach without a browser.
- * The picker is the authority on *which* devices and in *what order* — a row is built from
- * the id it reported, never from a panel that happens to still be in the form's data — and
- * the panel is the authority on everything else.
- *
- * Two things it is careful about, both of them about not churning somebody's YAML:
- *
- *  - an `{ entity: … }` and its bare id mean the same thing, so a row with nothing to add
- *    is written back as the plain string it arrived as;
- *  - the panel's answer goes through `deviceConfig`, so a field the user emptied is dropped
- *    rather than written as `icon: ''` — which would shadow the entity's own icon with
- *    nothing.
+ * control, and because it is the half of the editor a test can reach without a browser.
  */
-export const writeDeviceRows = (
-  reported: unknown,
-  panelFor: (entity: string) => unknown,
-): (string | BatteryDeviceConfig)[] =>
-  deviceConfigs(reported).map(({ entity }) => {
-    const panel = panelFor(entity)
-    // The id is the picker's and only the picker's — a panel is asked what to add to a row,
-    // never which row it is. Spread first so it cannot answer the second question either.
-    const row = deviceConfig({ ...(typeof panel === 'object' ? panel : {}), entity })
-    return row === undefined || Object.keys(row).length === 1 ? entity : row
-  })
+export const deviceRows = (rows: readonly unknown[]): (string | BatteryDeviceConfig)[] => {
+  const written: (string | BatteryDeviceConfig)[] = []
+  for (const row of rows) {
+    const one = deviceRow(row)
+    if (one !== undefined) written.push(one)
+  }
+  return written
+}
+
+/**
+ * A row moved from one place in the list to another — everything about a drag except the
+ * dragging, which is `ha-sortable`'s and reaches the editor as a pair of indices.
+ *
+ * Written over any list rather than over devices, because there is nothing about a battery
+ * in it. It stays here until a second card wants one, which is the point at which where it
+ * belongs becomes a question worth answering.
+ */
+export const moveRow = <T>(rows: readonly T[], from: number, to: number): T[] => {
+  const next = [...rows]
+  const [moved] = next.splice(from, 1)
+  if (moved !== undefined) next.splice(to, 0, moved)
+  return next
+}
 
 /**
  * Every entity id the card's rendering depends on.

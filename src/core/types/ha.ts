@@ -214,45 +214,23 @@ export interface TextSelector {
 export type Selector =
   EntitySelector | SelectSelector | NumberSelector | IconSelector | TextSelector
 
-/** A row that carries a value of its own. */
-export interface HaFormSelectorSchema {
+/**
+ * One row of an `ha-form`.
+ *
+ * `ha-form` also takes nodes carrying a `type` instead of a `selector` — `grid`,
+ * `expandable` and nine others, dispatched to `ha-form-${type}` and lazily imported when
+ * it first sees one — but a selector node is the only shape our editors need. The battery
+ * card's accordions are `ha-expansion-panel`s of its own rather than `expandable` nodes,
+ * because a panel it owns is one it can hang a drag handle and a delete button off;
+ * `docs/ha-api-notes.md` records how the `expandable` node nests its data, for whoever
+ * needs a group of rows and none of that chrome.
+ */
+export interface HaFormSchema {
   name: string
   selector: Selector
   /** Purely presentational here: `ha-form` marks the field, it does not enforce it. */
   required?: boolean
 }
-
-/**
- * A collapsible group of rows, lazily imported by `ha-form` when it sees the `type`.
- *
- * `name` is load-bearing and easy to misread. `ha-form` hands every node `data[node.name]`
- * and merges its answer back under the same key, so a named expandable **nests**: its rows
- * read and write an object of their own, and `data` gains one key per panel rather than one
- * per field. (`flatten: true` opts out of that, which is what Home Assistant's own badge
- * editors do with theirs. This library wants the nesting — a panel per device is a device's
- * config, and keeping it whole is what lets one be written back without disturbing the
- * others.) Verified in the 2026.7.4 bundle rather than taken from documentation.
- */
-export interface HaFormExpandableSchema {
-  type: 'expandable'
-  name: string
-  /** The summary line. `computeLabel(schema)` answers for it when this is absent. */
-  title?: string
-  /** An `mdi:` name, drawn before the title. */
-  icon?: string
-  /** Open on the first render. Off unless asked for. */
-  expanded?: boolean
-  schema: readonly HaFormSchema[]
-}
-
-/**
- * One row of an `ha-form`.
- *
- * `ha-form` takes nodes carrying a `type` instead of a `selector` — `grid`, `expandable`
- * and nine others — and dispatches to `ha-form-${type}`. Only `expandable` is modelled:
- * anything reading a schema has to narrow with `'selector' in node` first.
- */
-export type HaFormSchema = HaFormSelectorSchema | HaFormExpandableSchema
 
 /**
  * The element a card's `static getConfigElement()` hands back.

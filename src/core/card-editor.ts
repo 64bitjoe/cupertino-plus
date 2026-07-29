@@ -60,10 +60,6 @@ export const formData = (
   const data: Record<string, unknown> = { ...defaults, ...config }
 
   for (const node of schema) {
-    // An expandable carries no value of its own — the rows inside it read out of the
-    // object under its name, and `ha-form` does that splitting itself.
-    if (!('selector' in node)) continue
-
     const multiple = isMultiple(node.selector)
     const value = data[node.name]
     // `isBlank`, not `!== undefined`: a bare `entities:` in the YAML parses to `null`,
@@ -203,20 +199,14 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * fields back with `applyFormData`. The pair exists for the one shape that cannot round
    * trip: a list whose rows carry more than the selector can express.
    *
-   * The battery card is that shape. Its `entities` may hold
-   * `{ entity, charging_entity, name, icon }` objects, and `ha-entities-picker` reports a
-   * list of ids and nothing else — so a form that showed the config verbatim would hand the
-   * picker objects it maps over as strings, and an editor that wrote its answer back
-   * verbatim would delete every override the moment anybody opened the visual editor. What
-   * it does instead is show the picker the ids and put the rest of each row in a panel of
-   * its own, then reassemble the two here. Home Assistant's own entities card answers the
-   * same problem with a bespoke editor element in place of a selector; two hooks are the
-   * cheaper half of that, and they keep the plumbing in one place rather than in each card
-   * that grows a list.
-   *
-   * A `fromForm` whose form carries fields of the editor's own invention — a panel per row,
-   * say — has to keep them out of `applyFormData`, which cannot tell them from config keys
-   * and would write them into the user's YAML.
+   * No card in the library needs either at the moment: the one shape that could not round
+   * trip was the battery card's `entities`, whose rows carry `{ entity, charging_entity,
+   * name, icon }` objects that `ha-entities-picker` can only report as a list of ids — and
+   * that list is no longer a form row at all. It is a control of its own, drawn by
+   * `beforeForm` below, which is the same answer Home Assistant reaches for its entities
+   * card. The pair stays because it is the cheaper answer whenever a list's rows are only
+   * *slightly* more than a selector can say, and because deleting it would leave the next
+   * card that finds out to rediscover why.
    */
   protected toForm(config: C): Record<string, unknown> {
     return config
@@ -240,17 +230,15 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
   private readonly _computeHelper = (schema: HaFormSchema): string | undefined =>
     this.helper(schema)
 
-  private readonly _valueChanged = (
-    event: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
-    // It has been folded into the `config-changed` below; nothing above us wants to see
-    // the raw form value as well.
-    event.stopPropagation()
-    if (!this._config) return
-
-    const fields = this.schema().map(node => node.name)
-    const config = this.fromForm(this._config, event.detail.value, fields)
-
+  /**
+   * Tell Home Assistant the config changed.
+   *
+   * Protected rather than private because the form is not the only thing that can change a
+   * config: a card whose subject is a list draws a control of its own above the form (see
+   * `beforeForm`) and reports through here, so that both routes carry the same event with
+   * the same flags.
+   */
+  protected emitConfig(config: C): void {
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config },
@@ -264,6 +252,34 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
     )
   }
 
+  private readonly _valueChanged = (
+    event: CustomEvent<{ value: Record<string, unknown> }>,
+  ): void => {
+    // It has been folded into the `config-changed` below; nothing above us wants to see
+    // the raw form value as well.
+    event.stopPropagation()
+    if (!this._config) return
+
+    const fields = this.schema().map(node => node.name)
+    this.emitConfig(this.fromForm(this._config, event.detail.value, fields))
+  }
+
+  /**
+   * A control of the card's own, drawn above the form.
+   *
+   * For the one question an `ha-form` row cannot answer: a list whose rows are each a small
+   * config of their own, which wants adding, reordering and deleting as well as editing.
+   * Home Assistant's own entities card hand-rolls exactly this and so does the battery card,
+   * and both put it *above* the shared rows for the reason `schema()` gives — the card's
+   * subject is why somebody opened the dialog, and how big to draw it comes after.
+   *
+   * Anything drawn here reports with `emitConfig`; nothing about it goes through
+   * `formData`/`applyFormData`, which are the form's business alone.
+   */
+  protected beforeForm(): TemplateResult | typeof nothing {
+    return nothing
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     if (!this.hass || !this._config) return nothing
 
@@ -273,6 +289,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
     const defaults = { [SCALE_FIELD]: DEFAULT_SCALE, ...this.defaults() }
 
     return html`
+      ${this.beforeForm()}
       <ha-form
         .hass=${this.hass}
         .data=${formData(this.toForm(this._config), defaults, this.schema())}

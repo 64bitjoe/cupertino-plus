@@ -3,13 +3,15 @@ import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 import {
   deviceConfigs,
+  deviceRow,
+  deviceRows,
   entityIds,
   inheritedIcon,
   inheritedName,
+  moveRow,
   readDevice,
   readDevices,
   watchedIds,
-  writeDeviceRows,
 } from './model'
 
 const entity = (
@@ -96,71 +98,30 @@ describe('the entities a card has to be woken for', () => {
 
 /**
  * The half of the visual editor a test can reach without a browser, and the half where the
- * damage would be done. `ha-entities-picker` reports a list of ids and nothing else, so the
- * editor shows it the ids and puts the rest of each row in a panel of its own; these two
- * functions are the way out and the way back.
+ * damage would be done: what the device list writes back into the config after every
+ * keystroke, every drag and every delete.
  */
-describe('a round trip through the editor', () => {
+describe('what an edited list writes back', () => {
   const TABLET = 'sensor.tablet_battery'
   const WATCH = 'sensor.watch_battery'
   const CHARGER = 'binary_sensor.tablet_charging'
 
-  /** What the panels reported, as the editor hands it over: a lookup by entity id. */
-  const panels =
-    (rows: Record<string, unknown>) =>
-    (entity: string): unknown =>
-      rows[entity]
-
-  it('shows the picker the ids and nothing else', () => {
-    expect(entityIds([PHONE, { entity: TABLET, charging_entity: CHARGER }])).toEqual([
-      PHONE,
-      TABLET,
-    ])
-  })
-
-  it('writes what a panel reported into the row it belongs to', () => {
+  it('carries every field a row can hold', () => {
     expect(
-      writeDeviceRows([PHONE, TABLET], panels({ [TABLET]: { charging_entity: CHARGER } })),
-    ).toEqual([PHONE, { entity: TABLET, charging_entity: CHARGER }])
-  })
-
-  it('carries every field a panel offers', () => {
-    expect(
-      writeDeviceRows(
-        [TABLET],
-        panels({ [TABLET]: { icon: 'mdi:tablet', name: 'Tablet', charging_entity: CHARGER } }),
-      ),
+      deviceRows([
+        { entity: TABLET, icon: 'mdi:tablet', name: 'Tablet', charging_entity: CHARGER },
+      ]),
     ).toEqual([{ entity: TABLET, icon: 'mdi:tablet', name: 'Tablet', charging_entity: CHARGER }])
-  })
-
-  /** The picker is the authority on which devices there are and in what order. */
-  it('follows the picker when a row is reordered, added or removed', () => {
-    const overrides = panels({ [TABLET]: { charging_entity: CHARGER } })
-    const tablet = { entity: TABLET, charging_entity: CHARGER }
-
-    expect(writeDeviceRows([TABLET, PHONE], overrides)).toEqual([tablet, PHONE])
-    expect(writeDeviceRows([TABLET], overrides)).toEqual([tablet])
-    expect(writeDeviceRows([PHONE, TABLET, WATCH], overrides)).toEqual([PHONE, tablet, WATCH])
-  })
-
-  /**
-   * The bug that keying panels by position would have caused, stated as a test: removing the
-   * first of three devices shifts the other two up, and the second device must not inherit
-   * the first one's charging sensor on the way.
-   */
-  it('keeps a panel with its own device when an earlier one is removed', () => {
-    const overrides = panels({ [PHONE]: { icon: 'mdi:cellphone' } })
-    expect(writeDeviceRows([WATCH, TABLET], overrides)).toEqual([WATCH, TABLET])
   })
 
   /**
    * An `{ entity: … }` and its bare id say the same thing, so the object form must not spread
-   * through a list of plain strings on every keystroke of an edit.
+   * through a list of plain ids because somebody opened the editor.
    */
   it('does not churn a config of plain ids into objects', () => {
-    expect(writeDeviceRows([PHONE], panels({}))).toEqual([PHONE])
-    expect(writeDeviceRows([PHONE], panels({ [PHONE]: {} }))).toEqual([PHONE])
-    expect(writeDeviceRows([{ entity: PHONE }], panels({}))).toEqual([PHONE])
+    expect(deviceRows([PHONE, { entity: WATCH }])).toEqual([PHONE, WATCH])
+    expect(deviceRow(PHONE)).toBe(PHONE)
+    expect(deviceRow({ entity: PHONE })).toBe(PHONE)
   })
 
   /**
@@ -168,10 +129,60 @@ describe('a round trip through the editor', () => {
    * an emptied override has to leave the config rather than sit in it blank.
    */
   it('drops a field that was cleared rather than writing it empty', () => {
-    expect(
-      writeDeviceRows([PHONE], panels({ [PHONE]: { icon: '', name: '', charging_entity: '' } })),
-    ).toEqual([PHONE])
-    expect(writeDeviceRows([PHONE], panels({ [PHONE]: { icon: undefined } }))).toEqual([PHONE])
+    expect(deviceRows([{ entity: PHONE, icon: '', name: '', charging_entity: '' }])).toEqual([
+      PHONE,
+    ])
+    expect(deviceRows([{ entity: PHONE, icon: undefined }])).toEqual([PHONE])
+    expect(deviceRows([{ entity: PHONE, name: 'Phone', icon: '' }])).toEqual([
+      { entity: PHONE, name: 'Phone' },
+    ])
+  })
+
+  /**
+   * Clearing a row's entity is how the editor's user says "delete this row", which is Home
+   * Assistant's own reading of the gesture on its entities card. A device with no sensor
+   * behind it is not a device the card could draw, so it cannot survive as an empty row.
+   */
+  it('drops a row whose entity was cleared', () => {
+    expect(deviceRow({ entity: '', icon: 'mdi:tablet' })).toBeUndefined()
+    expect(deviceRows([PHONE, { entity: '', icon: 'mdi:tablet' }, WATCH])).toEqual([PHONE, WATCH])
+  })
+
+  it('shows a picker the ids and nothing else', () => {
+    expect(entityIds([PHONE, { entity: TABLET, charging_entity: CHARGER }])).toEqual([
+      PHONE,
+      TABLET,
+    ])
+  })
+})
+
+/**
+ * Everything about a drag except the dragging. `ha-sortable` rolls its own DOM change back
+ * and reports two indices, so this is what actually reorders the rings — and the order of
+ * `entities` is the order of the rings, with nothing sorting them afterwards.
+ */
+describe('a row moved', () => {
+  const list = ['a', 'b', 'c', 'd']
+
+  it('takes a row from one place and puts it in another', () => {
+    expect(moveRow(list, 0, 2)).toEqual(['b', 'c', 'a', 'd'])
+    expect(moveRow(list, 3, 0)).toEqual(['d', 'a', 'b', 'c'])
+    expect(moveRow(list, 1, 2)).toEqual(['a', 'c', 'b', 'd'])
+  })
+
+  it('leaves the list alone when the row did not move', () => {
+    expect(moveRow(list, 2, 2)).toEqual(list)
+  })
+
+  it('does not mutate the list it was given', () => {
+    const before = [...list]
+    moveRow(list, 0, 3)
+    expect(list).toEqual(before)
+  })
+
+  /** An index from outside the list, which a stray event would carry. */
+  it('answers the same list for an index that is not in it', () => {
+    expect(moveRow(list, 9, 0)).toEqual(list)
   })
 })
 

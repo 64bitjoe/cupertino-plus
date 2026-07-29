@@ -126,31 +126,6 @@ const HA_FORM_CSS = `
     width: 100%;
     box-sizing: border-box;
   }
-
-  /* An expandable node. The real one is an ha-expansion-panel with the device's icon in
-     its summary; a details element collapses and expands, which is the behaviour being
-     developed here. */
-  details {
-    margin: 0 0 12px;
-    border: 1px solid var(--divider-color, #e0e0e0);
-    border-radius: 6px;
-    padding: 0 10px;
-  }
-
-  summary {
-    padding: 10px 0;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  details[open] summary {
-    border-bottom: 1px solid var(--divider-color, #e0e0e0);
-    margin-bottom: 12px;
-  }
-
-  details fieldset:last-child {
-    margin-bottom: 12px;
-  }
 `
 
 /**
@@ -259,13 +234,272 @@ class HaCardStub extends HTMLElement {
   }
 }
 
-/** Where one row of the form reads its value and where its answer goes. */
-interface FormScope {
-  data: Record<string, unknown>
-  /** Prefixed onto every control's id, so nested rows cannot collide. */
-  prefix: string
-  emit(name: string, value: unknown): void
+/**
+ * `ha-svg-icon`: the same glyph as `ha-icon`, given as a path rather than by name.
+ *
+ * A property and not an attribute, because that is how it is used — `.path=${mdiDrag}`.
+ */
+class HaSvgIconStub extends HTMLElement {
+  private readonly _root: ShadowRoot
+  private _path = ''
+
+  public constructor() {
+    super()
+    this._root = this.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = HA_ICON_CSS
+    this._root.append(style)
+  }
+
+  public set path(value: string) {
+    if (this._path === value) return
+    this._path = value
+    const style = this._root.firstElementChild as HTMLStyleElement
+    const svg = document.createElementNS(SVG_NS, 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('aria-hidden', 'true')
+    const shape = document.createElementNS(SVG_NS, 'path')
+    shape.setAttribute('d', value)
+    svg.append(shape)
+    this._root.replaceChildren(style, svg)
+  }
+
+  public get path(): string {
+    return this._path
+  }
 }
+
+const HA_ICON_BUTTON_CSS = `
+  :host {
+    display: inline-block;
+    --mdc-icon-size: 24px;
+  }
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ha-icon-button-size, 48px);
+    height: var(--ha-icon-button-size, 48px);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: rgba(127, 127, 127, 0.12);
+  }
+`
+
+/**
+ * `ha-icon-button`: a real `<button>` around a glyph, and the `--ha-icon-button-size` handle
+ * the real one takes its size from.
+ *
+ * The `label` becomes the accessible name, as it does in Home Assistant. Worth having as a
+ * button rather than a clickable div: the editor's delete affordance has to be reachable by
+ * keyboard, and only a button is that for free.
+ */
+class HaIconButtonStub extends HTMLElement {
+  private readonly _button: HTMLButtonElement
+  private readonly _icon: HaSvgIconStub
+
+  public constructor() {
+    super()
+    const root = this.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = HA_ICON_BUTTON_CSS
+    this._button = document.createElement('button')
+    this._icon = document.createElement('ha-svg-icon') as HaSvgIconStub
+    this._button.append(this._icon)
+    root.append(style, this._button)
+  }
+
+  public set path(value: string) {
+    this._icon.path = value
+  }
+
+  public set label(value: string) {
+    this._button.setAttribute('aria-label', value)
+    this._button.title = value
+  }
+}
+
+const HA_EXPANSION_PANEL_CSS = `
+  :host {
+    display: block;
+  }
+
+  :host([outlined]) {
+    border: 1px solid var(--divider-color, #e0e0e0);
+    border-radius: 6px;
+  }
+
+  .top {
+    display: flex;
+    align-items: center;
+  }
+
+  #summary {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 8px;
+    font-weight: 500;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .header {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .secondary {
+    display: block;
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--secondary-text-color);
+  }
+
+  .chevron {
+    transition: transform 0.15s ease;
+  }
+
+  .chevron.expanded {
+    transform: rotate(180deg);
+  }
+
+  .container {
+    padding: 0 8px;
+  }
+
+  .container[hidden] {
+    display: none;
+  }
+`
+
+const CHEVRON = 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z'
+
+/**
+ * `ha-expansion-panel`: the accordion the battery card's device rows are.
+ *
+ * Its slots are the real one's, because the editor addresses them by name and getting one
+ * wrong is a silently empty summary: `leading-icon` before the header, `header` (which the
+ * `header`/`secondary` properties fill when nothing is slotted into it), and `icons` after
+ * the chevron, which is where the delete button goes.
+ *
+ * The one behaviour worth copying rather than approximating is the toggle guard. The real
+ * `_toggleContainer` opens with `if (e.defaultPrevented) return`, which is the whole reason a
+ * button can live inside a clickable summary at all — the editor's delete handler calls
+ * `preventDefault`, and a stub without this check would delete a device and open the panel
+ * below it in the same click.
+ */
+class HaExpansionPanelStub extends HTMLElement {
+  private readonly _root: ShadowRoot
+  private readonly _summary: HTMLDivElement
+  private readonly _headerText: HTMLSpanElement
+  private readonly _secondaryText: HTMLSpanElement
+  private readonly _chevron: HaSvgIconStub
+  private readonly _container: HTMLDivElement
+  private _expanded = false
+
+  public constructor() {
+    super()
+    this._root = this.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = HA_EXPANSION_PANEL_CSS
+
+    const top = document.createElement('div')
+    top.className = 'top'
+    this._summary = document.createElement('div')
+    this._summary.id = 'summary'
+    this._summary.setAttribute('role', 'button')
+    this._summary.tabIndex = 0
+
+    const leading = document.createElement('slot')
+    leading.name = 'leading-icon'
+
+    const headerSlot = document.createElement('slot')
+    headerSlot.name = 'header'
+    const header = document.createElement('div')
+    header.className = 'header'
+    this._headerText = document.createElement('span')
+    this._secondaryText = document.createElement('span')
+    this._secondaryText.className = 'secondary'
+    header.append(this._headerText, this._secondaryText)
+    headerSlot.append(header)
+
+    this._chevron = document.createElement('ha-svg-icon') as HaSvgIconStub
+    this._chevron.className = 'chevron'
+    this._chevron.path = CHEVRON
+
+    const icons = document.createElement('slot')
+    icons.name = 'icons'
+
+    this._summary.append(leading, headerSlot, this._chevron, icons)
+    top.append(this._summary)
+
+    this._container = document.createElement('div')
+    this._container.className = 'container'
+    this._container.hidden = true
+    this._container.append(document.createElement('slot'))
+
+    this._root.append(style, top, this._container)
+
+    const toggle = (event: Event): void => {
+      if (event.defaultPrevented) return
+      if (event instanceof KeyboardEvent && event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      this.expanded = !this._expanded
+      this.dispatchEvent(
+        new CustomEvent('expanded-changed', {
+          detail: { expanded: this._expanded },
+          bubbles: true,
+          composed: true,
+        }),
+      )
+    }
+    this._summary.addEventListener('click', toggle)
+    this._summary.addEventListener('keydown', toggle)
+  }
+
+  public set expanded(value: boolean) {
+    this._expanded = value
+    this._container.hidden = !value
+    this._chevron.classList.toggle('expanded', value)
+    this._summary.setAttribute('aria-expanded', String(value))
+  }
+
+  public get expanded(): boolean {
+    return this._expanded
+  }
+
+  public set header(value: string) {
+    this._headerText.textContent = value
+  }
+
+  public set secondary(value: string) {
+    this._secondaryText.textContent = value
+  }
+}
+
+/**
+ * `ha-sortable`: here, only the shape of it.
+ *
+ * The real one loads sortablejs and makes its first child's children draggable by a handle,
+ * then rolls its own DOM change back and reports `item-moved` with two indices so the
+ * framework can re-render the new order. Reproducing that is not what this harness is for,
+ * so this renders its children and drags nothing — the reorder *rule* is `moveRow` in
+ * `model.ts`, which a test covers, and the drag itself is one of the things `pnpm ha:up` is
+ * for. Light DOM rather than a shadow root, like the real one, so the editor's own CSS still
+ * reaches the rows inside it.
+ */
+class HaSortableStub extends HTMLElement {}
 
 /**
  * A stand-in for `ha-form`, so a card editor can be developed here too.
@@ -294,8 +528,6 @@ class HaFormStub extends HTMLElement {
     ((schema: HaFormSchema, data: Record<string, unknown>) => string) | undefined
   private _computeHelper: ((schema: HaFormSchema) => string | undefined) | undefined
   private _pending = false
-  /** Which panels the visitor has opened — see `_renderPanel`. */
-  private readonly _open = new Set<string>()
 
   constructor() {
     super()
@@ -346,43 +578,14 @@ class HaFormStub extends HTMLElement {
    * The real one merges the changed field into its data and re-fires the lot. Editors
    * are written against that, so the stub has to do it too.
    */
-  private _emit(data: Record<string, unknown>): void {
+  private _emit(name: string, value: unknown): void {
     this.dispatchEvent(
       new CustomEvent('value-changed', {
-        detail: { value: data },
+        detail: { value: { ...this._data, [name]: value } },
         bubbles: true,
         composed: true,
       }),
     )
-  }
-
-  /**
-   * Where one row reads its value and where its answer goes.
-   *
-   * The real `ha-form` splits this for us: a node with a `name` is handed `data[name]` and
-   * its answer is merged back under the same key, so the rows inside a named `expandable`
-   * read and write an object of their own. That nesting is the thing a card editor with a
-   * panel per row depends on, so the stub reproduces it rather than flattening — an editor
-   * developed against a flat stub would write every panel's fields into the top level and
-   * only fail in Home Assistant.
-   */
-  private _scope(): FormScope {
-    return {
-      data: this._data,
-      prefix: '',
-      emit: (name, value) => this._emit({ ...this._data, [name]: value }),
-    }
-  }
-
-  private _nested(name: string): FormScope {
-    const data = (this._data[name] as Record<string, unknown> | undefined) ?? {}
-    return {
-      data,
-      // Ids stay unique across panels, so the focus restore below cannot put the caret in
-      // another device's field.
-      prefix: `${name}--`,
-      emit: (field, value) => this._emit({ ...this._data, [name]: { ...data, [field]: value } }),
-    }
   }
 
   private _render(): void {
@@ -391,35 +594,31 @@ class HaFormStub extends HTMLElement {
     const focused = active instanceof HTMLElement ? active.id : ''
 
     const style = this._root.firstElementChild as HTMLStyleElement
-    const scope = this._scope()
-    this._root.replaceChildren(style, ...this._schema.map(node => this._renderRow(node, scope)))
+    this._root.replaceChildren(style, ...this._schema.map(node => this._renderRow(node)))
 
     if (focused) this._root.getElementById(focused)?.focus()
   }
 
-  private _renderRow(node: HaFormSchema, scope: FormScope): HTMLElement {
-    if (!('selector' in node)) return this._renderPanel(node)
-
+  private _renderRow(node: HaFormSchema): HTMLElement {
     const row = document.createElement('fieldset')
-    const id = `${scope.prefix}${node.name}`
-    const value = scope.data[node.name]
+    const value = this._data[node.name]
 
     const legend = document.createElement('legend')
-    legend.textContent = this._computeLabel?.(node, scope.data) ?? node.name
+    legend.textContent = this._computeLabel?.(node, this._data) ?? node.name
     row.append(legend)
 
     if ('select' in node.selector) {
-      row.append(this._renderSelect(node, node.selector.select.options, scope))
+      row.append(this._renderSelect(node, node.selector.select.options))
     } else if ('number' in node.selector) {
-      row.append(this._renderNumber(id, value, node.selector.number, node.name, scope))
+      row.append(this._renderNumber(node.name, value, node.selector.number))
     } else if ('icon' in node.selector) {
-      row.append(this._renderText(id, value, node.selector.icon.placeholder, node.name, scope))
+      row.append(this._renderText(node.name, value, node.selector.icon.placeholder))
     } else if ('text' in node.selector) {
-      row.append(this._renderText(id, value, node.selector.text.placeholder, node.name, scope))
+      row.append(this._renderText(node.name, value, node.selector.text.placeholder))
     } else if (node.selector.entity.multiple) {
-      row.append(this._renderEntities(node, node.selector.entity.filter, scope))
+      row.append(this._renderEntities(node, node.selector.entity.filter))
     } else {
-      row.append(this._renderEntity(id, value, node.selector.entity.filter, node.name, scope))
+      row.append(this._renderEntity(node.name, value, node.selector.entity.filter))
     }
 
     const helper = this._computeHelper?.(node)
@@ -433,44 +632,12 @@ class HaFormStub extends HTMLElement {
     return row
   }
 
-  /**
-   * A panel of rows over a nested object.
-   *
-   * Open state is held on the element rather than left to the `details`, because every
-   * keystroke rebuilds this DOM: without it, typing one character into a device's icon
-   * would collapse the panel it was typed into.
-   */
-  private _renderPanel(node: Extract<HaFormSchema, { type: 'expandable' }>): HTMLElement {
-    const panel = document.createElement('details')
-    panel.open = this._open.has(node.name)
-    panel.addEventListener('toggle', () => {
-      if (panel.open) this._open.add(node.name)
-      else this._open.delete(node.name)
-    })
-
-    const summary = document.createElement('summary')
-    if (node.icon) {
-      const icon = document.createElement('ha-icon')
-      icon.setAttribute('icon', node.icon)
-      summary.append(icon, ' ')
-    }
-    summary.append(node.title ?? this._computeLabel?.(node, this._data) ?? node.name)
-
-    const scope = this._nested(node.name)
-    panel.append(summary, ...node.schema.map(row => this._renderRow(row, scope)))
-    return panel
-  }
-
-  private _renderSelect(
-    node: HaFormSchema,
-    options: readonly SelectOption[],
-    scope: FormScope,
-  ): HTMLElement {
+  private _renderSelect(node: HaFormSchema, options: readonly SelectOption[]): HTMLElement {
     const list = document.createElement('div')
     list.className = 'options'
 
     for (const option of options) {
-      const id = `${scope.prefix}${node.name}-${option.value}`
+      const id = `${node.name}-${option.value}`
       const label = document.createElement('label')
       label.className = 'option'
 
@@ -479,8 +646,8 @@ class HaFormStub extends HTMLElement {
       radio.id = id
       radio.name = node.name
       radio.value = option.value
-      radio.checked = scope.data[node.name] === option.value
-      radio.addEventListener('change', () => scope.emit(node.name, option.value))
+      radio.checked = this._data[node.name] === option.value
+      radio.addEventListener('change', () => this._emit(node.name, option.value))
 
       const text = document.createElement('span')
       text.append(option.label)
@@ -506,11 +673,9 @@ class HaFormStub extends HTMLElement {
    * `scale: "110"` in somebody's YAML and look fine doing it here.
    */
   private _renderNumber(
-    id: string,
+    name: string,
     value: unknown,
     number: NumberSelector['number'],
-    name: string,
-    scope: FormScope,
   ): HTMLElement {
     const min = number.min ?? 0
     const max = number.max ?? 100
@@ -521,7 +686,7 @@ class HaFormStub extends HTMLElement {
 
     const input = document.createElement('input')
     input.type = 'range'
-    input.id = `${id}-range`
+    input.id = `${name}-range`
     input.min = String(min)
     input.max = String(max)
     input.step = String(number.step ?? 1)
@@ -530,7 +695,7 @@ class HaFormStub extends HTMLElement {
     const readout = document.createElement('output')
     readout.textContent = `${current}${number.unit_of_measurement ?? ''}`
 
-    input.addEventListener('input', () => scope.emit(name, Number(input.value)))
+    input.addEventListener('input', () => this._emit(name, Number(input.value)))
 
     wrap.append(input, readout)
     return wrap
@@ -545,20 +710,14 @@ class HaFormStub extends HTMLElement {
    * that is what makes an override disappear from the config instead of shadowing the
    * entity's own value with nothing, so the stub reports it the same way.
    */
-  private _renderText(
-    id: string,
-    value: unknown,
-    placeholder: string | undefined,
-    name: string,
-    scope: FormScope,
-  ): HTMLElement {
+  private _renderText(name: string, value: unknown, placeholder: string | undefined): HTMLElement {
     const input = document.createElement('input')
     input.type = 'text'
     input.className = 'text'
-    input.id = id
+    input.id = name
     input.value = typeof value === 'string' ? value : ''
     input.placeholder = placeholder ?? ''
-    input.addEventListener('input', () => scope.emit(name, input.value || undefined))
+    input.addEventListener('input', () => this._emit(name, input.value || undefined))
     return input
   }
 
@@ -592,16 +751,15 @@ class HaFormStub extends HTMLElement {
   private _renderEntities(
     node: HaFormSchema,
     filter: EntityFilter | readonly EntityFilter[] | undefined,
-    scope: FormScope,
   ): HTMLElement {
     const list = document.createElement('div')
     list.className = 'options'
 
-    const selected = Array.isArray(scope.data[node.name]) ? (scope.data[node.name] as string[]) : []
+    const selected = Array.isArray(this._data[node.name]) ? (this._data[node.name] as string[]) : []
     const candidates = this._candidates(filter)
 
     for (const entityId of candidates) {
-      const id = `${scope.prefix}${node.name}-${entityId}`
+      const id = `${node.name}-${entityId}`
       const label = document.createElement('label')
       label.className = 'option'
 
@@ -613,7 +771,7 @@ class HaFormStub extends HTMLElement {
         const next = box.checked
           ? [...selected, entityId]
           : selected.filter(current => current !== entityId)
-        scope.emit(node.name, next)
+        this._emit(node.name, next)
       })
 
       const text = document.createElement('span')
@@ -642,14 +800,12 @@ class HaFormStub extends HTMLElement {
    * a config as on what it puts there.
    */
   private _renderEntity(
-    id: string,
+    name: string,
     value: unknown,
     filter: EntityFilter | readonly EntityFilter[] | undefined,
-    name: string,
-    scope: FormScope,
   ): HTMLElement {
     const select = document.createElement('select')
-    select.id = id
+    select.id = name
 
     const blank = document.createElement('option')
     blank.value = ''
@@ -664,19 +820,23 @@ class HaFormStub extends HTMLElement {
     }
 
     select.value = typeof value === 'string' ? value : ''
-    select.addEventListener('change', () => scope.emit(name, select.value || undefined))
+    select.addEventListener('change', () => this._emit(name, select.value || undefined))
     return select
   }
 }
 
 export function defineHaStubs(): void {
-  if (!customElements.get('ha-card')) {
-    customElements.define('ha-card', HaCardStub)
+  const stubs: Record<string, CustomElementConstructor> = {
+    'ha-card': HaCardStub,
+    'ha-form': HaFormStub,
+    'ha-icon': HaIconStub,
+    'ha-svg-icon': HaSvgIconStub,
+    'ha-icon-button': HaIconButtonStub,
+    'ha-expansion-panel': HaExpansionPanelStub,
+    'ha-sortable': HaSortableStub,
   }
-  if (!customElements.get('ha-form')) {
-    customElements.define('ha-form', HaFormStub)
-  }
-  if (!customElements.get('ha-icon')) {
-    customElements.define('ha-icon', HaIconStub)
+
+  for (const [tag, ctor] of Object.entries(stubs)) {
+    if (!customElements.get(tag)) customElements.define(tag, ctor)
   }
 }

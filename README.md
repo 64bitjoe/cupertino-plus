@@ -185,14 +185,13 @@ change.
 
 ### The batteries
 
-**Devices**, then a panel per device, then **Scale**. This is the one card that draws nothing
-useful before it is configured — it says `No Devices` — because an installation's battery
-sensors are every remote, every valve and every door contact, and no order over them would be
-the one you meant. The picker lists the sensors carrying Home Assistant's `battery` device
-class, and you can drag them into the order you want the rings in.
+A list of devices, then **Scale**. This is the one card that draws nothing useful before it is
+configured — it says `No Devices` — because an installation's battery sensors are every remote,
+every valve and every door contact, and no order over them would be the one you meant.
 
-Each device you pick gets a panel of its own underneath, holding the three things Home
-Assistant cannot work out for you: its **icon**, its **charging sensor** and its **name**. Each
+**Add a device** and it joins the list as a panel of its own. Open it and everything about that
+device is in one place: which **battery sensor**, its **icon**, its **charging sensor** and its
+**name**. Drag a panel by the handle to move its ring; the bin in its header removes it. Each
 field shows what the card will draw if you leave it empty, so nothing here needs YAML.
 
 ```yaml
@@ -223,10 +222,10 @@ in; until then four is the design rather than a shortfall, and the wide card in 
 not stack a stub row under a full one.
 
 **Worth setting `icon`.** Home Assistant computes a battery sensor's icon from its level, so
-without one you get a battery glyph inside a battery ring, six times over. It is the first
-field in a device's panel, and the one thing on this card that says _which_ device a ring is.
-The only sensor the picker cannot offer you is a battery percentage published without the
-`battery` device class — that one still works, it just has to be named in YAML.
+without one you get a battery glyph inside a battery ring, six times over. It sits under the
+battery sensor in a device's panel, and it is the one thing on this card that says _which_
+device a ring is. The only sensor the picker cannot offer you is a battery percentage published
+without the `battery` device class — that one still works, it just has to be named in YAML.
 
 **Charging is detected without help** where the sensor says so itself — `is_charging` or
 `battery_state` on its attributes, which is what many integrations publish. `charging_entity`

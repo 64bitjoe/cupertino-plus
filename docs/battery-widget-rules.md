@@ -70,7 +70,10 @@ widget that is wrong.
 **None of the four is YAML-only, and they are one control rather than four.** A device is a
 panel in a sortable list — titled and iconed with what the card is drawing for it, dragged by a
 handle, deleted by the bin in its header — and inside it are the battery sensor, the icon, the
-charging sensor and the name. A picker under the list adds the next one.
+charging sensor and the name. An **Add a device** button under the list opens a picker that adds
+the next one — one press, not one to reveal the picker and another to open it — and that picker
+leaves out every sensor the list already holds: a device cannot be added twice, so offering one
+that would be refused is offering a dead end.
 
 Each of the two fields that override something greys the inherited value in as its placeholder,
 and that is the rule rather than a flourish: the placeholder is the answer to "what happens if I

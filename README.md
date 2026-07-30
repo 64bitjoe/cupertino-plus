@@ -189,10 +189,13 @@ A list of devices, then **Scale**. This is the one card that draws nothing usefu
 configured — it says `No Devices` — because an installation's battery sensors are every remote,
 every valve and every door contact, and no order over them would be the one you meant.
 
-**Add a device** and it joins the list as a panel of its own. Open it and everything about that
-device is in one place: which **battery sensor**, its **icon**, its **charging sensor** and its
-**name**. Drag a panel by the handle to move its ring; the bin in its header removes it. Each
-field shows what the card will draw if you leave it empty, so nothing here needs YAML.
+Press **Add a device** — which opens the list of sensors straight away — pick one, and it joins
+the list as a panel of its own. Open
+the panel and everything about that device is in one place: which **battery sensor**, its
+**icon**, its **charging sensor** and its **name**. Drag a panel by the handle to move its ring;
+the bin in its header removes it. Each field shows what the card will draw if you leave it
+empty, and the picker does not offer a sensor that is already in the list — so nothing here
+needs YAML.
 
 ```yaml
 type: custom:cupertino-widgets-battery

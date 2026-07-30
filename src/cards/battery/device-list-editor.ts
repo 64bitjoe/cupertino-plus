@@ -18,26 +18,32 @@
  *
  * Home Assistant hand-rolls this same element for its entities card
  * (`hui-entities-card-row-editor`), and everything below is borrowed from it: `ha-sortable`
- * around a wrapper the rows sit in, an `item-moved` event carrying two indices, a picker
- * with nothing in it as the add control, and clearing a row's entity as the way to say
- * delete. Its own rows open a dialog to be edited; ours expand in place, which is the one
- * departure and the reason this exists.
+ * around a wrapper the rows sit in, an `item-moved` event carrying two indices, an empty
+ * picker as the add control — behind a button, as theirs is once the list is not empty — and
+ * clearing a row's entity as the way to say delete. Its own rows open a dialog to be edited;
+ * ours expand in place, which is the one departure and the reason this exists.
  *
  * ## What it may render
  *
  * Only elements Home Assistant has already defined by the time an editor is open —
  * `ha-sortable`, `ha-expansion-panel`, `ha-icon-button`, `ha-svg-icon`, `ha-icon` and
  * `ha-form` all ride in the `lovelace` panel's own chunk group, checked with the script in
- * `docs/ha-api-notes.md`. `ha-entity-picker` and `ha-icon-picker` do **not**, and are
- * reached the only safe way there is: through an `ha-form` row whose selector asks for them,
- * so `ha-selector` does the lazy import it exists to do. A bare `<ha-entity-picker>` here
- * would be an undefined element, which renders as nothing at all and looks like a bug in
- * this file.
+ * `docs/ha-api-notes.md`. `ha-entity-picker` and `ha-icon-picker` do **not**: a bare
+ * `<ha-entity-picker>` is an undefined element until something has caused its chunk to load,
+ * and an undefined element renders as nothing at all, which looks like a bug in this file.
+ *
+ * Inside a device's panel that is somebody else's problem — those pickers are `ha-form` rows,
+ * and `ha-selector` does the lazy import it exists to do. The **add** control is the one place
+ * it matters, because what it wants is the picker's own `addButton` mode: a button that opens
+ * the list on one press, which is a property of `ha-entity-picker` and cannot be reached
+ * through a selector. So `_pickerReady` below waits for the definition rather than assuming
+ * it, and until then the add control is the same picker as a plain field — through `ha-form`,
+ * which is also the thing that causes the definition to arrive.
  */
 
 import { mdiDrag, mdiTrashCanOutline } from '@mdi/js'
 import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
-import { property } from 'lit/decorators.js'
+import { property, state } from 'lit/decorators.js'
 import { repeat } from 'lit/directives/repeat.js'
 
 import { defineElement } from '../../core/register'
@@ -59,18 +65,21 @@ export interface DevicesChangedDetail {
 }
 
 /**
+ * What both of the card's battery pickers offer, and a trade with a known loser.
+ *
+ * A list of every sensor in an installation is a haystack, so this asks for the device class
+ * an integration that knows publishes. The cost is a battery percentage published without
+ * one, which cannot be picked here at all; the card itself checks neither domain nor class,
+ * so such a config is still a working one, and the helper line says where to write it.
+ */
+const BATTERY_FILTER = { domain: 'sensor', device_class: 'battery' } as const
+
+/**
  * The four fields of one device.
  *
  * `entity` first because it is what the row *is*; the icon next because it is the one thing
  * on this card that says which device a ring belongs to; the name last because it is the
  * only one of the four that changes nothing on screen (§6 of the rules — it is the tooltip).
- *
- * Both entity rows are filtered, and the filters are a trade with a known loser. A list of
- * every sensor in an installation is a haystack, so the device row asks for
- * `device_class: battery` and the charging row for `battery_charging` — the classes an
- * integration that knows publishes. The cost is a battery percentage published without the
- * class, which cannot be picked here at all; the card checks no domain and no class, so such
- * a config is still a working one, and the helper line says where to write it.
  *
  * The two placeholders are what the card would draw if the fields were left empty, so the
  * panel reads as "this is what you will get" rather than as a blank to be guessed at. They
@@ -81,11 +90,21 @@ export interface DevicesChangedDetail {
 const deviceSchema = (
   hass: HomeAssistant | undefined,
   config: BatteryDeviceConfig,
+  taken: readonly string[],
 ): readonly HaFormSchema[] => [
   {
     name: 'entity',
     required: true,
-    selector: { entity: { filter: { domain: 'sensor', device_class: 'battery' } } },
+    // Every other device's sensor is left out of the list, so a row cannot be edited into
+    // a duplicate of its neighbour. Its own is not excluded — `exclude_entities` hides
+    // candidates rather than values, but a row that hid its own sensor would still be
+    // showing it as the one thing the list denies exists.
+    selector: {
+      entity: {
+        filter: BATTERY_FILTER,
+        exclude_entities: taken.filter(entity => entity !== config.entity),
+      },
+    },
   },
   { name: 'icon', selector: { icon: { placeholder: inheritedIcon(hass, config.entity) } } },
   {
@@ -97,11 +116,18 @@ const deviceSchema = (
   { name: 'name', selector: { text: { placeholder: inheritedName(hass, config.entity) } } },
 ]
 
-/** The add row: one empty picker, and the same filter the device row uses. */
-const ADD_SCHEMA: readonly HaFormSchema[] = [
+/**
+ * The add picker: the same filter, minus everything the list already holds.
+ *
+ * The exclusion is the point. Without it the picker offers a sensor that is already a ring,
+ * picking it is refused — two rings for one sensor is not something anybody means — and the
+ * only thing the user sees is a picker that filled itself in and did nothing. A candidate
+ * that cannot be added should not be offered.
+ */
+const addSchema = (taken: readonly string[]): readonly HaFormSchema[] => [
   {
     name: 'entity',
-    selector: { entity: { filter: { domain: 'sensor', device_class: 'battery' } } },
+    selector: { entity: { filter: BATTERY_FILTER, exclude_entities: [...taken] } },
   },
 ]
 
@@ -127,8 +153,9 @@ const HELPERS: Record<string, string> = {
 const ADD_LABEL = 'Add a device'
 
 const ADD_HELPER =
-  'Pick a battery sensor and it joins the list. A sensor published without the battery ' +
-  'device class is not offered here; it still works if you add it in YAML.'
+  'Pick a battery sensor and it joins the list. One already in the list is not offered ' +
+  'again, and a sensor published without the battery device class is not offered at all — ' +
+  'that one still works if you add it in YAML.'
 
 class CupertinoBatteryDevices extends LitElement {
   /**
@@ -192,8 +219,16 @@ class CupertinoBatteryDevices extends LitElement {
     }
 
     .add {
-      display: block;
       margin-top: 16px;
+    }
+
+    /* The add control's own line, rather than the helper of whichever of the two controls is
+       standing there: the button mode draws no helper, and a hint that came and went with the
+       control would be a hint nobody reads. */
+    .hint {
+      margin: 6px 0 0;
+      color: var(--secondary-text-color);
+      font-size: 12px;
     }
 
     .empty {
@@ -207,6 +242,17 @@ class CupertinoBatteryDevices extends LitElement {
 
   /** Normalised by the editor, so every row here is known to have an entity in it. */
   @property({ attribute: false }) public devices: readonly BatteryDeviceConfig[] = []
+
+  /**
+   * Whether `ha-entity-picker` has been defined yet, and so whether the add control can be
+   * the button.
+   *
+   * It resolves itself: the field this renders in the meantime is an `ha-form` whose entity
+   * row makes `ha-selector` import the picker, so the definition arrives because of the
+   * fallback. Read synchronously first, because on the second editor of a session it is
+   * already there and the field should never be seen.
+   */
+  @state() private _pickerReady = customElements.get('ha-entity-picker') !== undefined
 
   /**
    * Which panels are open, by entity id.
@@ -226,7 +272,22 @@ class CupertinoBatteryDevices extends LitElement {
 
   private readonly _computeAddLabel = (): string => ADD_LABEL
 
-  private readonly _computeAddHelper = (): string => ADD_HELPER
+  /**
+   * Ask for the picker, once, and re-render as the button when it arrives.
+   *
+   * `whenDefined` cannot be relied on to settle by itself — nothing in Home Assistant loads
+   * `ha-entity-picker` unless something asks for one — so the field this renders in the
+   * meantime is not merely a fallback: it is what makes the promise resolve. If it somehow
+   * never does, the field stays, which is a working control and was this editor's own
+   * behaviour one version ago.
+   */
+  public override connectedCallback(): void {
+    super.connectedCallback()
+    if (this._pickerReady) return
+    void customElements.whenDefined('ha-entity-picker').then(() => {
+      this._pickerReady = true
+    })
+  }
 
   private _emit(rows: readonly unknown[]): void {
     this.dispatchEvent(
@@ -288,16 +349,36 @@ class CupertinoBatteryDevices extends LitElement {
   }
 
   /**
-   * The add picker reported an entity.
+   * The native picker in `addButton` mode reports the id it was given, as a bare string.
    *
-   * Nothing is emitted for the empty value the picker reports when it is cleared, and the
-   * duplicate is refused: two rings for one sensor is not something anybody means, and the
-   * rows are keyed by entity id.
+   * Nothing to reset afterwards: in that mode the picker passes `undefined` down as its
+   * value whatever it holds, so it goes back to being a button by itself.
    */
-  private readonly _add = (event: CustomEvent<{ value: Record<string, unknown> }>): void => {
+  private readonly _addPicked = (event: CustomEvent<{ value?: string }>): void => {
+    event.stopPropagation()
+    this._addDevice(event.detail.value)
+  }
+
+  /** The same thing through the `ha-form` field, which reports the row as an object. */
+  private readonly _addFromField = (
+    event: CustomEvent<{ value: Record<string, unknown> }>,
+  ): void => {
     event.stopPropagation()
     const entity = event.detail.value.entity
-    if (typeof entity !== 'string' || entity === '') return
+    this._addDevice(typeof entity === 'string' ? entity : undefined)
+  }
+
+  /**
+   * Nothing happens for the empty value a cleared picker reports, and a duplicate is refused
+   * — neither control offers one, and this is the rule behind that rather than a second guess
+   * at it: two rings for one sensor is not something anybody means, and the rows are keyed by
+   * entity id.
+   *
+   * The new device's panel opens itself, because a device that has just been added is the one
+   * whose icon somebody is most likely about to set.
+   */
+  private _addDevice(entity: string | undefined): void {
+    if (entity === undefined || entity === '') return
     if (this.devices.some(device => device.entity === entity)) return
 
     this._open.add(entity)
@@ -309,7 +390,11 @@ class CupertinoBatteryDevices extends LitElement {
     else this._open.delete(entity)
   }
 
-  private _renderDevice(config: BatteryDeviceConfig, index: number): TemplateResult {
+  private _renderDevice(
+    config: BatteryDeviceConfig,
+    index: number,
+    taken: readonly string[],
+  ): TemplateResult {
     // Name and icon as the card is drawing them right now, overrides included — so a row is
     // recognisable in the editor by the same glyph it has on the widget.
     const device = readDevice(this.hass, config)
@@ -339,7 +424,7 @@ class CupertinoBatteryDevices extends LitElement {
             class="fields"
             .hass=${this.hass}
             .data=${config}
-            .schema=${deviceSchema(this.hass, config)}
+            .schema=${deviceSchema(this.hass, config, taken)}
             .computeLabel=${this._computeLabel}
             .computeHelper=${this._computeHelper}
             @value-changed=${(event: CustomEvent<{ value: Record<string, unknown> }>) =>
@@ -352,6 +437,10 @@ class CupertinoBatteryDevices extends LitElement {
 
   protected override render(): TemplateResult | typeof nothing {
     if (!this.hass) return nothing
+
+    // Every sensor the list has already taken: what the add picker must not offer, and what
+    // a row's own picker must not offer except for its own.
+    const taken = this.devices.map(device => device.entity)
 
     return html`
       ${
@@ -370,19 +459,41 @@ class CupertinoBatteryDevices extends LitElement {
           ${repeat(
             this.devices,
             device => device.entity,
-            (device, index) => this._renderDevice(device, index),
+            (device, index) => this._renderDevice(device, index, taken),
           )}
         </div>
       </ha-sortable>
-      <ha-form
-        class="add"
-        .hass=${this.hass}
-        .data=${{}}
-        .schema=${ADD_SCHEMA}
-        .computeLabel=${this._computeAddLabel}
-        .computeHelper=${this._computeAddHelper}
-        @value-changed=${this._add}
-      ></ha-form>
+      <div class="add">
+        ${
+          this._pickerReady
+            ? // Home Assistant's own add control, and the reason for the wait above: with
+              // `add-button` the picker renders as a button whose press opens the list, all
+              // inside the one element. Nothing here reaches into it — the filter, the
+              // exclusions and the label are its own properties, and `includeDomains` /
+              // `includeDeviceClasses` are the picker's spelling of the selector's `filter`.
+              html`
+                <ha-entity-picker
+                  add-button
+                  .hass=${this.hass}
+                  .addButtonLabel=${ADD_LABEL}
+                  .includeDomains=${[BATTERY_FILTER.domain]}
+                  .includeDeviceClasses=${[BATTERY_FILTER.device_class]}
+                  .excludeEntities=${taken}
+                  @value-changed=${this._addPicked}
+                ></ha-entity-picker>
+              `
+            : html`
+                <ha-form
+                  .hass=${this.hass}
+                  .data=${{}}
+                  .schema=${addSchema(taken)}
+                  .computeLabel=${this._computeAddLabel}
+                  @value-changed=${this._addFromField}
+                ></ha-form>
+              `
+        }
+        <p class="hint">${ADD_HELPER}</p>
+      </div>
     `
   }
 }

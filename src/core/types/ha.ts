@@ -133,6 +133,17 @@ export interface EntitySelector {
   entity: {
     filter?: EntityFilter | EntityFilter[]
     /**
+     * Ids to leave out of the list, on top of whatever `filter` allows.
+     *
+     * A list rather than a predicate, which is the whole of its usefulness: what a card
+     * editor wants to hide is the entities its own config has already taken, and that is
+     * a set of ids rather than a property of any entity. `ha-selector-entity` forwards it
+     * to the picker's `excludeEntities`. Note it hides them from the *list* — a value
+     * already selected still shows, which is what lets a row exclude its siblings without
+     * blanking itself.
+     */
+    exclude_entities?: string[]
+    /**
      * Turns the picker into a list of pickers. The value it reports is then a
      * `string[]` — and, once the user removes the last entity, an empty array rather
      * than `undefined`. See `applyFormData` in `core/card-editor.ts`.

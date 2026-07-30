@@ -536,6 +536,12 @@ names are the panel's own. This library passes explicit placeholders instead —
   `domain` / `device_class` / `unit_of_measurement` each also accept an array.
 - `multiple: true` renders `ha-entities-picker` and emits `string[]`. Removing the last
   entity emits `[]`, never `undefined`. Reordering is opt-in with `reorder: true`.
+- **`exclude_entities`** (and `include_entities`) are forwarded to the picker's
+  `excludeEntities`/`includeEntities`, so a list editor can hide the ids its own config has
+  already taken — the one thing `filter` cannot express, since it is a set of ids rather than
+  a property of any entity. They hide _candidates_, not values: a picker whose current value
+  is excluded still shows it, which is what lets a row exclude its siblings without blanking
+  itself.
 - The picker lists everything in `hass.states` that matches; it does **not** hide
   registry-hidden or unavailable entities.
 - `select` mode, when omitted, is decided by the option count: under six renders `list`
@@ -600,9 +606,36 @@ cannot be shown inside the dialog anyway.
 
 `hui-entities-card-row-editor` is the shape to copy — `ha-sortable` around a wrapper, an
 `item-moved` event carrying two indices, an empty picker as the add control, and clearing a
-row's entity as the way to delete it. What it costs to copy is knowing which elements exist
-by the time an editor is open. Checked with the panel-group script from the `ha-form` section,
-substituting each tag:
+row's entity as the way to delete it. Two details of theirs are worth having as well:
+`.addButton=${entities.length > 0}` on the add picker, which turns it into a **button** that
+opens the list rather than a field sitting there filled in (the picker's own template branches
+on `addButtonLabel && !this.value` and renders `ha-button … @click=${this.open}`), and
+`excludeEntities` on it so an entity already in the list is not offered.
+
+Both are properties of `ha-entity-picker` rather than of the entity _selector_, and only the
+exclusion has a selector key, so an add control that wants the button has to render the picker
+itself. Two things make that worth the trouble rather than reimplementing it:
+
+```js
+// ha-entity-picker.render(), deminified
+.value=${this.addButton ? void 0 : this.value}
+.addButtonLabel=${this.addButton ? this.addButtonLabel ?? localize('ui.components.entity.entity-picker.add') : void 0}
+// and, separately
+async open() { await this.updateComplete; await this._picker?.open() }
+```
+
+In `addButton` mode it passes `undefined` down as its value **whatever it holds** — so it is a
+button before the press, its own `open` runs on the press, and it is a button again afterwards
+with nothing for the editor to reset. `value-changed` carries the bare id, not the
+`{ [name]: value }` an `ha-form` reports.
+
+Reaching for `open()` from outside instead is a trap this library fell into first: walking the
+shadow trees under an `ha-form` for something with an `open` method finds `ha-generic-picker`
+or the combo box below it rather than the picker, and what that looks like on screen is a
+popover that opens and shuts again. The lever is on `ha-entity-picker` and nowhere else.
+
+Which brings up what a hand-rolled editor may render at all. Checked with the panel-group
+script from the `ha-form` section, substituting each tag:
 
 | in the `lovelace` panel group                                                                       | **not** in it                                                                         |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |

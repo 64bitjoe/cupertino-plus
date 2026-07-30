@@ -22,6 +22,7 @@ import {
 
 import type {
   EntityFilter,
+  EntitySelector,
   HaFormSchema,
   HomeAssistant,
   NumberSelector,
@@ -30,6 +31,42 @@ import type {
 
 const asArray = <T>(value: T | readonly T[] | undefined): readonly T[] =>
   value === undefined ? [] : Array.isArray(value) ? value : [value as T]
+
+const entityName = (hass: HomeAssistant | undefined, entityId: string): string =>
+  hass?.states[entityId]?.attributes.friendly_name ?? entityId
+
+/**
+ * The entities a filter allows, as ids.
+ *
+ * The real selector ORs the filter's clauses and ANDs the keys inside one, then takes the
+ * exclusions off the result. All three are read here, because all three change what the
+ * battery card's editor offers: `device_class` is what turns a list of every sensor in the
+ * installation into a list of batteries, and the exclusions are what stop it offering a device
+ * that is already in the list.
+ *
+ * Shared by the two stubs that need it — the form's entity rows and the picker below — because
+ * the real ones share it too, and a harness where one of them filtered differently would be
+ * answering a question Home Assistant does not ask.
+ */
+const matchingEntities = (
+  hass: HomeAssistant | undefined,
+  clauses: readonly EntityFilter[],
+  excluded: readonly string[] | undefined,
+): string[] => {
+  const skip = new Set(excluded ?? [])
+  const states = hass?.states ?? {}
+
+  return Object.keys(states).filter(id => {
+    if (skip.has(id)) return false
+    if (!clauses.length) return true
+    return clauses.some(clause => {
+      const domains = asArray(clause.domain)
+      const classes = asArray(clause.device_class)
+      if (domains.length && !domains.includes(id.split('.')[0] ?? '')) return false
+      return !classes.length || classes.includes(String(states[id]?.attributes.device_class))
+    })
+  })
+}
 
 const HA_CARD_CSS = `
   :host {
@@ -488,6 +525,179 @@ class HaExpansionPanelStub extends HTMLElement {
   }
 }
 
+const HA_ENTITY_PICKER_CSS = `
+  :host {
+    display: block;
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 9999px;
+    background: var(--primary-color, #03a9f4);
+    color: var(--text-primary-color, #fff);
+    font: 500 14px/1 inherit;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  select[hidden] {
+    display: none;
+  }
+`
+
+/**
+ * `ha-entity-picker`, and only the two things about it this library leans on.
+ *
+ * The real one is a searchable combo box over every entity in the installation, with state
+ * badges, area breadcrumbs and a create-helper row; this is a `select`. What it copies exactly
+ * is the contract the battery card's add control depends on:
+ *
+ *  - **`add-button`**: with it the real picker renders `ha-button` with the label from
+ *    `addButtonLabel` and `@click=${this.open}`, and passes `undefined` down as its value
+ *    whatever it holds — so it is a button before the press, opens the list on the press, and
+ *    is a button again afterwards, with nothing to reset. Both halves matter and one of them
+ *    is what two earlier attempts at this control got wrong.
+ *  - **`value-changed` carrying a bare id string**, not the `{ [name]: value }` object an
+ *    `ha-form` reports. An editor written against the wrong one of those silently adds nothing.
+ *
+ * The filter properties are the picker's own spelling of a selector's `filter`, which is why
+ * they are read here rather than ignored: `includeDomains`, `includeDeviceClasses` and
+ * `excludeEntities`.
+ */
+class HaEntityPickerStub extends HTMLElement {
+  private readonly _root: ShadowRoot
+  private _hass: HomeAssistant | undefined
+  private _addButtonLabel = 'Add'
+  private _includeDomains: string[] = []
+  private _includeDeviceClasses: string[] = []
+  private _excludeEntities: string[] = []
+  private _value = ''
+  private _pending = false
+
+  public constructor() {
+    super()
+    this._root = this.attachShadow({ mode: 'open', delegatesFocus: true })
+    const style = document.createElement('style')
+    style.textContent = HA_ENTITY_PICKER_CSS
+    this._root.append(style)
+  }
+
+  public set hass(value: HomeAssistant | undefined) {
+    this._hass = value
+    this._invalidate()
+  }
+
+  public set addButtonLabel(value: string) {
+    this._addButtonLabel = value
+    this._invalidate()
+  }
+
+  public set includeDomains(value: string[] | undefined) {
+    this._includeDomains = value ?? []
+    this._invalidate()
+  }
+
+  public set includeDeviceClasses(value: string[] | undefined) {
+    this._includeDeviceClasses = value ?? []
+    this._invalidate()
+  }
+
+  public set excludeEntities(value: readonly string[] | undefined) {
+    this._excludeEntities = [...(value ?? [])]
+    this._invalidate()
+  }
+
+  public set value(value: string | undefined) {
+    this._value = value ?? ''
+    this._invalidate()
+  }
+
+  public get value(): string {
+    return this._value
+  }
+
+  /** The one method an editor calls on it. */
+  public open(): void {
+    const select = this._root.querySelector('select')
+    if (!select) return
+    select.hidden = false
+    select.focus()
+    try {
+      select.showPicker()
+    } catch {
+      // Needs a user gesture, and the harness is not always in one.
+    }
+  }
+
+  private _invalidate(): void {
+    if (this._pending) return
+    this._pending = true
+    queueMicrotask(() => {
+      this._pending = false
+      this._render()
+    })
+  }
+
+  private _render(): void {
+    const style = this._root.firstElementChild as HTMLStyleElement
+    const addButton = this.hasAttribute('add-button')
+
+    const select = document.createElement('select')
+    const blank = document.createElement('option')
+    blank.value = ''
+    blank.textContent = '—'
+    select.append(blank)
+
+    for (const entityId of matchingEntities(
+      this._hass,
+      [{ domain: this._includeDomains, device_class: this._includeDeviceClasses }],
+      this._excludeEntities,
+    )) {
+      const option = document.createElement('option')
+      option.value = entityId
+      option.textContent = entityName(this._hass, entityId)
+      select.append(option)
+    }
+
+    // Never shows a value in add-button mode, exactly as the real one does not.
+    select.value = addButton ? '' : this._value
+    select.hidden = addButton
+    select.addEventListener('change', () => {
+      const value = select.value
+      this._value = addButton ? '' : value
+      if (addButton) select.hidden = true
+      this.dispatchEvent(
+        new CustomEvent('value-changed', {
+          detail: { value: value || undefined },
+          bubbles: true,
+          composed: true,
+        }),
+      )
+    })
+
+    const children: Element[] = [select]
+    if (addButton) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = this._addButtonLabel
+      button.addEventListener('click', () => this.open())
+      children.unshift(button)
+    }
+
+    this._root.replaceChildren(style, ...children)
+  }
+}
+
 /**
  * `ha-sortable`: here, only the shape of it.
  *
@@ -531,7 +741,11 @@ class HaFormStub extends HTMLElement {
 
   constructor() {
     super()
-    this._root = this.attachShadow({ mode: 'open' })
+    // `delegatesFocus` is the real one's (`shadowRootOptions = {mode:'open', delegatesFocus:true}`)
+    // and it is not decoration: it is how an editor gets the keyboard into a control it has
+    // just revealed — `form.focus()` lands on the field inside, and a keydown there bubbles
+    // back out to the editor's own handler. A stub without it swallows both.
+    this._root = this.attachShadow({ mode: 'open', delegatesFocus: true })
     const style = document.createElement('style')
     style.textContent = HA_FORM_CSS
     this._root.append(style)
@@ -616,9 +830,9 @@ class HaFormStub extends HTMLElement {
     } else if ('text' in node.selector) {
       row.append(this._renderText(node.name, value, node.selector.text.placeholder))
     } else if (node.selector.entity.multiple) {
-      row.append(this._renderEntities(node, node.selector.entity.filter))
+      row.append(this._renderEntities(node, node.selector.entity))
     } else {
-      row.append(this._renderEntity(node.name, value, node.selector.entity.filter))
+      row.append(this._renderEntity(node.name, value, node.selector.entity))
     }
 
     const helper = this._computeHelper?.(node)
@@ -721,42 +935,20 @@ class HaFormStub extends HTMLElement {
     return input
   }
 
-  /**
-   * The candidates a filter allows, as ids.
-   *
-   * The real selector ORs the clauses and ANDs the keys inside one. Both keys our schemas
-   * use are read, `device_class` included — the battery card's pickers are filtered on it,
-   * and a stub that ignored it would offer every binary sensor in the mock installation
-   * where Home Assistant offers one.
-   */
-  private _candidates(filter: EntityFilter | readonly EntityFilter[] | undefined): string[] {
-    const clauses = asArray(filter)
-    const states = this._hass?.states ?? {}
-
-    return Object.keys(states).filter(id => {
-      if (!clauses.length) return true
-      return clauses.some(clause => {
-        const domains = asArray(clause.domain)
-        const classes = asArray(clause.device_class)
-        if (domains.length && !domains.includes(id.split('.')[0] ?? '')) return false
-        return !classes.length || classes.includes(String(states[id]?.attributes.device_class))
-      })
-    })
+  private _candidates(selector: EntitySelector['entity']): string[] {
+    return matchingEntities(this._hass, asArray(selector.filter), selector.exclude_entities)
   }
 
   private _name(entityId: string): string {
-    return this._hass?.states[entityId]?.attributes.friendly_name ?? entityId
+    return entityName(this._hass, entityId)
   }
 
-  private _renderEntities(
-    node: HaFormSchema,
-    filter: EntityFilter | readonly EntityFilter[] | undefined,
-  ): HTMLElement {
+  private _renderEntities(node: HaFormSchema, selector: EntitySelector['entity']): HTMLElement {
     const list = document.createElement('div')
     list.className = 'options'
 
     const selected = Array.isArray(this._data[node.name]) ? (this._data[node.name] as string[]) : []
-    const candidates = this._candidates(filter)
+    const candidates = this._candidates(selector)
 
     for (const entityId of candidates) {
       const id = `${node.name}-${entityId}`
@@ -798,11 +990,18 @@ class HaFormStub extends HTMLElement {
    * One entity, or none. A blank option rather than a required choice, because that is what
    * clearing the real picker does — and an editor is judged as much on what it removes from
    * a config as on what it puts there.
+   *
+   * It also answers to **`open()`**, which is the one thing about the real picker an editor
+   * can call. `ha-entity-picker` has such a method — its own add button is
+   * `@click=${this.open}` — and the battery card's device list finds it by walking the shadow
+   * trees under its `ha-form` so that its Add button opens the list in one press. A stub
+   * without an `open` would send that search down its fallback path, and the harness would
+   * quietly stop exercising the thing being developed.
    */
   private _renderEntity(
     name: string,
     value: unknown,
-    filter: EntityFilter | readonly EntityFilter[] | undefined,
+    selector: EntitySelector['entity'],
   ): HTMLElement {
     const select = document.createElement('select')
     select.id = name
@@ -812,7 +1011,7 @@ class HaFormStub extends HTMLElement {
     blank.textContent = '—'
     select.append(blank)
 
-    for (const entityId of this._candidates(filter)) {
+    for (const entityId of this._candidates(selector)) {
       const option = document.createElement('option')
       option.value = entityId
       option.textContent = this._name(entityId)
@@ -821,6 +1020,10 @@ class HaFormStub extends HTMLElement {
 
     select.value = typeof value === 'string' ? value : ''
     select.addEventListener('change', () => this._emit(name, select.value || undefined))
+
+    // `showPicker` is the browser's own version of what the real picker's `open` does. It
+    // wants a user gesture and throws without one, which is why the caller of `open` catches.
+    Object.assign(select, { open: () => select.showPicker() })
     return select
   }
 }
@@ -833,6 +1036,7 @@ export function defineHaStubs(): void {
     'ha-svg-icon': HaSvgIconStub,
     'ha-icon-button': HaIconButtonStub,
     'ha-expansion-panel': HaExpansionPanelStub,
+    'ha-entity-picker': HaEntityPickerStub,
     'ha-sortable': HaSortableStub,
   }
 

@@ -17,6 +17,23 @@ Image: `ghcr.io/home-assistant/home-assistant:stable` = **HA core 2026.7.4**,
 frontend package **20260624.6**. Bundle: `hass_frontend/frontend_latest/*.js` (minified).
 A `frontend_es5/` build still ships, but custom cards only need the modern one.
 
+One note on the recipe above: `.{0,N}` either side of the pattern is fine for a short window
+and starts backtracking for minutes once N is in the hundreds, because every chunk is one
+line of a megabyte. For a wide window, ask python for a fixed slice instead — no regex around
+the match at all:
+
+```bash
+docker exec cupertino-widgets-ha python3 -c "
+import re, glob
+for p in glob.glob('/usr/local/lib/python3.*/site-packages/hass_frontend/frontend_latest/*.js'):
+    s = open(p, encoding='utf8', errors='replace').read()
+    for m in re.finditer('PATTERN', s):
+        print(p.split('/')[-1], repr(s[m.start() - 400 : m.start() + 400]))
+"
+```
+
+It also runs against the container that is already up, which saves pulling the image again.
+
 ## Sizing / grid (VERIFIED, not from docs)
 
 `hui-card` (the wrapper HA puts around every card) does:
@@ -840,6 +857,166 @@ A single `filter: { domain: 'sensor', device_class: 'battery' }` clause is there
 turn the card's picker from every sensor in the installation into the dozen that are batteries.
 `battery_charging` is not in a picker at all — `charging_entity` is per row, and a multiple
 entity picker cannot express that (see `CupertinoCardEditor`'s `toForm`/`fromForm`).
+
+## Navigating out of a card (VERIFIED)
+
+### `navigate()` is a history push and one event
+
+`common/navigate`, deminified from module 56245:
+
+```js
+const closeOpenDialogs = async started => {
+  const { history } = mainWindow
+  if (!history.state?.dialog || Date.now() - started >= 500) return true
+  return (await closeAllDialogs())
+    ? (await new Promise(r => setTimeout(r)), closeOpenDialogs(started))
+    : (console.warn('Navigation blocked, because dialog refused to close'), false)
+}
+
+const navigate = async (path, options) => {
+  if (!(await closeOpenDialogs(Date.now()))) return false
+  const replace = options?.replace || false
+  replace
+    ? mainWindow.history.replaceState(
+        mainWindow.history.state?.root ? { root: true } : (options?.data ?? null),
+        '',
+        path,
+      )
+    : mainWindow.history.pushState(options?.data ?? null, '', path)
+  fireEvent(mainWindow, 'location-changed', { replace })
+  return true
+}
+```
+
+The listener is `window.addEventListener('location-changed', …)` on the panels and on
+`hass-tabs-subpage-data-table`, so the event has to reach a **window**, not a card's ancestor.
+`src/core/navigate.ts` is this function less the dialog preamble — that reads
+`history.state.dialog` and needs the frontend's own dialog registry, and a card on a dashboard
+has no dialog of its own to close.
+
+`mainWindow` is module 27802, and it is not always `window`:
+
+```js
+const MAIN_WINDOW_NAME = 'ha-main-window' // module 54135
+const mainWindow = (() => {
+  try {
+    return window.name === MAIN_WINDOW_NAME
+      ? window
+      : parent.name === MAIN_WINDOW_NAME
+        ? parent
+        : top
+  } catch {
+    return window
+  }
+})()
+```
+
+### There is no global anchor delegation in the app
+
+Tempting, and false. The `<a>`-in-composed-path helper exists (module 73459) and turns a
+same-origin `href` into a route:
+
+```js
+const routeFromClick = (event, preventDefault = true) => {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey
+  )
+    return
+  const anchor = event.composedPath().find(el => el.tagName === 'A')
+  if (
+    !anchor ||
+    anchor.target ||
+    anchor.hasAttribute('download') ||
+    anchor.getAttribute('rel') === 'external'
+  )
+    return
+  let href = anchor.href
+  if (!href || href.indexOf('mailto:') !== -1) return
+  const origin = location.origin || location.protocol + '//' + location.host
+  if (!href.startsWith(origin)) return
+  href = href.slice(origin.length)
+  if (href === '#') return
+  if (preventDefault) event.preventDefault()
+  return href
+}
+```
+
+Its callers are the point. The only `document.body.addEventListener('click', …)` that uses it
+is in **`custom-panel.js`** — the iframe wrapper around third-party panels, forwarding link
+clicks to the parent. Inside the app it is called from specific elements on their own clicks
+(`hass-tabs-subpage._tabClicked`). So an `<a href="/todo">` in a card's shadow root is handled
+by the browser: a full document load, the whole frontend again. HA's own
+`hui-energy-distribution-card` links out that way and pays it.
+
+### `hass.panels`, and asking whether a page exists
+
+Keyed by `url_path`, which is what core registers:
+
+```python
+# components/calendar/__init__.py       components/todo/__init__.py
+frontend.async_register_built_in_panel(hass, "calendar", "calendar", "mdi:calendar")
+frontend.async_register_built_in_panel(hass, "todo", "todo", "mdi:clipboard-list")
+```
+
+So `/calendar` and `/todo`, and each key is absent when its integration is not loaded. HA's own
+cards test exactly that before offering a link —
+`this._config.link_dashboard && this.hass.panels.energy ? … : nothing` in
+`hui-energy-distribution-card`. Entry shape: `component_name`, `url_path`, `title`, `icon`,
+`config`.
+
+### What the two panels read out of the URL
+
+**`ha-panel-todo` takes `entity_id`**, and writes it back:
+
+```js
+willUpdate(changed) {
+  if (!this.hasUpdated) {
+    const params = extractSearchParamsObject()
+    this._openAddItemFromUrl = params.add_item ?? false
+    if (params.entity_id) this._entityId = params.entity_id
+    else { /* fall back to the first list */ }
+  }
+  …
+}
+_setupTodoElement() {
+  navigate(constructUrlCurrentPath(createSearchParam({ entity_id: this._entityId })),
+           { replace: true })
+}
+```
+
+`add_item` is the second parameter — it opens the add-item dialog. `_entityId` is also
+persisted (`@storage({ key: 'selectedTodoEntity' })`), which is why passing the parameter
+matters: without it the panel opens whichever list was last looked at.
+
+**`ha-panel-calendar` reads nothing.** No `entity_id`, no date, no event. Which calendars are
+shown is `@storage({ key: 'deSelectedCalendars' })`, so `/calendar` is the whole of its
+addressable surface and it opens on today.
+
+### A card need not guard navigation on edit mode
+
+`hui-card-edit-mode` wraps every card while the dashboard is being edited and covers it:
+
+```css
+.card-overlay {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+.card-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+```
+
+`visible` follows `_hover`/`_focused`/`_touchStarted`, so by the time a click lands the overlay
+has it, and `_handleOverlayClick` turns it into `ll-edit-card`. A `preview`-based guard inside
+a card would be dead code — and see `CupertinoCard.preview` on why that property does not mean
+what its name suggests anyway.
 
 ## Theming — HA has a real design-token system now
 

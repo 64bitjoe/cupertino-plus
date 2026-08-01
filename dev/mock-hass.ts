@@ -241,6 +241,17 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
     entities: Object.fromEntries(
       Object.keys(STATES).map(id => [id, { entity_id: id, hidden: false }]),
     ),
+    /*
+     * No panels, and the empty object is the honest answer rather than a gap: the showcase is
+     * a page with cards on it, not a Home Assistant, so there is no `/calendar` and no
+     * `/todo` behind this document to send anybody to.
+     *
+     * A card asks before it navigates — `_open` in the calendar card — so this is also what
+     * keeps a tap in the harness to its press effect instead of pushing a history entry the
+     * showcase cannot serve on reload. Fill it in the day the harness grows something worth
+     * navigating to.
+     */
+    panels: {},
     config: { time_zone: 'Europe/Warsaw', country: 'PL', version: '2026.7.4' },
     themes: { darkMode: dark, theme: 'default' },
     locale: {

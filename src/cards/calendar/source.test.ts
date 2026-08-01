@@ -229,6 +229,9 @@ describe('toCalendarItem', () => {
     })
 
     expect(item).toMatchObject({
+      // The calendar it was subscribed from, not anything in the payload — a tap on the row
+      // is answered from this.
+      entityId: 'calendar.work',
       kind: 'event',
       title: 'Design review',
       location: 'Długa 36, Warsawa',

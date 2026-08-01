@@ -169,6 +169,9 @@ describe('toReminderItem', () => {
     const item = map(wire)
 
     expect(item).toMatchObject({
+      // The list it was subscribed from, which is the one thing a tap on the row needs and
+      // the one thing the payload does not carry.
+      entityId: 'todo.chores',
       kind: 'reminder',
       title: 'Pick up dry cleaning',
       color: 'var(--cw-orange)',

@@ -73,9 +73,31 @@ export interface HassConnection {
   ): Promise<() => Promise<void>>
 }
 
+/**
+ * One entry of `hass.panels`, keyed by its own `url_path` — `hass.panels.todo` is the
+ * To-do lists panel at `/todo`, and its absence means the integration behind it is not
+ * loaded.
+ *
+ * Presence is the whole of what this library reads it for, and asking that question this
+ * way is Home Assistant's own idiom rather than our invention:
+ * `hui-energy-distribution-card` draws its dashboard link as
+ * `this._config.link_dashboard && this.hass.panels.energy ? … : nothing`. Modelled past the
+ * key anyway, because a type whose only content is a comment invites the next reader to
+ * guess what else is in there. `config` is left out: it is `Record<string, any> | null`
+ * upstream, so declaring it would buy nothing but an `any`.
+ */
+export interface PanelInfo {
+  component_name: string
+  url_path: string
+  title: string | null
+  icon: string | null
+}
+
 export interface HomeAssistant {
   states: Record<string, HassEntity>
   entities: Record<string, HassEntityRegistryDisplayEntry>
+  /** Every page in the sidebar, keyed by `url_path`. See `PanelInfo`. */
+  panels: Record<string, PanelInfo>
   config: HassConfig
   themes: HassThemes
   locale: FrontendLocaleData

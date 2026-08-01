@@ -298,6 +298,7 @@ export const toCalendarItem = (
 
   return {
     id: `${entityId}|${uid || title}|${String(event.start)}`,
+    entityId,
     kind: 'event',
     title,
     start,

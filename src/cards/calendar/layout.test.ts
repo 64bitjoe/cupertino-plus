@@ -6,6 +6,7 @@ import type { CalendarItem } from './model'
 
 const item = (title: string, location?: string): CalendarItem => ({
   id: title,
+  entityId: 'calendar.work',
   kind: 'event',
   title,
   ...(location ? { location } : {}),
@@ -266,6 +267,7 @@ describe('medium — packing rules', () => {
       key: title,
       item: {
         id: title,
+        entityId: 'todo.reminders',
         kind: 'reminder',
         title,
         start: new Date('2026-07-24T00:00:00Z'),

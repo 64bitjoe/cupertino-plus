@@ -290,7 +290,7 @@ This is a rule the screenshots settled against the reservation it replaces, whic
 whole section on unless its first row could follow the heading in the same column. That cost
 the widget headings it was perfectly able to draw: `WEDNESDAY, 29 JUL` over `1 more event`,
 with not one of that day's events on screen, is the shape the reservation forbade and the
-widget does. §9 has what it costs to state the rule this simply.
+widget does. §10 has what it costs to state the rule this simply.
 
 ### The tail
 
@@ -448,7 +448,7 @@ Both are still cut mid-tomorrow, so both counts are tomorrow's own.
 
 The third row is the one the heading rule moved, and the `1` at the end of that left column
 is `TOMORROW`: the location takes three of the four rows, and the row it leaves over is
-enough for a heading that no longer has to arrive with its first event. §9 is where that
+enough for a heading that no longer has to arrive with its first event. §10 is where that
 disagrees with a screenshot.
 
 The fifth row is the seventh screenshot, and it is worth reading twice: the location
@@ -461,7 +461,45 @@ all-day entry costs one row instead of two, and that saved row is exactly what p
 `Warsawa Główna` underneath the event below it. The same day in **small** comes to
 `1 + 3` — two items _and_ a location inside four rows.
 
-## 9. Still open
+## 9. What a tap opens
+
+**The row is the tap target, not the card.** A widget-sized card holds up to eight rows, and
+one press effect over all of them says the card is one thing to press when it is a list of
+them: the surface dipped under a finger aimed at a single event and then opened nothing. So
+`cw-pressable` is on the chips, one at a time, and `ha-card` carries none.
+
+A heading is not tappable, and neither is the date block. Nor is the tail indicator, and that
+one is a decision rather than an omission: the line exists to say those events did **not** fit,
+and giving it a row's feedback would make it read as one more of them.
+
+**An event opens the calendar.** `/calendar`, which is the whole of what Home Assistant's
+calendar panel can be sent to — it reads nothing out of the URL, so there is no addressing a
+date or an event, and which calendars are shown lives in its own local storage. It opens on
+today, which is the day the widget is about, so the gap between this and a deep link is
+narrower than it sounds.
+
+**A reminder opens its own list.** `/todo?entity_id=todo.…`, and the parameter is the point:
+`ha-panel-todo` remembers the last list the user looked at, so `/todo` on its own would open
+whichever that was rather than the one the row came from. That is what `CalendarItem.entityId`
+is for — the row has to carry the list it belongs to all the way from the subscription.
+
+Both are a history push and a `location-changed` event rather than a link or a document load,
+which is the difference between a page the app already has and the whole frontend again.
+`core/navigate.ts` has the mechanism and `docs/ha-api-notes.md` has what it was verified
+against, including why an `<a href>` could not do it.
+
+**A page that is not there does nothing.** The panel is only registered while its integration
+is loaded, so the card asks `hass.panels` first and a row whose page is missing declines
+rather than landing the user on a not-found screen. Thin in a real installation — a card
+drawing `todo.…` rows is one whose `todo` integration is loaded — and it is also what keeps a
+tap in the showcase to its press effect, since a page with cards on it is not a Home Assistant
+and has no panels at all.
+
+Keyboard: a row is `role="button"` with `tabindex="0"`, and Enter or Space opens it. Both are
+swallowed, because Space would otherwise scroll the dashboard and Enter would submit whatever
+form the card is sitting inside.
+
+## 10. Still open
 
 No screenshot settles the first two, so they are decided rather than known; the third has
 two screenshots that settle it opposite ways. Each is one edit — the trade in `addMoreRow`,

@@ -85,10 +85,26 @@ const earlier = (now: Date, hours: number): Date => {
   return wanted < start ? start : wanted
 }
 
-type Draft = Omit<CalendarItem, 'id'>
+type Draft = Omit<CalendarItem, 'id' | 'entityId'>
+
+/**
+ * The entities the fixtures pretend to have come out of.
+ *
+ * One of each kind, filled in centrally rather than written on forty drafts, because no
+ * scenario below is about *which* calendar or list a row belongs to — the colours already
+ * carry that distinction, and a per-draft entity would be a second way to say the same thing
+ * and a second way to get it wrong. What they buy is a row that can answer `itemTarget`, so
+ * the tap behaviour is the same shape in the harness as in a dashboard.
+ */
+const DEMO_CALENDAR = 'calendar.personal'
+const DEMO_LIST = 'todo.reminders'
 
 const withIds = (scenario: string, drafts: Draft[]): CalendarItem[] =>
-  drafts.map((draft, index) => ({ id: `${scenario}-${index}`, ...draft }))
+  drafts.map((draft, index) => ({
+    id: `${scenario}-${index}`,
+    entityId: draft.kind === 'reminder' ? DEMO_LIST : DEMO_CALENDAR,
+    ...draft,
+  }))
 
 /**
  * The days after today, shared by most scenarios. `offset` is which day they land on:

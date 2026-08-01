@@ -12,6 +12,7 @@ const ctx: FormatContext = { locale: 'en-GB', timeZone: 'Europe/Warsaw', hour12:
 let counter = 0
 const event = (title: string, start: string, end?: string): CalendarItem => ({
   id: `${title}-${(counter += 1)}`,
+  entityId: 'calendar.work',
   kind: 'event',
   title,
   start: new Date(start),
@@ -37,6 +38,7 @@ describe('selection', () => {
   it('keeps a reminder whose moment has passed — it is still a thing to do', () => {
     const overdue: CalendarItem = {
       id: 'r',
+      entityId: 'todo.reminders',
       kind: 'reminder',
       title: 'Pick up dry cleaning',
       start: new Date('2026-07-24T10:30:00+02:00'),
@@ -59,6 +61,7 @@ describe('selection', () => {
   it('does not carry yesterday’s reminder forward for want of an end time', () => {
     const stale: CalendarItem = {
       id: 'r',
+      entityId: 'todo.reminders',
       kind: 'reminder',
       title: 'Yesterday’s reminder',
       start: new Date('2026-07-23T10:30:00+02:00'),
@@ -66,6 +69,7 @@ describe('selection', () => {
     }
     const staleAllDay: CalendarItem = {
       id: 'a',
+      entityId: 'calendar.work',
       kind: 'event',
       title: 'Yesterday all day',
       allDay: true,
@@ -96,6 +100,7 @@ describe('order', () => {
   it('puts all-day entries first, then sorts by start time', () => {
     const allDay: CalendarItem = {
       id: 'a',
+      entityId: 'calendar.work',
       kind: 'event',
       title: 'Poznań trip',
       allDay: true,
@@ -113,6 +118,7 @@ describe('order', () => {
   it('interleaves reminders with events instead of grouping them', () => {
     const reminder: CalendarItem = {
       id: 'r',
+      entityId: 'todo.reminders',
       kind: 'reminder',
       title: 'Pick up dry cleaning',
       start: new Date('2026-07-24T14:30:00+02:00'),

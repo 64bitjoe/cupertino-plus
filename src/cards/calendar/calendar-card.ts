@@ -10,6 +10,7 @@ import {
 import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
+import { cwNavigate } from '../../core/navigate'
 import { registerCard } from '../../core/register'
 import type { HomeAssistant, LovelaceCardEditor } from '../../core/types/ha'
 import { CALENDAR_EDITOR_TAG } from './calendar-card-editor'
@@ -19,7 +20,7 @@ import { LOOKAHEAD_DAYS, buildFlow } from './flow'
 import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
 import type { FormatContext, ItemTime, TimeToken } from './format'
 import { geometryFor, packFlow, type LayoutColumn, type LayoutRow } from './layout'
-import type { CalendarItem } from './model'
+import { itemTarget, type CalendarItem } from './model'
 import { CalendarFeed, calendarsFor, subscriptionWindow } from './source'
 import { TodoFeed, remindersEnabled, todoListsFor } from './todo-source'
 
@@ -593,11 +594,105 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     return html`${this._renderToken(time.from)} ${TIME_DASH} ${this._renderToken(time.to)}`
   }
 
+  /**
+   * Open the page behind an item: the calendar for an event, its own list for a reminder.
+   *
+   * A missing panel means nothing happens, rather than a navigation to Home Assistant's
+   * not-found page — see `itemTarget` for what `panel` is and `PanelInfo` for why presence is
+   * asked this way. It is a thin guard in a real installation, since a card drawing `todo.…`
+   * rows is one whose `todo` integration is loaded, and it earns its keep in the showcase:
+   * the harness's `hass` has no panels because it is not Home Assistant, so a row there dips
+   * under the finger and goes nowhere.
+   *
+   * Nothing here checks for edit mode. Home Assistant's `hui-card-edit-mode` covers a card
+   * being edited with an overlay that takes `pointer-events: auto` the moment the pointer is
+   * over it and turns the click into "edit this card", so a row cannot be tapped through it
+   * — and a `preview` guard of our own would be dead code claiming otherwise.
+   */
+  private _open(item: CalendarItem): void {
+    const target = itemTarget(item)
+    if (!this.hass?.panels?.[target.panel]) return
+    cwNavigate(target.path)
+  }
+
+  /**
+   * One item's chip, in the two shapes it comes in: an all-day entry closed up around its
+   * single line, and a timed one with a body under the title.
+   *
+   * They share the outer element rather than being two templates, and that is what the
+   * restructuring was for. The tap behaviour is four bindings, lit has no way to spread them
+   * over an element, and a second copy of them is a second place for a row to quietly stop
+   * being tappable.
+   *
+   * `role="button"` and the keydown are the same arrangement the battery card's rings use.
+   * The chip is the tap target rather than the card, which is the whole point of the change:
+   * a widget-sized card holds several rows, and one press effect over all of them said the
+   * card was one thing to press when it is a list of them.
+   */
+  private _renderItem(item: CalendarItem, expanded: boolean, ctx: FormatContext): TemplateResult {
+    const mark =
+      item.kind === 'reminder'
+        ? html`<div class="bullet"></div>`
+        : item.allDay
+          ? ALL_DAY_BADGE
+          : html`<div class="rail"></div>`
+
+    const time = itemTime(item, ctx)
+
+    // Built rather than interpolated: `allday` is conditional, and a ternary inside the
+    // attribute has to carry the separating space with it, which is a space nothing in the
+    // template can be read to need.
+    const classes = ['row', item.kind, ...(item.allDay ? ['allday'] : []), 'cw-pressable']
+
+    return html`
+      <div
+        class=${classes.join(' ')}
+        style="--item-color: ${item.color}"
+        role="button"
+        tabindex="0"
+        @click=${() => this._open(item)}
+        @keydown=${(event: KeyboardEvent) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          // Space scrolls the dashboard otherwise, and Enter would submit a form the card
+          // may be sitting inside.
+          event.preventDefault()
+          this._open(item)
+        }}
+      >
+        ${mark}
+        ${
+          item.allDay
+            ? html`<div class="title cw-truncate">${item.title}</div>`
+            : html`
+                <div class="body">
+                  <div class="title cw-truncate">${item.title}</div>
+                  ${
+                    expanded && item.location
+                      ? html`<div class="location cw-truncate">${item.location}</div>`
+                      : nothing
+                  }
+                  ${
+                    // Not an empty div when there is no time: the row is priced in pixels,
+                    // and a line box with nothing in it still costs one.
+                    time.kind === 'none'
+                      ? nothing
+                      : html`<div class="time cw-truncate">${this._renderTime(time)}</div>`
+                  }
+                </div>
+              `
+        }
+      </div>
+    `
+  }
+
   private _renderRow(row: LayoutRow, ctx: FormatContext): TemplateResult {
     if (row.node.type === 'header') {
       return html`<div class="heading cw-truncate">${row.node.text}</div>`
     }
 
+    // Deliberately not pressable, unlike the rows above it: the line exists to say those
+    // events did NOT fit, and giving it the same feedback as a row would make it read as one
+    // more of them. It is a caption — see the `.more` rule in the stylesheet.
     if (row.node.type === 'more') {
       return html`
         <div class="more" style="--item-color: ${row.node.color}">
@@ -607,37 +702,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       `
     }
 
-    const item = row.node.item
-
-    if (item.allDay) {
-      return html`
-        <div class="row ${item.kind} allday" style="--item-color: ${item.color}">
-          ${item.kind === 'event' ? ALL_DAY_BADGE : html`<div class="bullet"></div>`}
-          <div class="title cw-truncate">${item.title}</div>
-        </div>
-      `
-    }
-
-    const time = itemTime(item, ctx)
-
-    return html`
-      <div class="row ${item.kind}" style="--item-color: ${item.color}">
-        ${item.kind === 'event' ? html`<div class="rail"></div>` : html`<div class="bullet"></div>`}
-        <div class="body">
-          <div class="title cw-truncate">${item.title}</div>
-          ${
-            row.expanded && item.location
-              ? html`<div class="location cw-truncate">${item.location}</div>`
-              : nothing
-          }
-          ${
-            time.kind === 'none'
-              ? nothing
-              : html`<div class="time cw-truncate">${this._renderTime(time)}</div>`
-          }
-        </div>
-      </div>
-    `
+    return this._renderItem(row.node.item, row.expanded, ctx)
   }
 
   private _renderColumn(
@@ -672,8 +737,11 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     const date = widgetDate(now, ctx)
     const emptyLabel = flow.todayDone ? NO_MORE_EVENTS_TODAY : NO_EVENTS_TODAY
 
+    // `ha-card` carries no `cw-pressable`: the rows do, one at a time. A widget holding a
+    // list of things to open is not itself one thing to open, and the whole surface dipping
+    // under a finger aimed at one row was the card claiming otherwise.
     return html`
-      <ha-card class="cw-pressable">
+      <ha-card>
         <div class="widget">
           <div class="column">
             <div class="date">

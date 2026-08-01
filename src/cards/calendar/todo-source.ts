@@ -185,6 +185,7 @@ export const toReminderItem = (
     // render on it. `uid` is `null` on the wire for a store that does not keep one, and
     // the due date is folded in because re-dating an item should redraw the row.
     id: `${entityId}|${uid || title}|${String(todo.due)}`,
+    entityId,
     kind: 'reminder',
     title,
     start,

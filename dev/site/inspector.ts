@@ -1,7 +1,7 @@
 /**
  * The panel down the right-hand side: what to paste, and every knob that changes it.
  *
- * One narrow column, because the widgets themselves are narrow and tall — reading them
+ * One narrow column, because the widgets themselves are narrow and tall: reading them
  * beside their settings works, reading them above their settings means scrolling past the
  * thing you are adjusting.
  *
@@ -95,8 +95,8 @@ const controlInput = (control: Control, ctx: ControlContext): TemplateResult => 
 /**
  * One control, wired to wherever its value lives.
  *
- * The card's options and the page's own knobs are kept in separate records — they have
- * different lifetimes, and one of them is per widget — but the panel shows them together,
+ * The card's options and the page's own knobs are kept in separate records (they have
+ * different lifetimes, and one of them is per widget), but the panel shows them together,
  * grouped by whether they belong to the card. A binding is what lets it do that without
  * knowing about either record.
  */

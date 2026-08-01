@@ -6,8 +6,8 @@ section, and `src/cards/calendar/*.test.ts` pins the worked examples at the bott
 
 Two sizes, matching the two Apple offers on a home screen:
 
-- **small** — today, and nothing else, ever
-- **medium** — two columns of one continuous flow: today plus what comes after it
+- **small**: today, and nothing else, ever
+- **medium**: two columns of one continuous flow: today plus what comes after it
 
 ---
 
@@ -25,27 +25,27 @@ Two sizes, matching the two Apple offers on a home screen:
 }
 ```
 
-**Event** — a thin bar down the left, a chip behind the whole row, the title, and the
+**Event**: a thin bar down the left, a chip behind the whole row, the title, and the
 time. Four things in the calendar's colour and no two of them the same shade of it; the
 palette below is how the four come out of the one colour Home Assistant holds.
 
-**Reminder** — a neutral grey background, an empty circle in the list's colour, muted
+**Reminder**: a neutral grey background, an empty circle in the list's colour, muted
 text. Reminders never show a location.
 
-**A reminder with a date and no time** — the same row with the time line gone, so one line
+**A reminder with a date and no time**: the same row with the time line gone, so one line
 and 24px, priced exactly like an all-day event (§4). It keeps its circle rather than taking
 the badge below: the badge is a calendar, and a to-do is not on one. `allDay` is the flag
-for both, because both mean the same thing — this belongs to a day rather than to a moment
-— and it is what puts them at the top of their day and prints no time under them. There is
+for both, because both mean the same thing (this belongs to a day rather than to a moment)
+and it is what puts them at the top of their day and prints no time under them. There is
 no time to print: `12:00AM` would be an invention, and an invention about the one thing the
 reader would act on.
 
-**All-day event** — the chip of an event, but the bar gives way to a filled circle with
+**All-day event**: the chip of an event, but the bar gives way to a filled circle with
 a calendar knocked out of it, in the bar's colour, and then the title on one line
 with an ellipsis. Nothing else: no time, no location, no expanded form. The badge has to
 carry the meaning on its own, because there is no second line left to say "all day" on.
 The circle is set concentric with the rounded end of the chip and 2px smaller in radius,
-so it clears the chip by the same 2px right around that arc — not on the 10px rail inset
+so it clears the chip by the same 2px right around that arc, not on the 10px rail inset
 the other rows use, and not flush either: flush, the two rims merge into one edge and
 the badge stops reading as a badge. The chip is 24px with a 12px radius, so the badge is
 20px with a 10px one, and the row still measures the 24px §4 prices it at.
@@ -57,21 +57,21 @@ dashboard, but it is deliberately not an `<ha-icon>`: rows are priced in pixels 
 the wrong height. The dev harness has no registry at all, and the screenshots below are
 taken in it.
 
-**`2 more events`** — the tail indicator, and the one row the flow can end on that is
+**`2 more events`**: the tail indicator, and the one row the flow can end on that is
 not an item: a thin bar in the calendar colour, grey text at a normal weight, and
 **no tinted background**, unlike an event. A tint would read as one more event, when the
 point of the line is that those did not fit.
 
 ### The palette
 
-Home Assistant holds one colour per calendar — the hex the `google` integration seeds, the
+Home Assistant holds one colour per calendar: the hex the `google` integration seeds, the
 token its colour picker writes, or the palette entry `source.ts` deals a calendar that has
 neither. The widget needs four out of that one: the bar, the title, the time, and the chip
 behind them. Twice over, because a dark theme is not a light one with the numbers nudged.
 
-A **to-do list** has no colour at all in Home Assistant — no registry option, nothing in
-the to-do panel — so for those the palette is not a fallback, it is the whole answer: a list
-takes the entry at its own position in the card's list of lists. That is dealt
+A **to-do list** has no colour at all in Home Assistant (no registry option, nothing in
+the to-do panel), so for those the palette is not a fallback, it is the whole answer: a
+list takes the entry at its own position in the card's list of lists. That is dealt
 independently of the calendars, so a calendar and a to-do list can come out the same hue.
 The alternative, dealing the lists from where the calendars left off, would make a list's
 colour depend on how many calendars happen to exist, and the two rows do not look alike
@@ -83,7 +83,7 @@ colours. Written against `L₀` and `C₀`, the calendar's own lightness and chr
 
 | Role  | Light                                        | Dark                          |
 | ----- | -------------------------------------------- | ----------------------------- |
-| bar   | `L₀`, `C₀` — the base exactly                | `L = max(L₀, 0.68)`, `C₀`     |
+| bar   | `L₀`, `C₀`, the base exactly                 | `L = max(L₀, 0.68)`, `C₀`     |
 | title | `L₀ − 0.29` held in [0.26, 0.48], `0.52 C₀`  | the bar's colour, exactly     |
 | time  | `L₀ − 0.135` held in [0.38, 0.62], `0.66 C₀` | `L = L_bar − 0.11`, `0.85 C₀` |
 | chip  | `L = 0.97`, `0.08 C₀`                        | `L = 0.28`, `0.25 C₀`         |
@@ -93,7 +93,7 @@ it: the reminder circle, the all-day badge, and the bar on `2 more events`.
 
 The asymmetry between the two columns is the substance of the table rather than an artefact
 of writing it down. In light every role has a lightness of its own, the bar is the base
-untouched, and the title sits 0.29 below it — most of the way to the dark end, and far more
+untouched, and the title sits 0.29 below it, most of the way to the dark end, and far more
 than a text colour usually travels from the thing it belongs to. In dark two roles share
 one: the bar and the title are the same lifted colour, and it is the time that steps 0.11
 below them.
@@ -102,7 +102,7 @@ Two guards sit over the table, and neither is arithmetic the card does at runtim
 browser owns one, and the constants above have the other pre-solved.
 
 **The gamut.** Moving `L` at a fixed `C` walks colours out of sRGB, so `C` has to come back
-down until the result can be drawn — at the same lightness and the same hue, which is the
+down until the result can be drawn, at the same lightness and the same hue, which is the
 whole reason for working in this space. The browser does it, `oklch()` being gamut-mapped
 when it is painted, and it is not a formality: lifting `--cw-blue` to the dark bar's floor
 of 0.68 costs it 0.034 of the 0.218 of chroma it had, and indigo 0.032 of 0.191. At the
@@ -112,7 +112,7 @@ the edge.
 **The contrast.** `|L_title − L_chip| ≥ 0.38`, or the title moves further from the chip.
 The constants above are chosen so that it never has to, and the sum is worth keeping
 because it is what pins two of them. Light: the title tops out at 0.48 against a chip at
-0.97, so the narrowest it comes is 0.49. Dark: 0.68 − 0.28 = 0.40 — and that floor of 0.68
+0.97, so the narrowest it comes is 0.49. Dark: 0.68 − 0.28 = 0.40, and that floor of 0.68
 _is_ this guard solved, since 0.28 + 0.38 = 0.66 and the floor clears it by 0.02 and by
 nothing else. Move the dark chip up or the bar's floor down and this is the line that has
 to be redone.
@@ -121,7 +121,7 @@ to be redone.
 
 Two calendars of a real installation: `#EC8834` at L 0.721 C 0.154 H 56, and `#C830DC` at
 L 0.615 C 0.259 H 323. What the stylesheet paints for them, read back out of a screenshot
-rather than computed — the CSS is the implementation, so a number worked out beside it
+rather than computed: the CSS is the implementation, so a number worked out beside it
 would be checking the arithmetic twice and the rendering not at all:
 
 | Base      | Theme | Bar       | Title     | Time      | Chip      |
@@ -142,7 +142,7 @@ And the same eight roles sampled off screenshots of the widget this copies:
 
 The recipe is a reading of the second table, so the first agreeing with it is the check and
 not the news. The two are within 0.013 of lightness everywhere except the orange calendar's
-dark rows, where the sample runs 0.019 to 0.024 lighter — and that same screenshot reads
+dark rows, where the sample runs 0.019 to 0.024 lighter; and that same screenshot reads
 its light bar 0.007 above a base the rule says it is _exactly_, so most of the gap is in
 the sampling rather than in the recipe. That the dark title is the dark bar is the second
 table's own finding as much as anything here: in both calendars those two cells are the
@@ -161,7 +161,7 @@ is the only way to say it.
 Not everything on the card is tinted, and the two rows that barely are take the bar's
 colour and nothing else from the table:
 
-- **Grey text** — section headings, `2 more events`, both empty lines — is
+- **Grey text** (section headings, `2 more events`, both empty lines) is
   `--cw-label-secondary`: Home Assistant's `--secondary-text-color` wherever the theme has
   one, and the system's secondary label where it does not. The fallback is what the
   screenshots were sampled at, `#8A8A8E` over a white card and `#98989F` over a `#1C1C1E`
@@ -177,7 +177,7 @@ colour and nothing else from the table:
 - **`2 more events`** is grey text on no background at all, with its bar in the colour of
   the calendar whose event was the first one not to fit (§5).
 - **The all-day badge** is that same bar colour, filled, with the calendar knocked out of
-  it in white — not the title's, because the badge stands in for the bar and it is the bar
+  it in white, not the title's, because the badge stands in for the bar and it is the bar
   it has to agree with.
 
 ## 2. Selection and order
@@ -186,32 +186,32 @@ colour and nothing else from the table:
 
 Events come from the `calendar` entities the config names, and every calendar in the
 installation when it names none. Reminders work the same way over `todo` entities, with one
-question in front of them that the calendars do not have — **whether reminders are drawn**,
+question in front of them that the calendars do not have: **whether reminders are drawn**,
 which defaults to yes. An empty picker cannot say "none": Home Assistant reports an emptied
 entity list as `[]`, which is what "I chose nothing" and "I chose everything" both look
 like, so the switch is what says no. Off means not subscribed rather than subscribed and
 filtered.
 
 **A to-do item is a row only if it has a due date, and is not ticked off.** The date is what
-files it under a day, and a calendar widget has nowhere to put an item without one — which
+files it under a day, and a calendar widget has nowhere to put an item without one, which
 is most of a real list, so this is the rule that keeps a shopping list from arriving as a
 wall of undated rows. A due date with no time on it is a day (§1); a due time is a moment
 and prints like one.
 
 ### Order
 
-1. Today and forwards only — a fortnight is more than enough.
+1. Today and forwards only: a fortnight is more than enough.
 2. Anything that has finished is dropped; anything running now stays. Only a real end
    time can retire a row, so an overdue reminder stays up for the rest of its day.
 3. Inside a day: all-day first, then by start time. Reminders and events share one
-   stream — `Pick up dry cleaning 10:30` comes before `Language class 12:00`, and it is
+   stream: `Pick up dry cleaning 10:30` comes before `Language class 12:00`, and it is
    not shunted into a section of its own. A reminder due on a date with no time is one of
    the all-day rows, so it sits with them at the top rather than at midnight.
 4. Sections are calendar days. **A day with nothing in it disappears entirely**,
    heading and all: if today is Friday and Saturday is empty, the next heading is
    `SUNDAY, 26 JUL`, not an empty Saturday.
 
-Everything above is answered in the _display_ timezone — Home Assistant lets a profile
+Everything above is answered in the _display_ timezone: Home Assistant lets a profile
 follow the server's zone rather than the browser's, and "is that tomorrow" has a
 different answer in each.
 
@@ -222,11 +222,11 @@ red, and the day number, large. Always today, whether or not today has anything 
 
 **Section headings**, in the flow, medium only:
 
-| Section                     | Heading                            |
-| --------------------------- | ---------------------------------- |
-| today                       | none — the date block already said |
-| exactly one day after today | `TOMORROW`                         |
-| anything later              | `SUNDAY, 26 JUL`                   |
+| Section                     | Heading                           |
+| --------------------------- | --------------------------------- |
+| today                       | none, the date block already said |
+| exactly one day after today | `TOMORROW`                        |
+| anything later              | `SUNDAY, 26 JUL`                  |
 
 `TOMORROW` means literally tomorrow. If tomorrow is empty and the next section is the
 day after, that section gets a date. Headings are small and grey, never a calendar
@@ -234,14 +234,14 @@ colour, and follow the locale's own day/month order (`JUL 26` in en-US).
 
 ## 4. What each size shows
 
-**Small** — today. If today is empty: the empty line, below. Other days never appear, not
+**Small**: today. If today is empty: the empty line, below. Other days never appear, not
 even when today is empty and tomorrow is full.
 
-**Medium** — two columns holding one vertical flow that spills from the left column
+**Medium**: two columns holding one vertical flow that spills from the left column
 into the right:
 
 - left: the date block, and the start of the flow beneath it;
-- right: the same flow continuing — the rest of today first, **with no heading**, then
+- right: the same flow continuing, the rest of today first, **with no heading**, then
   the next day's heading and its rows;
 - if today is empty, the left column reads the empty line under the date and the flow
   starts at the top of the right column.
@@ -257,7 +257,7 @@ free day and a finished one:
 "Already over" is §2's own rule read backwards: a row is retired only by a real end
 time, so the same events that drop out of the flow during the day are what turn the line
 into `No More Events Today` once the last of them ends. An entry with no end time never
-retires and so never produces it, and the end is exclusive — an all-day entry for
+retires and so never produces it, and the end is exclusive: an all-day entry for
 yesterday ends at today's midnight and is still yesterday's.
 
 ## 5. The height budget
@@ -283,7 +283,7 @@ takes it. A heading is a node like any other and holds nothing back for what fol
 is drawn wherever its one row fits, and if its first event will not fit under it, that event
 starts the next column while the heading finishes this one. One guard, applied at the end: a
 heading that came out the last row drawn anywhere is taken back off the card, because what
-it heads is nothing — not even a count, which would have gone under it had there been a row
+it heads is nothing, not even a count, which would have gone under it had there been a row
 to put one on.
 
 This is a rule the screenshots settled against the reservation it replaces, which moved a
@@ -294,8 +294,8 @@ widget does. §10 has what it costs to state the rule this simply.
 
 ### The tail
 
-One row, at the end of the flow — meaning the last column the flow actually reached, not
-whichever column happens to have space left in it — and it speaks for **one day**: the
+One row, at the end of the flow (meaning the last column the flow actually reached, not
+whichever column happens to have space left in it), and it speaks for **one day**: the
 section it is drawn inside.
 
 `N` is the rest of that section. The items counted are the ones of that day that did not
@@ -310,7 +310,7 @@ event and one Thursday" would be a lie. Singular is `1 more event`.
 The indicator costs a row like everything else, and on a column that came out exactly full
 it buys one, cheapest first:
 
-1. the last location line drawn in that column gives way — §6's third line, handed back;
+1. the last location line drawn in that column gives way (§6's third line, handed back);
 2. failing that, the last event drawn steps aside and joins the count.
 
 What it will not buy is its own section's last visible row. If what sits above the event it
@@ -318,12 +318,12 @@ would evict is a heading, or there is nothing above it at all, the event stays a
 widget says nothing. The second of those would leave a column holding a count and no
 calendar, which is worse than a quiet one. The first is not about the shape that comes out
 but about the price: `TOMORROW` over nothing but a count is a legitimate row when a spare
-one paid for it, and tomorrow's one readable event — its title, its time — is too much to
+one paid for it, and tomorrow's one readable event (its title, its time) is too much to
 pay for the same row when it is not going spare.
 
 The count-and-no-calendar half is a rule about the column and not only about the trade, so
 it holds where the count would have come free as well: a column too short to have fitted an
-event — one row, which the 3-row footprint reaches at 110% and up — says nothing rather
+event (one row, which the 3-row footprint reaches at 110% and up) says nothing rather
 than standing the count on its own. Otherwise the size would contradict itself as it
 shrank, three rows drawing the event and the count, two keeping the event quietly, and one
 dropping the event to announce it.
@@ -336,8 +336,8 @@ the reader has no way to know about, and a widget that cannot be trusted to be c
 one you open the calendar app behind anyway.
 
 In the small size that trade is at its most expensive, and the answer is the same. The
-indicator beats §6's locations to a leftover row — "count wins" is about how much of the
-day you know about, not how much of it is drawn — and where there is no leftover row it
+indicator beats §6's locations to a leftover row: "count wins" is about how much of the
+day you know about, not how much of it is drawn, and where there is no leftover row it
 beats the second of two events as well: four rows and three timed events come out as one
 event and `2 more events`. A row an eviction frees and the count does not need is slack
 like any other, so a location on the event still standing takes it (`3 + 1`) rather than
@@ -347,7 +347,7 @@ leaving white space at the foot of the column.
 
 Apple can hardcode 4 and 7 because an iPhone widget is always the same number of
 points tall. A Home Assistant card is whatever the user dragged it to, so `layout.ts`
-measures instead. A row is priced at 31px — half of a compact row's 56px plus the 6px
+measures instead. A row is priced at 31px: half of a compact row's 56px plus the 6px
 gap beneath it, which is the dearest any kind of row gets per row, so no mix of them can
 overflow. The right column fits `floor((content + 6) / 31)` of those; the left one is
 short by the 84px date block above it. At the default card height of 248px that works out
@@ -358,8 +358,8 @@ Two pixels of that arithmetic are easy to lose, and losing either one clips a de
 off the last row of a column packed exactly full:
 
 - `content` is the card's measured height less the 16px inset **and less the 1px border
-  `ha-card` draws top and bottom** — it is `box-sizing: border-box`, so the border comes
-  out of the height, not on top of it.
+  `ha-card` draws top and bottom**, because it is `box-sizing: border-box`, so the border
+  comes out of the height, not on top of it.
 - a compact row is 56px only while the AM/PM keeps out of the line box. A smaller font in
   the same line gets a larger half-leading and hangs below the strut, which made the time
   line 22px instead of 20 and the row 58px on any 12-hour clock; the `.meridiem` rule
@@ -367,7 +367,7 @@ off the last row of a column packed exactly full:
 
 ### And at another scale
 
-`scale` — the one option in this library that is about the room rather than the data —
+`scale` (the one option in this library that is about the room rather than the data)
 multiplies everything the card draws: 56px, 31px, 84px, 16px and every type size are
 **design units**, and at 120% they are drawn at 120% of themselves. `ha-card`'s border is
 not, because it is Home Assistant's and it stays 1px.
@@ -384,8 +384,8 @@ bugs from a distance:
 - **Size costs rows.** The same footprint holds 4 and 7 rows at 100%, 2 and 5 at 130%, 6
   and 9 at 80%. A card scaled up wants dragging taller in the Layout tab; scaled down, it
   fills the height it already has with more of the day.
-- **Size can change the layout.** §4's threshold is a statement about type — two columns
-  of event rows need so much room before every title truncates — so it too is compared in
+- **Size can change the layout.** §4's threshold is a statement about type: two columns
+  of event rows need so much room before every title truncates, so it too is compared in
   design units. Scaled up far enough, a card that had two columns folds to one; scaled
   down, a narrow one unfolds. The range `scale.ts` permits is chosen to keep the two
   designed footprints, 6 × 4 and 12 × 4, in the layouts they were designed for at every
@@ -396,10 +396,10 @@ bugs from a distance:
 The location is a third line, drawn only when the item has one and there is room. The
 two sizes disagree on purpose:
 
-- **Medium — greedy, location wins.** Going top to bottom: if an event has a location
+- **Medium: greedy, location wins.** Going top to bottom: if an event has a location
   and three rows fit in what is left of the column, draw it expanded, even though the
   next event will be pushed into the other column or off the card entirely.
-- **Small — count wins.** Pack everything compactly first, then spend whatever budget
+- **Small: count wins.** Pack everything compactly first, then spend whatever budget
   is left over on locations, top down. One event → 3 rows, location shown. Two timed
   events → `2 + 2`, no slack, so neither shows a location even though the first one
   would have fitted. The rule is about the slack and not about the count, though: an
@@ -415,16 +415,16 @@ Location and title are each one line, truncated with an ellipsis.
 
 - 12-hour or 24-hour per the locale, AM/PM a size down. The card's `time_format` pins it
   when set to `12` or `24`; `system` and an absent key both defer to the Home Assistant
-  profile, whose own detection can only read the browser's locale — see
-  `TIME_FORMAT_OPTIONS` in `datetime.ts` for the case that motivates the override.
+  profile, whose own detection can only read the browser's locale (see
+  `TIME_FORMAT_OPTIONS` in `datetime.ts` for the case that motivates the override).
 - `:00` is not printed on a 12-hour clock: `5 – 6PM`, `3 – 4:30PM`. A 24-hour clock
-  keeps its minutes — `17 – 18` would read as a range of numbers.
+  keeps its minutes: `17 – 18` would read as a range of numbers.
 - The meridiem prints **only on the end of a range** while both ends are in the same
   half of the day: `12 – 1PM`, `6:15 – 7:15PM`. Different halves, and both get one:
   `11AM – 1PM`.
 - The separator is a spaced en dash.
-- No duration — a reminder, a zero-length event — prints one time: `10:30AM`.
-- All-day prints no time at all, and no location either — one line of content, costing
+- No duration (a reminder, a zero-length event) prints one time: `10:30AM`.
+- All-day prints no time at all, and no location either, one line of content, costing
   the one row (§5).
 
 ## 8. Worked examples
@@ -435,15 +435,15 @@ row in it, in order. Tomorrow is three more rows in every case.
 | Today                             | Left  | Right     | The tail                           |
 | --------------------------------- | ----- | --------- | ---------------------------------- |
 | 3 events, no locations            | `2+2` | `2+1+2+1` | full column: an event buys the row |
-| 2 events                          | `2+2` | `1+2+2+2` | — everything fitted                |
-| 1 event with a location           | `3+1` | `2+2+2`   | — everything fitted                |
+| 2 events                          | `2+2` | `1+2+2+2` | everything fitted                  |
+| 1 event with a location           | `3+1` | `2+2+2`   | everything fitted                  |
 | 2 events, a location on the first | `3`   | `2+1+2+1` | full column: an event buys the row |
 | 2 events, a location on both      | `3`   | `3+1+2+1` | that last `1` is `2 more events`   |
-| all-day + 1 event with a location | `1+3` | `1+2+2+2` | — everything fitted                |
+| all-day + 1 event with a location | `1+3` | `1+2+2+2` | everything fitted                  |
 
 The first and fourth rows are the two the screenshots disagree with, and §5 says why: Apple
 came out at `2+1+2+2` there and let tomorrow's third event vanish, where this card ends the
-column on `2 more events` — the event that had been drawn last is the one that paid for it.
+column on `2 more events`: the event that had been drawn last is the one that paid for it.
 Both are still cut mid-tomorrow, so both counts are tomorrow's own.
 
 The third row is the one the heading rule moved, and the `1` at the end of that left column
@@ -454,12 +454,12 @@ disagrees with a screenshot.
 The fifth row is the seventh screenshot, and it is worth reading twice: the location
 `Focha 4, Warsawa` on the second event is what cost tomorrow two of its three rows.
 Greedy locations are paid for in events (§6), and the indicator is how the widget admits
-it — here out of a row that was going spare, with nothing to buy.
+it, here out of a row that was going spare, with nothing to buy.
 
 The sixth is the eighth screenshot, and it is the same trade read the other way: the
 all-day entry costs one row instead of two, and that saved row is exactly what pays for
 `Warsawa Główna` underneath the event below it. The same day in **small** comes to
-`1 + 3` — two items _and_ a location inside four rows.
+`1 + 3`: two items _and_ a location inside four rows.
 
 ## 9. What a tap opens
 
@@ -473,7 +473,7 @@ one is a decision rather than an omission: the line exists to say those events d
 and giving it a row's feedback would make it read as one more of them.
 
 **An event opens the calendar.** `/calendar`, which is the whole of what Home Assistant's
-calendar panel can be sent to — it reads nothing out of the URL, so there is no addressing a
+calendar panel can be sent to: it reads nothing out of the URL, so there is no addressing a
 date or an event, and which calendars are shown lives in its own local storage. It opens on
 today, which is the day the widget is about, so the gap between this and a deep link is
 narrower than it sounds.
@@ -481,7 +481,7 @@ narrower than it sounds.
 **A reminder opens its own list.** `/todo?entity_id=todo.…`, and the parameter is the point:
 `ha-panel-todo` remembers the last list the user looked at, so `/todo` on its own would open
 whichever that was rather than the one the row came from. That is what `CalendarItem.entityId`
-is for — the row has to carry the list it belongs to all the way from the subscription.
+is for: the row has to carry the list it belongs to all the way from the subscription.
 
 Both are a history push and a `location-changed` event rather than a link or a document load,
 which is the difference between a page the app already has and the whole frontend again.
@@ -490,8 +490,8 @@ against, including why an `<a href>` could not do it.
 
 **A page that is not there does nothing.** The panel is only registered while its integration
 is loaded, so the card asks `hass.panels` first and a row whose page is missing declines
-rather than landing the user on a not-found screen. Thin in a real installation — a card
-drawing `todo.…` rows is one whose `todo` integration is loaded — and it is also what keeps a
+rather than landing the user on a not-found screen. Thin in a real installation: a card
+drawing `todo.…` rows is one whose `todo` integration is loaded. It is also what keeps a
 tap in the showcase to its press effect, since a page with cards on it is not a Home Assistant
 and has no panels at all.
 
@@ -502,8 +502,8 @@ form the card is sitting inside.
 ## 10. Still open
 
 No screenshot settles the first two, so they are decided rather than known; the third has
-two screenshots that settle it opposite ways. Each is one edit — the trade in `addMoreRow`,
-the wording in `moreLabel`, the room `packFlow` asks for before it draws a heading — and
+two screenshots that settle it opposite ways. Each is one edit: the trade in `addMoreRow`,
+the wording in `moreLabel`, the room `packFlow` asks for before it draws a heading, and
 the current answer is whichever keeps the rule simplest to state.
 
 - **What to call them.** Always `events`, even when everything hidden is a reminder.
@@ -511,17 +511,17 @@ the current answer is whichever keeps the rule simplest to state.
 - **What the indicator is worth in the small size.** It is worth an event there, same as
   in the medium size (§5), which is the most expensive answer available: four rows hold
   two events, so the third one costs the second one. The alternative is to buy the row
-  only where it is free — a location line, or slack — and go quiet on a full column, which
+  only where it is free (a location line, or slack) and go quiet on a full column, which
   is what Apple does and what this card did until the count stopped over-reporting.
 
-- **What a heading has to arrive with.** Nothing, per §5 — and that is the one rule here
+- **What a heading has to arrive with.** Nothing, per §5, and that is the one rule here
   where two screenshots cannot both be right. `WEDNESDAY, 29 JUL` over `1 more event` says a
   heading is drawn with no event of its own under it; §8's third row says a heading passed
   over a spare row at the foot of the left column and started the right one instead. A middle
   rule fits both: hold back the heading's row and one more for _anything at all_, a count
   included, rather than for the first event's own cost. It is written down rather than
-  adopted because the reservation it revives is the part that was wrong — the cost of the
-  first row is what made a heading's placement depend on what kind of event followed it —
+  adopted because the reservation it revives is the part that was wrong (the cost of the
+  first row is what made a heading's placement depend on what kind of event followed it),
   and because a rule ending in one guard at the end of packing is a rule the tests can state
   in one line. The screenshot it gives up is the cheaper of the two to be wrong about: a
   heading one column early is a heading the reader still finds, where a heading the widget

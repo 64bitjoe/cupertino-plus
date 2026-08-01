@@ -10,7 +10,7 @@ import {
   todoListsFor,
 } from './todo-source'
 
-/** Sunday, 26 July 2026, one minute past midnight in Warsaw — the awkward end of a day. */
+/** Sunday, 26 July 2026, one minute past midnight in Warsaw: the awkward end of a day. */
 const NOW = new Date('2026-07-26T00:01:00+02:00')
 
 const WARSAW = 'Europe/Warsaw'
@@ -102,7 +102,7 @@ describe('discoverTodoLists', () => {
 
   /**
    * A to-do entity's state is the count of unfinished items, so `0` is the state of every
-   * list somebody has just cleared — and `unknown` is one that has not been read yet.
+   * list somebody has just cleared, and `unknown` is one that has not been read yet.
    * Neither is a broken list.
    */
   it('keeps a list that is empty or has not been read', () => {
@@ -141,7 +141,7 @@ describe('todoListsFor', () => {
   })
 
   /** A card is given its config before its `hass`, so this is the state of every card
-   * for a moment — and it must not be an exception. */
+   * for a moment, and it must not be an exception. */
   it('has nothing to show before hass arrives', () => {
     expect(todoListsFor(undefined, undefined)).toEqual([])
     expect(todoListsFor(['todo.chores'], undefined)).toEqual(['todo.chores'])
@@ -219,7 +219,7 @@ describe('toReminderItem', () => {
 
   /**
    * `local_todo` keeps a date-only due a day forward, because rfc5545 due dates are
-   * exclusive — and shifts it back on the way out. So the date that arrives is the day the
+   * exclusive, and shifts it back on the way out. So the date that arrives is the day the
    * item is due, and correcting it here the way an all-day event's end is corrected would
    * put every to-do on the wrong day.
    */

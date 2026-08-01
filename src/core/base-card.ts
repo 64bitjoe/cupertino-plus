@@ -24,15 +24,15 @@ import type {
  * What every card in the library can be configured with, whatever it draws.
  *
  * It held a `size` preset until the Layout tab was found to do the same job properly, and
- * then nothing at all for a while — kept as the shared base so a card's own config still
- * named one type, and so the next genuinely cross-card option had somewhere to go. `scale`
- * is that option: it is about the room the dashboard is in, which is a question no card
- * gets to answer differently from its neighbour.
+ * then nothing at all for a while; it was kept as the shared base so a card's own config
+ * still named one type, and so the next genuinely cross-card option had somewhere to go.
+ * `scale` is that option: it is about the room the dashboard is in, which is a question no
+ * card gets to answer differently from its neighbour.
  */
 export interface CupertinoCardConfig extends LovelaceCardConfig {
   /**
    * How large to draw the widget, as a percentage of the size it was designed at. Absent
-   * means 100%. See `core/scale.ts` — including why an out-of-range value is clamped
+   * means 100%. See `core/scale.ts`, including why an out-of-range value is clamped
    * rather than refused.
    */
   scale?: number
@@ -63,7 +63,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * `card.preview = this.lovelace.editMode`, so this goes true for every card on the
    * dashboard the moment the pencil is pressed, and wrapper cards forward it down. Home
    * Assistant's own cards use it to keep themselves visible when their condition is false
-   * and to size differently in the editor — never to draw something other than the real
+   * and to size differently in the editor, but never to draw something other than the real
    * thing. A card that showed sample data on this would replace the whole dashboard's
    * contents with samples as soon as the user went to edit it.
    */
@@ -73,13 +73,13 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
 
   /**
    * The layout actually being rendered, derived from the card's measured box rather
-   * than from `config.size` — Home Assistant lets the user's `grid_options` override
+   * than from `config.size`: Home Assistant lets the user's `grid_options` override
    * whatever we asked for, so the configured size is only a starting point.
    * Reflected so CSS can select on it.
    *
    * Deliberately NOT called `layout`: Home Assistant already owns that name on a card
-   * element. Wrapper cards forward it down verbatim —
-   * `this._element.layout = this.layout` in `hui-entity-filter-card.shouldUpdate` — so
+   * element. Wrapper cards forward it down verbatim
+   * (`this._element.layout = this.layout` in `hui-entity-filter-card.shouldUpdate`), so
    * a card nested in `conditional` or `entity-filter` would silently have this
    * overwritten with the view's layout type (`"grid"`, `"panel"`) and every
    * `:host([cw-layout=…])` rule would stop matching.
@@ -102,7 +102,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * Both are `@state()`, and the width has to be: it used to be a plain field on the
    * grounds that the only thing reading it was `layoutFromBox`, whose answer is reflected
    * through `cwLayout` and reactive on its own. That holds only for a card whose rendering
-   * depends on the width in no finer a way than which of the two layouts it is — the
+   * depends on the width in no finer a way than which of the two layouts it is: the
    * calendar. A card that sizes cells from the width, as the battery grid does, would
    * otherwise keep last frame's ring diameter through every resize that did not happen to
    * cross the layout threshold.
@@ -127,8 +127,8 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   /**
    * How wide the card actually is, in px.
    *
-   * `cwLayout` answers the question most cards have about their width — one column of
-   * content or two — and this answers the one it cannot: how much room a single column
+   * `cwLayout` answers the question most cards have about their width (one column of
+   * content or two), and this answers the one it cannot: how much room a single column
    * actually got. The battery card's ring is drawn to fit its cell, and a cell is the
    * measured width shared out, so it reads this directly.
    */
@@ -141,7 +141,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    *
    * The CSS side of it is set on the element by `_applyScale`; this is the same number for
    * the arithmetic side, which every card that prices its content in pixels needs. Read
-   * from the config on each call rather than cached — it is a clamp and a division, and a
+   * from the config on each call rather than cached; it is a clamp and a division, and a
    * second copy of a number that has to agree with a stylesheet is a way to get it wrong.
    */
   protected get scaleFactor(): number {
@@ -161,7 +161,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * Hand the factor to CSS.
    *
    * Inline on the element, so it beats the `:host` default in `tokens.ts` and anything a
-   * theme has to say — see `core/scale.ts` on why this must not be a theme hook. Set from
+   * theme has to say (see `core/scale.ts` on why this must not be a theme hook). Set from
    * `setConfig` rather than from an update, because the config is the only thing it
    * depends on and a scaled card must be scaled on its first paint: this runs before Lit
    * has rendered anything, and it works on an element that is not in the document yet.
@@ -175,8 +175,8 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * the card was measured in.
    *
    * The floor is there for the masonry layout, whose cell imposes no height at all. Take it
-   * away and the row budget chases the content down — fewer rows drawn, a shorter card,
-   * fewer rows again — so in that layout this number IS the height of the card.
+   * away and the row budget chases the content down: fewer rows drawn, a shorter card,
+   * fewer rows again, so in that layout this number IS the height of the card.
    *
    * In the sections layout the cell has a height of its own and the floor is only ever in
    * the way, because `min-height` beats the `max-height: 100%` that holds a card inside its
@@ -188,10 +188,10 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * Clamped to the measurement rather than switched on which layout we are in, because
    * "is anything imposing a height on me" is the question the measurement already answers:
    * a dragged cell reports its own height, while a masonry cell reports whatever this floor
-   * made the card — so there the clamp is a no-op and the floor stands at the full 248.
+   * made the card, so there the clamp is a no-op and the floor stands at the full 248.
    *
    * Which leaves the clamp only as honest as the measurement, and the measurement is one
-   * `min-height: 0` away from being this floor read back to itself — `:host` in
+   * `min-height: 0` away from being this floor read back to itself: `:host` in
    * `base-styles.ts` has the loop and why it only closes under a grid or flex parent.
    */
   private _applyMinHeight(): void {
@@ -201,7 +201,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   /**
    * Measurement beats configuration, and the measurement outlives a config change.
    *
-   * `setConfig` runs again whenever the card is edited — and a config edit does not
+   * `setConfig` runs again whenever the card is edited, and a config edit does not
    * resize anything, so the ResizeObserver will not fire to put things right. Reading
    * back the last measured width instead of resetting to the default is what stops an
    * edit from leaving a narrow card rendering the two-column layout for a frame.
@@ -230,7 +230,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
 
   public override connectedCallback(): void {
     super.connectedCallback()
-    // The default footprint until the first measurement corrects it — see `_applyMinHeight`
+    // The default footprint until the first measurement corrects it; see `_applyMinHeight`
     // for what it is for and what the measurement does to it.
     this._applyMinHeight()
     this._resizeObserver ??= new ResizeObserver(entries => {

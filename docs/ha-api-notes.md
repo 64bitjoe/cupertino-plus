@@ -19,8 +19,8 @@ A `frontend_es5/` build still ships, but custom cards only need the modern one.
 
 One note on the recipe above: `.{0,N}` either side of the pattern is fine for a short window
 and starts backtracking for minutes once N is in the hundreds, because every chunk is one
-line of a megabyte. For a wide window, ask python for a fixed slice instead — no regex around
-the match at all:
+line of a megabyte. For a wide window, ask python for a fixed slice instead, with no regex
+around the match at all:
 
 ```bash
 docker exec cupertino-widgets-ha python3 -c "
@@ -62,12 +62,12 @@ getConfigGridOptions() {
 Consequences that drive our architecture:
 
 1. `getGridOptions()` is THE current API. `getLayoutOptions()` exists only as a
-   back-compat branch — we implement `getGridOptions()` only.
+   back-compat branch; we implement `getGridOptions()` only.
 2. **User config wins.** `config.grid_options` is spread _after_ ours, so whatever
    the user drags in the sections UI overrides our returned columns/rows.
    => the card must render from its ACTUAL measured box, never from anything it asked
    for. `getGridOptions()` only supplies a good _default_ + min/max clamps.
-3. `getCardSize()` is still used for the legacy masonry layout — ship both.
+3. `getCardSize()` is still used for the legacy masonry layout: ship both.
 
 Grid is **12 columns**. Confirmed by real cards in the bundle:
 
@@ -91,7 +91,7 @@ const a = this.rowMin ?? 1,
 ```
 
 So `min_rows` is a promise the card makes rather than a hint it offers: the user can drag
-to exactly that height, and the frontend does nothing else about it — in particular it
+to exactly that height, and the frontend does nothing else about it. In particular, it
 knows nothing of the `min-height` a card keeps on its own `ha-card`, and CSS applies
 `min-height` after `max-height`, so a floor taller than the cell hangs the card over its
 neighbour instead of being clamped. => whatever we name in `min_rows`, the card has to be
@@ -105,7 +105,7 @@ getGridOptions() {
 }
 ```
 
-Note `this.preview` — **HA sets a `preview` property on the card element.** The name is
+Note `this.preview`: **HA sets a `preview` property on the card element.** The name is
 misleading and the mistake it invites is expensive, so: it means **the user is editing**,
 not "this card is a thumbnail". From the sections view:
 
@@ -127,20 +127,20 @@ So it flips to `true` for the whole dashboard the moment the pencil is pressed, 
 wrapper cards forward it down (`this._element.preview = this.preview`). What HA's own
 cards do with it:
 
-- size differently while editing — `rows: this.preview ? "auto" : 1`;
-- stay visible when they would otherwise hide — `hui-conditional-card` does
+- size differently while editing: `rows: this.preview ? "auto" : 1`;
+- stay visible when they would otherwise hide: `hui-conditional-card` does
   `setVisibility(visible) { const show = this.preview || visible; … }`.
 
 What no card does with it is **draw something other than the real thing**. A card that
 showed sample data on `preview` would swap the entire dashboard's contents for samples as
-soon as the user went to edit it — see `_fixtures` in `calendar-card.ts`, which is where
+soon as the user went to edit it. See `_fixtures` in `calendar-card.ts`, which is where
 this library got it wrong once.
 
 Not to be confused with `window.customCards[].preview`, which is a different flag with a
 similar name: that one really is picker-only, and asks the picker to render a live card
 instead of a grey tile.
 
-## Calendar data (VERIFIED — contradicts most tutorials)
+## Calendar data (VERIFIED: contradicts most tutorials)
 
 HA's own frontend does **not** use the REST endpoint `/api/calendars/<entity>?start=&end=`
 anywhere in the bundle. It uses a websocket **subscription**:
@@ -169,12 +169,12 @@ hass.callWS({
 hass.callWS({ type: 'calendar/event/delete', entity_id, uid, recurrence_id, recurrence_range })
 ```
 
-A subscription means push updates — no polling loop needed. Big UX win for a widget.
+A subscription means push updates, so no polling loop is needed. Big UX win for a widget.
 
 ### The subscribe REQUEST is strict, and takes ONE entity
 
 ```python
-# components/calendar/__init__.py — handle_calendar_event_subscribe
+# components/calendar/__init__.py, handle_calendar_event_subscribe
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "calendar/event/subscribe",
@@ -188,16 +188,16 @@ A subscription means push updates — no polling loop needed. Big UX win for a w
 - Four keys, and the schema is `vol.PREVENT_EXTRA`: a fifth is rejected with
   `invalid_format`. There are no optional keys.
 - `cv.entity_domain` wraps `cv.entities_domain` and then demands exactly one, so **a list
-  of two is refused** — _"Expected exactly 1 entity, got 2"_. A one-element list is
+  of two is refused**: _"Expected exactly 1 entity, got 2"_. A one-element list is
   accepted and coerced to the bare string. So N calendars means N subscriptions, which is
   what the frontend does (`hui-calendar-card` keys `_unsubs` by entity id).
 - `start >= end` is refused in the handler with `invalid_format`, _"Start must be before
-  end"_. There is **no cap on the window size** — a 100-year span passes.
+  end"_. There is **no cap on the window size**. A 100-year span passes.
 - A non-existent entity is `not_found`; in JS that **rejects the `subscribeMessage`
   promise** with the raw `{code, message}`. An entity that merely went `unavailable` does
   NOT reject: `get_entity` is a state-independent dict lookup.
 
-### The PUSH payload (verified — this is the part no tutorial gets right)
+### The PUSH payload (verified, and this is the part no tutorial gets right)
 
 ```python
 connection.send_message(websocket_api.event_message(subscription_id, {"events": events}))
@@ -210,15 +210,15 @@ connection.send_message(websocket_api.event_message(subscription_id, {"events": 
 ```
 
 - An **object with one key**, not a bare list.
-- `events: null` is how a **failed fetch** arrives — on the same subscription, not as an
-  error frame. `_async_update_listener` catches `HomeAssistantError` and calls
+- `events: null` is how a **failed fetch** arrives, on the same subscription rather than as
+  an error frame. `_async_update_listener` catches `HomeAssistantError` and calls
   `listener(None)`. HA's own card tests `msg.events === null` and shows
   `ui.components.calendar.event_retrieval_error`. `msg.events.map(…)` is a crash.
 - Every push is a **full snapshot** of that calendar's window, never a delta. HA's card
   drops all prior events for the calendar and re-appends.
 - The result ack is sent **before** the first snapshot (the fetch is wrapped in
   `hass.async_create_task`), so there is nothing to await for data.
-- Events are **not clipped** to the window — a platform returns anything _overlapping_ it,
+- Events are **not clipped** to the window; a platform returns anything _overlapping_ it,
   so a returned `start` may precede the requested one. Clipping is the client's job.
 - Re-push is debounced 1 s and fires on every state write; with `SCAN_INTERVAL = 60` and
   `should_poll` defaulting true, that is roughly once a minute, plus each event boundary.
@@ -240,15 +240,15 @@ def _event_dict_factory(obj):          # note: value.isoformat(), NOT as_local
 ```jsonc
 // timed
 {"start":"2026-07-26T09:30:00+02:00","end":"2026-07-26T10:30:00+02:00","summary":"Standup","uid":"a1","all_day":false}
-// all-day — bare dates, and `end` is EXCLUSIVE
+// all-day: bare dates, and `end` is EXCLUSIVE
 {"start":"2026-07-27","end":"2026-07-29","summary":"Trip","all_day":true}
 ```
 
 - `start`, `end`, `summary`, `all_day` are always there. `description`, `location`, `uid`,
-  `recurrence_id`, `rrule` are **omitted entirely** when unset — absent, not `null`.
+  `recurrence_id`, `rrule` are **omitted entirely** when unset: absent, not `null`.
 - `start` / `end` are **plain ISO strings**. The nested `{"dateTime": …}` / `{"date": …}`
-  form is the REST endpoint's (`_api_event_dict_factory`), and the frontend never calls it
-  — `grep -c "api/calendars" frontend_latest/*.js` is 0. Do not write one parser for both.
+  form is the REST endpoint's (`_api_event_dict_factory`), and the frontend never calls it:
+  `grep -c "api/calendars" frontend_latest/*.js` is 0. Do not write one parser for both.
 - All-day is a date-only `start` **and** `all_day: true`, the same fact twice.
   Interestingly the frontend reads neither flag: it hands the raw string to FullCalendar,
   which infers all-day from the absence of a time portion.
@@ -256,7 +256,7 @@ def _event_dict_factory(obj):          # note: value.isoformat(), NOT as_local
   should end (exclusive)") and `CalendarEvent.__post_init__` rewrites a same-day all-day
   event to end the next day. The frontend's event editor proves it from the other side:
   it reads `addDays(new Date(dtend + "T00:00:00"), -1)` and writes `addDays(dtend, 1)`.
-- The offset is **not normalised** — `isoformat()` emits whatever the integration built.
+- The offset is **not normalised**. `isoformat()` emits whatever the integration built.
   `demo` and `local_calendar` carry the HA local offset; a UTC-based integration sends
   `+00:00`. So a card must not assume the offset matches `hass.config.time_zone`.
   Naive datetimes cannot occur (`CALENDAR_EVENT_SCHEMA` rejects them).
@@ -264,13 +264,13 @@ def _event_dict_factory(obj):          # note: value.isoformat(), NOT as_local
 ### Per-calendar colour is NOT on `hass.entities`
 
 `hass.entities` is the DISPLAY registry, decoded in `connection-mixin.ts` from
-`config/entity_registry/list_for_display` into exactly twelve fields — `entity_id`,
+`config/entity_registry/list_for_display` into exactly twelve fields: `entity_id`,
 `device_id`, `area_id`, `labels`, `translation_key`, `platform`, `entity_category`,
 `has_entity_name`, `name`, `icon`, `hidden`, `display_precision`. **No `options`.** So the
 zero-config helper sketched above cannot get the colour from `hass`; its third argument is
 the full registry, which HA's panel and card both subscribe to separately.
 
-The full registry is `config/entity_registry/list` (a flat array) — but there is a scoped
+The full registry is `config/entity_registry/list` (a flat array), but there is a scoped
 alternative, which is what this library uses:
 
 ```ts
@@ -279,17 +279,17 @@ hass.callWS({ type: 'config/entity_registry/get_entries', entity_ids: [...] })
 ```
 
 Neither is admin-gated; only `update` and `remove` carry `@require_admin`. `null` comes
-back for an entity with no registry entry at all — which every `demo` and YAML calendar
+back for an entity with no registry entry at all, which every `demo` and YAML calendar
 is, since they have no unique id, so those can never have a colour set.
 
 `options.calendar.color` is a plain string two levels deep. It is a **named token** when
 the colour picker wrote it (its options are `Array.from(THEME_COLORS)`, 25 of them), and a
-`#RRGGBB` when an integration seeded it — `CalendarEntity.get_initial_entity_options()`
+`#RRGGBB` when an integration seeded it; `CalendarEntity.get_initial_entity_options()`
 validates `initial_color` through `cv.color_hex`, and `google` is the one integration that
 sets it. `computeCssColor` turns a token into the string `var(--<token>-color)` and passes
 anything else through.
 
-`isValidColor` is broader than it looks — three accept paths, and the last one needs a DOM:
+`isValidColor` is broader than it looks: three accept paths, and the last one needs a DOM:
 
 ```js
 if (THEME_COLORS.has(v)) return true
@@ -307,12 +307,12 @@ Note the three text tokens (`primary-text`, `secondary-text`, `disabled`) are ma
 `computeCssVariable` but **rejected** by this, so a calendar carrying one falls through to
 the index palette.
 
-The fallback palette is not hex in JS — `getColorByIndex(index, style)` is
+The fallback palette is not hex in JS; `getColorByIndex(index, style)` is
 `style.getPropertyValue(\`--color-${index % 54 + 1}\`)`, reading 54 custom properties
 defined once in `color.globals.ts`'s `html {}`block, with no dark override.`--color-54`duplicates`--color-1`, so it is 53 distinct colours. `--graph-color-N`is
 never defined by the shipped theme, so`getGraphColorByIndex` always falls through.
 
-### Zero-config calendar discovery + colors — HA's own helper, deminified
+### Zero-config calendar discovery + colors: HA's own helper, deminified
 
 ```js
 ;(hass, styleTargetEl, entityOptionsList) => {
@@ -343,7 +343,7 @@ registry-hidden entities, honour the user's per-calendar colour from the entity 
 else assign from a palette by index. Also confirms `hass.entities` (entity registry) is
 available to custom cards.
 
-## To-do data (VERIFIED — and it is NOT the calendar's protocol twice)
+## To-do data (VERIFIED: it is NOT the calendar's protocol twice)
 
 The calendar card reads reminders off `todo` entities. Same idea as the calendar
 subscription, three differences that matter, all four points checked in the image:
@@ -357,12 +357,12 @@ subscription, three differences that matter, all four points checked in the imag
 ```
 
 1. **No window.** The command takes nothing but the entity, so what arrives is the WHOLE
-   list, however far out its due dates reach. Nothing to key a re-subscribe on either —
+   list, however far out its due dates reach. Nothing to key a re-subscribe on either:
    the calendar's midnight rollover has no counterpart here.
 2. **The push is not the REST shape and not the calendar's shape.** The listener sends
-   `[dataclasses.asdict(item) for item in todo_items or []]` — `asdict` with **no dict
-   factory**, unlike `todo/item/list` below, which passes `_api_items_factory` and drops
-   the `None`s. So every field is present and the unset ones are `null`:
+   `[dataclasses.asdict(item) for item in todo_items or []]`, calling `asdict` with **no
+   dict factory**, unlike `todo/item/list` below, which passes `_api_items_factory` and
+   drops the `None`s. So every field is present and the unset ones are `null`:
 
    ```json
    {
@@ -379,7 +379,7 @@ subscription, three differences that matter, all four points checked in the imag
    }
    ```
 
-   `{ "items": null }` does **not** happen — the `or []` is inside the comprehension, which
+   `{ "items": null }` does **not** happen: the `or []` is inside the comprehension, which
    is the one way this is kinder than `calendar/event/subscribe`.
 
 3. **`due` is a date OR a datetime, and the datetime may be naive.** It is whatever
@@ -392,14 +392,14 @@ subscription, three differences that matter, all four points checked in the imag
    datetime(2026,7,31,10,30,tzinfo=Warsaw)  -> "2026-07-31T10:30:00+02:00"
    ```
 
-   Nothing on the way out makes it aware, so the naive form is real — unlike a calendar
+   Nothing on the way out makes it aware, so the naive form is real, unlike a calendar
    event, whose datetimes core requires to be aware. The frontend's own to-do card tells
    the two apart with `due?.includes("T")`, which is `isWireDateOnly` here.
 
 `status` is `TodoItemStatus`, a `StrEnum` orjson serialises to its value: `needs_action` or
 `completed`, and the field is `Optional` on the dataclass so an integration may omit it.
 An initial snapshot is pushed by the subscribe handler itself (`entity.async_update_listeners()`),
-but after `send_result` — so, as with the calendar, there is nothing to await for data.
+but after `send_result`. So, as with the calendar, there is nothing to await for data.
 A missing entity is `send_error(..., "invalid_entity_id")`, i.e. a rejected command rather
 than an error frame on a live subscription.
 
@@ -407,7 +407,7 @@ Also there, and not used: `todo/item/list` (a one-shot with `_api_items_factory`
 nulls), `todo/item/move`, and the `todo.get_items` service with `SupportsResponse.ONLY`.
 
 **A to-do list has no colour.** There is no `options.todo` in the entity registry and no
-colour anywhere in the to-do panel — grepped both. `options.calendar.color` has no
+colour anywhere in the to-do panel (grepped both). `options.calendar.color` has no
 counterpart, so a palette is the whole answer rather than a fallback.
 
 **`TodoListEntityFeature` is about writing, not about content.**
@@ -417,14 +417,14 @@ Filtering discovery on them would hide exactly the lists a calendar wants.
 
 One store-level detail, because it looks like the calendar's exclusive-end trap:
 `local_todo` keeps a date-only due a day forward (rfc5545 due dates are exclusive) and
-shifts it back on the way out — `if (due := item.due) and not isinstance(due, datetime):
+shifts it back on the way out: `if (due := item.due) and not isinstance(due, datetime):
 due -= timedelta(days=1)`. The date on the wire is the day the item is due, inclusive.
 
-## Visual editors (VERIFIED — and the received wisdom here is stale)
+## Visual editors (VERIFIED, and the received wisdom here is stale)
 
 A card gets a visual editor by answering `static getConfigElement()`. Without one,
-Home Assistant shows `ui.errors.config.visual_editor_not_supported` — _"Visual editor
-not supported"_ — and a raw YAML box.
+Home Assistant shows `ui.errors.config.visual_editor_not_supported` (_"Visual editor
+not supported"_) and a raw YAML box.
 
 That costs more than the fields. `hui-card-element-editor` renders its tab strip inside
 `renderConfigElement()`, which `hui-element-editor` only calls in the **GUI branch**; no
@@ -440,39 +440,39 @@ if (this._showLayoutTab) tabs.push('layout')
 if (tabs.length === 1) return super.renderConfigElement() // no tab bar
 ```
 
-`_showLayoutTab` additionally needs a `sectionConfig`, which only `hui-section` passes —
+`_showLayoutTab` additionally needs a `sectionConfig`, which only `hui-section` passes,
 so the Layout tab exists in the sections layout and not in masonry or panel views.
 
 This is what killed our own `size` preset, so it is worth following through. The
 temptation is to read the missing tab as "so a `size` option is the sizing control in the
 other views". It is not a control there at all. `getGridOptions()` has exactly three call
-sites in the whole bundle — `hui-view-footer`, `hui-section`, and
-`hui-card.getElementGridOptions()`, which only those two consume — so `columns` is never
+sites in the whole bundle: `hui-view-footer`, `hui-section`, and
+`hui-card.getElementGridOptions()`, which only those two consume, so `columns` is never
 read outside the sections grid. Masonry asks a card only for `computeCardSize()`, and uses
 the answer to pick the shortest column rather than to size anything; panel view asks for
 nothing and sizes with CSS. Our footprint is `rows: 4`, so `getCardSize()` is 5 and the
-fallback height is 248px, and the rendered layout comes from the measured width — the
-masonry column's.
+fallback height is 248px, and the rendered layout comes from the measured width (the
+masonry column's).
 
 So a `size` config key could only ever have done two things, both of them in the one view
 that already has the Layout tab: set the footprint the card arrives with, and set the
 `min_columns` clamp on how far it can be dragged. Neither is worth a control, because the
 tab does the first better (any footprint, dragged, live) and wins outright over it
-anyway — `config.grid_options` is spread after ours. A card that renders from its measured
-box needs one default footprint and a floor, not a menu. See `core/size.ts`.
+anyway, because `config.grid_options` is spread after ours. A card that renders from its
+measured box needs one default footprint and a floor, not a menu. See `core/size.ts`.
 
 ### The contract for the element
 
 Read out of `hui-element-editor`, not out of documentation:
 
 ```js
-// loadConfigElement — runs once; only a change of config.type replaces the element
+// loadConfigElement: runs once; only a change of config.type replaces the element
 const el = await elClass.getConfigElement()      // static, awaited, may return a promise
 el.hass = this.hass                              // hass FIRST
 if ('lovelace' in el) el.lovelace = this.lovelace
 el.context = this.context
 el.addEventListener('config-changed', ev => this._handleUIConfigChanged(ev))
-// _updateConfigElement — then, and again on EVERY later change, including our own
+// _updateConfigElement: then, and again on EVERY later change, including our own
 el.setConfig(this.value)
 
 _handleUIConfigChanged(ev) {
@@ -488,9 +488,9 @@ Consequences:
 
 1. `config-changed` carries the **whole** config in `detail.config`. Note _where_ the
    listener goes: on the config element itself, so the handler runs at the target and
-   neither `bubbles` nor `composed` is actually required. Set them anyway — HA's own
+   neither `bubbles` nor `composed` is actually required. Set them anyway: HA's own
    `fireEvent` does, and it costs nothing to survive a host that listens further up.
-2. Only `undefined` values are stripped. An `entities: []` lands in the user's YAML —
+2. Only `undefined` values are stripped. An `entities: []` lands in the user's YAML,
    hence `applyFormData` in `core/card-editor.ts`.
 3. Throwing out of `setConfig` is the supported way to say "I cannot edit this": the
    host wraps it in a `GUISupportError`, shows the message as a warning, and drops to
@@ -500,12 +500,12 @@ Consequences:
    timeout, after which the editor shows `Custom element not found: <tag>`.
 5. `GUImode-changed` is fired **by** the host, not by us. A config element never needs it.
 
-There is a second path — `static getConfigForm()` returning `{schema, assertConfig,
+There is a second path: `static getConfigForm()` returning `{schema, assertConfig,
 computeLabel, computeHelper}`, which HA renders with its own `hui-form-editor`. We do
 not use it: its schema cannot depend on the config, and it writes the form value into
 the config verbatim, empty arrays and all.
 
-### `ha-form` is already loaded — no `loadCardHelpers` dance needed
+### `ha-form` is already loaded, so no `loadCardHelpers` dance is needed
 
 The widely-copied trick of calling `window.loadCardHelpers()` and forcing a built-in
 card's editor open, just to get `ha-form` defined, is not needed on 2026.7. `ha-form`
@@ -516,7 +516,7 @@ chunk is in the `lovelace` panel's own initial group:
 lovelace: () => Promise.all([e(4801), ..., e(85407), ...])
 ```
 
-So by the time any card editor renders, both are defined. Worth re-checking on a bump —
+So by the time any card editor renders, both are defined. Worth re-checking on a bump:
 the edit-card dialog itself (`[45776, 70808, 28451]`) does **not** carry them, and
 neither does HA's own calendar-card-editor chunk, so the panel group is the only thing
 holding this up:
@@ -555,8 +555,8 @@ that matter:
 - `error` / `warning` are objects keyed by field name; the key `base` renders a
   top-level `ha-alert`.
 - A node with a `selector` goes to `ha-selector`; a node with a `type` goes to
-  `ha-form-${type}`, lazily imported in `willUpdate`. Eleven of those exist —
-  `grid`, `expandable`, `select`, `string`, `boolean`, … — and none need importing.
+  `ha-form-${type}`, lazily imported in `willUpdate`. Eleven of those exist
+  (`grid`, `expandable`, `select`, `string`, `boolean`, …), and none need importing.
 
 ### A node's `name` is what decides whether its data nests
 
@@ -575,19 +575,19 @@ this.data = { ...this.data, ...o }
 
 So a **named** `expandable` nests: the rows inside it read and write an object of their own,
 and the form's data gains one key per panel rather than one per field. `flatten: true` opts
-out, which is what Home Assistant's own badge and heading-entity editors do — they group
+out, which is what Home Assistant's own badge and heading-entity editors do: they group
 `name`/`icon`/`color` under a **Content** panel that still writes flat config keys.
 
 Worth knowing and, in the end, not what the battery card uses. Its device list was built on
 named `expandable` nodes first, one per configured device, with a multiple entity picker above
-them for adding and reordering — and the thing that sank it is that **nothing in `ha-form` can
+them for adding and reordering, and the thing that sank it is that **nothing in `ha-form` can
 hang a drag handle or a delete button off a panel**. The panels could describe the devices but
 could never _be_ the list, so the list stayed a separate picker and one device sat in two
 controls. See `cards/battery/device-list-editor.ts`, which owns its panels instead.
 
 `ha-form-expandable` itself takes `title`, `icon`, `iconPath`, `expanded` and `headingLevel`,
 renders `schema.title || computeLabel(schema)` as the summary, and hands `computeLabel` /
-`computeHelper` straight down to the nested `ha-form` — so one `computeLabel` answers for the
+`computeHelper` straight down to the nested `ha-form`, so one `computeLabel` answers for the
 rows inside every panel, and the panel is the only thing saying which one they belong to. It
 does **not** forward `context` (it declares no such property), which is only worth knowing
 because of the next paragraph.
@@ -603,11 +603,11 @@ _generateContext(schema) {
 }
 ```
 
-Each key is what the selector reads, each value the name of the row to read it from — so
+Each key is what the selector reads, each value the name of the row to read it from, so
 `{name: 'icon', selector: {icon: {}}, context: {icon_entity: 'entity'}}` shows the entity's
 own icon in the picker, and `{selector: {entity_name: {}}, context: {entity: 'entity'}}` its
 own name. Resolution is against **that** form's data, so inside a nested panel the field
-names are the panel's own. This library passes explicit placeholders instead — see
+names are the panel's own. This library passes explicit placeholders instead: see
 `IconSelector` in `core/types/ha.ts` for the one case where HA's answer is wrong for us.
 
 ### Selectors
@@ -624,29 +624,29 @@ names are the panel's own. This library passes explicit placeholders instead —
 ```
 
 - `filter` is the current spelling. A top-level `{ entity: { domain } }` still works, but
-  only because `ha-selector` migrates it — and the migration lifts `domain`,
+  only because `ha-selector` migrates it, and the migration lifts `domain`,
   `integration` and `device_class` only, **silently dropping** a `supported_features`
   sitting beside them. `include_domains` is not a thing here at all.
-- `filter` may be an array — clauses are ORed, keys inside a clause ANDed, and
+- `filter` may be an array: clauses are ORed, keys inside a clause ANDed, and
   `domain` / `device_class` / `unit_of_measurement` each also accept an array.
 - `multiple: true` renders `ha-entities-picker` and emits `string[]`. Removing the last
   entity emits `[]`, never `undefined`. Reordering is opt-in with `reorder: true`.
 - **`exclude_entities`** (and `include_entities`) are forwarded to the picker's
   `excludeEntities`/`includeEntities`, so a list editor can hide the ids its own config has
-  already taken — the one thing `filter` cannot express, since it is a set of ids rather than
+  already taken; the one thing `filter` cannot express, since it is a set of ids rather than
   a property of any entity. They hide _candidates_, not values: a picker whose current value
   is excluded still shows it, which is what lets a row exclude its siblings without blanking
   itself.
 - The picker lists everything in `hass.states` that matches; it does **not** hide
   registry-hidden or unavailable entities.
 - `select` mode, when omitted, is decided by the option count: under six renders `list`
-  (radios), six or more `dropdown`. `box` — tiles with an optional `description` line —
+  (radios), six or more `dropdown`. `box` (tiles with an optional `description` line)
   is never chosen for you. An older frontend that does not know `box` falls through to
   the dropdown rather than breaking.
 - `number` is a box, not a slider, unless it is given **both** `min` and `max`:
 
   ```js
-  // ha-selector-number.render(), chunk 6749 — the same decision, unminified
+  // ha-selector-number.render(), chunk 6749: the same decision, unminified
   const isBox =
     'box' === this.selector.number?.mode ||
     void 0 === this.selector.number?.min ||
@@ -659,40 +659,40 @@ names are the panel's own. This library passes explicit placeholders instead —
   it, so a bare `'%'` shows as `%`.
 
 - Both of its handlers emit a **number**: `Number(target.value)` from the slider, and from
-  the box the same or `undefined` when the field is emptied or unparseable — never `''`,
+  the box the same or `undefined` when the field is emptied or unparseable, never `''`,
   and never a numeric string. So a number selector is the one control that cannot put a
   `"110"` in somebody's config, and `applyFormData` sees a real blank when they clear it.
 - Its chunk is **not** in the `lovelace` panel group (the check above prints `False` for
   6749), so it arrives with the lazy import `ha-selector` does when it first sees the
-  selector — same as `ha-select-box` and `ha-entities-picker`, and it needs no help either.
+  selector, the same as `ha-select-box` and `ha-entities-picker`, and it needs no help either.
 - `icon` renders `ha-icon-picker`, a searchable combo box over the whole set. Its
   `placeholder` **wins over** the icon it would work out for itself from
   `context.icon_entity`, which is what makes it usable for a battery sensor: HA's own state
   icon for one is computed from the level, so its guess is `mdi:battery-70` where this
   library draws `mdi:battery`.
 - `text` renders `ha-input`, and reports **`undefined`** rather than `''` for a field that
-  has been emptied — as long as the row is not `required`. That is what lets an override
+  has been emptied, as long as the row is not `required`. That is what lets an override
   disappear from a config instead of sitting in it blank.
 - `boolean` takes no options and renders an `ha-switch` inside an `ha-formfield`, with the
   helper as a second line under the label rather than beneath the control. It reports
-  `target.checked`, so always a real boolean — `false` included, which is what lets an
+  `target.checked`, so always a real boolean (`false` included), which is what lets an
   option be switched _off_ in a config rather than only blanked out of it. Its `.checked` is
   `this.value ?? this.placeholder === true`, so a schema-level default is available there
   too; our editors do it through `defaults()` instead, which puts the same value in front of
   every row and in one place.
 
-### The list-of-objects selector — considered, and not used
+### The list-of-objects selector: considered, and not used
 
 `{ object: { fields, multiple, label_field, description_field, translation_key } }` is HA's
 current answer to a list whose rows carry more than an id, and it is what its own heading
-badges and markdown buttons use. Given `fields` it draws a sortable `ha-md-list` — drag
-handle, pencil, bin, an **Add** button — and edits one row in a modal `dialog-form` built
+badges and markdown buttons use. Given `fields` it draws a sortable `ha-md-list` (drag
+handle, pencil, bin, an **Add** button) and edits one row in a modal `dialog-form` built
 from those fields; without `fields` it falls back to a raw `ha-yaml-editor`. Worth knowing:
 
 - `fields` is `{[name]: {selector, required?, label?, description?}}`, and the per-field
   `label`/`description` are read directly, so no translation key is needed.
-- the item's headline is `label_field` formatted **through that field's own selector** — an
-  entity id comes out as `hass.formatEntityName(...)`, i.e. the friendly name — and with no
+- the item's headline is `label_field` formatted **through that field's own selector**: an
+  entity id comes out as `hass.formatEntityName(...)`, i.e. the friendly name, and with no
   `label_field` it joins every set field with `·`.
 - `dialog-form` seeds its data with the whole item and submits `this._data`, so keys the
   `fields` do not mention survive an edit rather than being dropped.
@@ -706,7 +706,7 @@ cannot be shown inside the dialog anyway.
 
 ### What a hand-rolled list editor may render
 
-`hui-entities-card-row-editor` is the shape to copy — `ha-sortable` around a wrapper, an
+`hui-entities-card-row-editor` is the shape to copy: `ha-sortable` around a wrapper, an
 `item-moved` event carrying two indices, an empty picker as the add control, and clearing a
 row's entity as the way to delete it. Two details of theirs are worth having as well:
 `.addButton=${entities.length > 0}` on the add picker, which turns it into a **button** that
@@ -726,7 +726,7 @@ itself. Two things make that worth the trouble rather than reimplementing it:
 async open() { await this.updateComplete; await this._picker?.open() }
 ```
 
-In `addButton` mode it passes `undefined` down as its value **whatever it holds** — so it is a
+In `addButton` mode it passes `undefined` down as its value **whatever it holds**, so it is a
 button before the press, its own `open` runs on the press, and it is a button again afterwards
 with nothing for the editor to reset. `value-changed` carries the bare id, not the
 `{ [name]: value }` an `ha-form` reports.
@@ -745,7 +745,7 @@ script from the `ha-form` section, substituting each tag:
 | `ha-sortable`, `ha-expansion-panel`                                                                 |                                                                                       |
 
 The right-hand column is the trap, because an undefined custom element renders as **nothing at
-all** — no error, no box, just a gap that reads as a bug in your own file. `ha-entity-picker`
+all**: no error, no box, just a gap that reads as a bug in your own file. `ha-entity-picker`
 and `ha-icon-picker` are reached the safe way, through an `ha-form` row whose selector asks for
 them, so `ha-selector` does the lazy import it exists to do. `ha-button` has no such route,
 which is one more reason the battery card's add control is a picker rather than a button.
@@ -765,7 +765,7 @@ _handleChoose = e => { this.rollback && (e.item.placeholder = document.createCom
 _handleEnd = async e => { fireEvent(this, 'drag-end'); this.rollback && e.item.placeholder && (e.item.placeholder.replaceWith(e.item), delete e.item.placeholder) }
 ```
 
-Three consequences. It needs a **wrapper element** to make sortable — its own children are
+Three consequences. It needs a **wrapper element** to make sortable: its own children are
 the container, not the items. `rollback` defaults **true**, so it undoes its own DOM move on
 drop and the re-render is what actually reorders: the list is data-driven, and a handler that
 tried to move the DOM itself would fight it. And sortablejs arrives lazily, so the first drag
@@ -789,7 +789,7 @@ of a session has a chunk to fetch.
 
 - `header` and `secondary` are **properties** that fill the default content of the `header`
   slot, so a two-line summary needs no markup of its own.
-- `icons` is a trailing slot **inside** `#summary` — where a per-panel action button goes.
+- `icons` is a trailing slot **inside** `#summary`, where a per-panel action button goes.
 - and it is inside the click target, so a button there must `preventDefault()`: the toggle
   opens with `if (e.defaultPrevented) return`, which is the only thing standing between a
   delete button and a panel that opens as its row is removed.
@@ -804,7 +804,7 @@ predates the entity selector and still hand-renders an `<ha-entities-picker>` be
 `hass.localize(key)` returns `''` for a key it does not have, so `localize(k) || fallback`
 is the right shape. `ui.panel.lovelace.editor.card.calendar.calendar_entities`
 ("Calendar entities") is translated into every language HA ships and lives in the
-lazily-loaded `lovelace` translation fragment — which is loaded whenever an editor is
+lazily-loaded `lovelace` translation fragment, which is loaded whenever an editor is
 open, so a card editor can borrow it.
 
 ## Icons and more-info (VERIFIED)
@@ -815,7 +815,7 @@ open, so a card editor can borrow it.
 own initial promise group, so a card can render `<ha-icon icon="mdi:…">` with no import dance.
 Re-check with the script in the `ha-form` section above, substituting the tag names.
 
-`ha-icon` takes its size from `--mdc-icon-size` and from nothing else — its `:host` rule is
+`ha-icon` takes its size from `--mdc-icon-size` and from nothing else: its `:host` rule is
 `width: var(--mdc-icon-size, 24px); height: var(--mdc-icon-size, 24px)`, with `fill:
 currentcolor`. A card that wants an icon to scale with its own layout has to set that property;
 there is no `size` attribute.
@@ -823,7 +823,7 @@ there is no `size` attribute.
 Two reasons to reach for `ha-icon` rather than an inlined `@mdi/js` path, and one against.
 For: it resolves whatever name the user put in `attributes.icon`, which a card cannot enumerate
 ahead of time, and it goes through HA's own icon cache. Against: it resolves asynchronously out
-of IndexedDB, so anything measured off the glyph is measured at the wrong height for a frame —
+of IndexedDB, so anything measured off the glyph is measured at the wrong height for a frame,
 which is why the calendar's all-day badge is an inlined path and the battery card's device icon
 is not. The battery icon's size is a CSS length, not a measurement.
 
@@ -850,12 +850,12 @@ docker run --rm --entrypoint bash ghcr.io/home-assistant/home-assistant:stable -
 
 ### The device classes the battery card leans on
 
-`sensor` has `battery` (a percentage) and `binary_sensor` has `battery_charging` — both in
+`sensor` has `battery` (a percentage) and `binary_sensor` has `battery_charging`, both in
 `/usr/src/homeassistant/homeassistant/components/*/__init__.py` inside the image, which is
 where core's Python lives; `site-packages/homeassistant` is only the dist-info licence copy.
 A single `filter: { domain: 'sensor', device_class: 'battery' }` clause is therefore enough to
 turn the card's picker from every sensor in the installation into the dozen that are batteries.
-`battery_charging` is not in a picker at all — `charging_entity` is per row, and a multiple
+`battery_charging` is not in a picker at all: `charging_entity` is per row, and a multiple
 entity picker cannot express that (see `CupertinoCardEditor`'s `toForm`/`fromForm`).
 
 ## Navigating out of a card (VERIFIED)
@@ -890,7 +890,7 @@ const navigate = async (path, options) => {
 
 The listener is `window.addEventListener('location-changed', …)` on the panels and on
 `hass-tabs-subpage-data-table`, so the event has to reach a **window**, not a card's ancestor.
-`src/core/navigate.ts` is this function less the dialog preamble — that reads
+`src/core/navigate.ts` is this function less the dialog preamble, which reads
 `history.state.dialog` and needs the frontend's own dialog registry, and a card on a dashboard
 has no dialog of its own to close.
 
@@ -946,7 +946,7 @@ const routeFromClick = (event, preventDefault = true) => {
 ```
 
 Its callers are the point. The only `document.body.addEventListener('click', …)` that uses it
-is in **`custom-panel.js`** — the iframe wrapper around third-party panels, forwarding link
+is in **`custom-panel.js`**, the iframe wrapper around third-party panels, forwarding link
 clicks to the parent. Inside the app it is called from specific elements on their own clicks
 (`hass-tabs-subpage._tabClicked`). So an `<a href="/todo">` in a card's shadow root is handled
 by the browser: a full document load, the whole frontend again. HA's own
@@ -963,7 +963,7 @@ frontend.async_register_built_in_panel(hass, "todo", "todo", "mdi:clipboard-list
 ```
 
 So `/calendar` and `/todo`, and each key is absent when its integration is not loaded. HA's own
-cards test exactly that before offering a link —
+cards test exactly that before offering a link:
 `this._config.link_dashboard && this.hass.panels.energy ? … : nothing` in
 `hui-energy-distribution-card`. Entry shape: `component_name`, `url_path`, `title`, `icon`,
 `config`.
@@ -988,7 +988,7 @@ _setupTodoElement() {
 }
 ```
 
-`add_item` is the second parameter — it opens the add-item dialog. `_entityId` is also
+`add_item` is the second parameter: it opens the add-item dialog. `_entityId` is also
 persisted (`@storage({ key: 'selectedTodoEntity' })`), which is why passing the parameter
 matters: without it the panel opens whichever list was last looked at.
 
@@ -1015,10 +1015,10 @@ addressable surface and it opens on today.
 
 `visible` follows `_hover`/`_focused`/`_touchStarted`, so by the time a click lands the overlay
 has it, and `_handleOverlayClick` turns it into `ll-edit-card`. A `preview`-based guard inside
-a card would be dead code — and see `CupertinoCard.preview` on why that property does not mean
+a card would be dead code. See `CupertinoCard.preview` on why that property does not mean
 what its name suggests anyway.
 
-## Theming — HA has a real design-token system now
+## Theming: HA has a real design-token system now
 
 Legacy card vars (still present):
 `--ha-card-background`, `--ha-card-border-radius`, `--ha-card-border-width`,
@@ -1026,7 +1026,7 @@ Legacy card vars (still present):
 `--ha-card-header-color`, `--ha-card-header-font-family`, `--ha-card-header-font-size`,
 `--ha-card-feature-gap`, `--ha-card-features-border-radius`
 
-Newer token scales — these are what we bridge our Cupertino tokens onto:
+Newer token scales (these are what we bridge our Cupertino tokens onto):
 
 - Typography: `--ha-font-family-body|heading|code|longform`,
   `--ha-font-size-xs|s|m|l|xl|2xl|3xl|4xl|5xl`, `--ha-font-size-scale`,
@@ -1038,11 +1038,11 @@ Newer token scales — these are what we bridge our Cupertino tokens onto:
 Consuming these means a user theme restyles our cards for free, while our own
 `--cw-*` layer adds the Cupertino rhythm on top.
 
-## Toolchain — probed locally, not guessed
+## Toolchain: probed locally, not guessed
 
 Current registry versions (2026-07-25): lit **3.3.3**, vite **8.1.5**,
 typescript **7.0.2**, eslint 10.8.0, prettier 3.9.6,
-custom-card-helpers 2.0.0 (published 2026-02-21 — alive again),
+custom-card-helpers 2.0.0 (published 2026-02-21, alive again),
 home-assistant-js-websocket 9.6.0.
 
 ### Vite 8 is Rolldown-based, and esbuild is GONE
@@ -1071,7 +1071,7 @@ build: {
 ```
 
 Result: one 21.6 kB file (7.2 kB gzip) with Lit bundled in, **zero** leftover bare
-imports — verified by regex over the output. No separate CSS file (Lit `css` tagged
+imports, verified by regex over the output. No separate CSS file (Lit `css` tagged
 templates stay in JS).
 
 ### Decorators: experimental, and TS 7 still supports them
@@ -1088,7 +1088,7 @@ Vite 8/Rolldown transpiles the experimental form correctly (`__decorate([...])`
 present in output, `customElements.define` emitted). So: stay on experimental
 decorators; it is the path with zero friction across TS 7 + Vite 8 + Lit 3.
 
-## Dev-loop plumbing — proven end to end
+## Dev-loop plumbing, proven end to end
 
 Host `./dist` -> container `/config/www/cupertino-widgets/` -> served at
 `/local/cupertino-widgets/cupertino-widgets.js`, **HTTP 200 verified with curl**.
@@ -1117,7 +1117,7 @@ registerRoute(/\/.*/, new StaleWhileRevalidate({               // <-- /local/ la
 ```
 
 Identified from the minified `_handle` bodies rather than from strings, since the strategy
-names do not survive the build — `StaleWhileRevalidate` is the one that fires
+names do not survive the build: `StaleWhileRevalidate` is the one that fires
 `fetchAndCachePut`, `waitUntil`s it, and then prefers `cacheMatch`:
 
 ```js
@@ -1135,7 +1135,7 @@ expected is when your code shows up. That reads as flakiness and sends you looki
 wrong place.
 
 A hard reload does not fix it, and the reason is worth writing down: HA loads a dashboard
-resource by appending a script element at runtime —
+resource by appending a script element at runtime:
 
 ```js
 // deminified: the `module` branch of the panel/resource loader
@@ -1148,14 +1148,14 @@ subresources the parser found in the HTML. A fetch a script issues afterwards is
 it goes through the worker as usual, and the revalidation the worker fires behind it is
 answered by the month-old HTTP entry.
 
-Both caches key on the full URL **including the query** — that catch-all sets no
-`ignoreSearch`, unlike the `/static/` route above it — so bumping `?v=` on the resource is
+Both caches key on the full URL **including the query**: that catch-all sets no
+`ignoreSearch`, unlike the `/static/` route above it, so bumping `?v=` on the resource is
 what misses both. `pnpm verify` does that and force-recreates; `dev/bump-resource.mjs` is
 the bump. The interactive alternative is DevTools -> Application -> Service Workers ->
 "Bypass for network" plus "Disable cache", both of which last only as long as DevTools is
 open.
 
-## Dev HA instance config — the clean way to pin the resource
+## Dev HA instance config, the clean way to pin the resource
 
 `lovelace.resource_mode` is a real, current key (`CONF_RESOURCE_MODE = "resource_mode"`
 in `components/lovelace/const.py`), independent of the dashboard `mode`:

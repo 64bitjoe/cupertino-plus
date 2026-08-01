@@ -1,18 +1,18 @@
 /**
  * Step one of the widget's layout: turn a pile of items into the single ordered
- * stream that both sizes render — Apple's widget is one flow of rows, and the medium
+ * stream that both sizes render. Apple's widget is one flow of rows, and the medium
  * layout just pours that flow through two columns.
  *
  * The rules, in order:
  *
  *  1. today and forwards only, out to `LOOKAHEAD_DAYS`;
- *  2. anything already finished is dropped, anything running now stays — though a
+ *  2. anything already finished is dropped, anything running now stays, though a
  *     finished item is still counted, so a day that is over can say so;
- *  3. inside a day: all-day first, then by start time — reminders and events share
+ *  3. inside a day: all-day first, then by start time, reminders and events share
  *     one stream rather than being separated;
  *  4. days with nothing in them vanish completely, headings and all, so an empty
  *     Saturday is not a gap between Friday and Sunday;
- *  5. today gets no heading — the widget's own date block already says which day it is.
+ *  5. today gets no heading, since the widget's own date block already says which day it is.
  */
 
 import { dayNumber } from './datetime'
@@ -44,7 +44,7 @@ export interface Flow {
    */
   todayEmpty: boolean
   /**
-   * Today is empty because it is *over*, not because it was ever free — everything on
+   * Today is empty because it is *over*, not because it was ever free: everything on
    * it has already finished. Only ever true alongside `todayEmpty`, and the whole of
    * the difference between `No Events Today` and `No More Events Today`: the first one,
    * read at six in the evening of a day with three meetings behind it, says the card
@@ -90,7 +90,7 @@ export function buildFlow(items: readonly CalendarItem[], options: FlowOptions):
 
     const startDay = dayNumber(item.start, ctx.timeZone)
     // Something with a duration that began before today and has not ended is still
-    // happening, so it belongs to today rather than to the day it started on — else it
+    // happening, so it belongs to today rather than to the day it started on, else it
     // would fall off the back of the widget while it was going on. Something without a
     // duration gets no such reprieve: yesterday's reminder was for yesterday.
     const day = item.end && startDay < today ? today : startDay

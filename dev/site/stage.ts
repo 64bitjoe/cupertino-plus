@@ -6,7 +6,7 @@
  * subscription and its own measurement; the drag-to-resize box, whose size lives in the
  * inline style the browser's resize handle writes, so recreating it would snap it back;
  * and the visual editor, which Home Assistant's contract says is built once and kept.
- * All three are made here, cached by key, and handed to the templates as nodes —
+ * All three are made here, cached by key, and handed to the templates as nodes:
  * lit-html plants a `Node` value where it finds one and leaves it alone on every
  * subsequent render.
  *
@@ -29,7 +29,7 @@ export interface Footprint {
 /**
  * The two shapes the widgets are designed for.
  *
- * Not presets — the cards have none, and neither does their config. These are the two
+ * Not presets: the cards have none, and neither does their config. These are the two
  * footprints Apple's widgets come in, reached in Home Assistant by dragging in the
  * Layout tab: in a section of the usual 500px, 6 columns is 246px against a 4-row height
  * of 248px, which is the square, and 12 columns is 500px, which is the 2:1.
@@ -43,7 +43,7 @@ export const MEDIUM: Footprint = { columns: 12, rows: 4 }
  * For the Advanced panel, where the question is whether the in-between footprints hold
  * up rather than what the widget is meant to look like. Both floors `gridOptions()` allows
  * are in here: 4 columns, and the 3-row height, which is the one worth looking at with
- * **Scale** turned up — the date block takes the left column first, so the short
+ * **Scale** turned up, since the date block takes the left column first, so the short
  * footprints are where a scaled-up card runs out of room.
  */
 export const ODD_FOOTPRINTS: readonly Footprint[] = [
@@ -72,14 +72,14 @@ export const footprintBox = (footprint: Footprint, sectionWidth: number): Box =>
  * anybody makes crosses the line. Start it comfortably inside either layout and the
  * story reads as a third static size rather than as the one place the rule is felt.
  *
- * At 100%, that is — the threshold is compared against design units, so turning Scale down
+ * At 100%, that is, the threshold is compared against design units, so turning Scale down
  * moves the line out from under a box that has not moved and it begins on the wide side
  * instead. Left alone rather than recomputed, because the box's size stops being ours the
  * moment anybody drags it: snapping it back to a fresh start on an unrelated change would
  * undo their drag to preserve a first impression they have already had. The rule is still
  * demonstrable from either side, which is all the box is for.
  *
- * Set as an inline style on the element itself, once, when it is made — never from a
+ * Set as an inline style on the element itself, once, when it is made; never from a
  * template, because the resize handle writes to the same two properties and a template
  * that also owned them would undo every drag on the next render.
  */
@@ -111,7 +111,7 @@ const slots = new Map<string, Slot>()
 /**
  * The card for one slot, made on first ask and kept.
  *
- * Keyed by a name the caller chooses — `story:small`, `odd:9x4` — so a template can ask
+ * Keyed by a name the caller chooses (`story:small`, `odd:9x4`), so a template can ask
  * for the same card on every render without holding a reference to it.
  */
 export function slotCard(key: string, tag: string, config: SlotConfig = passThrough): LovelaceCard {
@@ -132,7 +132,7 @@ export function clearStage(): void {
 /**
  * Push the current config and `hass` into every card on the stage.
  *
- * `hass` first, then `setConfig` — the order Home Assistant uses, and the only one a
+ * `hass` first, then `setConfig`: the order Home Assistant uses, and the only one a
  * card that reads `hass` inside `setConfig` would survive.
  *
  * The fixture goes on last, over whatever the slot pinned down, so that changing Data in
@@ -140,7 +140,7 @@ export function clearStage(): void {
  * on the page not driven by the inspector would sit there showing yesterday's choice.
  *
  * A card whose config has not actually changed is left alone. `setConfig` stores a fresh
- * object, which is a state change, which is a re-render — and this runs after every
+ * object, which is a state change, which is a re-render, and this runs after every
  * render, including the sixty a second that dragging the resize corner produces. Eight
  * cards repainting on each of those for no reason is exactly the jank a page about
  * measuring things cannot afford.
@@ -173,7 +173,7 @@ const clamp = (value: number, low: number, high: number): number =>
 /**
  * The limits the box is actually under, read back rather than restated.
  *
- * The floor is Home Assistant's own — 4 columns by 3 rows — so it moves with the section
+ * The floor is Home Assistant's own (4 columns by 3 rows), so it moves with the section
  * width, which means it cannot be a constant here. `site.css` takes it from a custom
  * property the template sets, and this reads the same computed values, so the keyboard
  * and the mouse can never disagree about where the box stops.
@@ -191,7 +191,7 @@ const limitsOf = (box: HTMLElement): { minW: number; maxW: number; minH: number;
 /**
  * The resizable box, made once, with its card already inside it.
  *
- * `onResize` is handed the measured box on every frame of a drag — and once when the
+ * `onResize` is handed the measured box on every frame of a drag, and once when the
  * observer is first attached, which is what puts a real number under the box before
  * anyone has touched it.
  */
@@ -212,7 +212,7 @@ export function dragBox(card: Node, onResize: (box: Box) => void): HTMLElement {
 
   // `resize: both` is a mouse affordance and nothing else, and this box is the one thing
   // on the page anybody is meant to touch. Arrows move an edge by a grid gap, shift by a
-  // single pixel — enough to walk up to the threshold and step over it.
+  // single pixel: enough to walk up to the threshold and step over it.
   box.addEventListener('keydown', event => {
     const horizontal = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0

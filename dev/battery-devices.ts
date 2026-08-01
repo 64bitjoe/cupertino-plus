@@ -2,7 +2,7 @@
  * The devices the battery card is developed against, and the sets the harness points it at.
  *
  * Note where this lives. The calendar's fixtures are in `src/`, because they are
- * `CalendarItem`s — data that only exists on the far side of a websocket mapper, so the card
+ * `CalendarItem`s: data that only exists on the far side of a websocket mapper, so the card
  * itself has to be able to produce them and `demo_scenario` is the door. The battery card has
  * no such door and needs none: everything it draws comes out of `hass.states`, so a fixture
  * here is just a mock entity plus the config that points at it. Both belong to the harness,
@@ -89,7 +89,7 @@ type Row = string | { entity: string; charging_entity?: string; name?: string; i
  * The tablet, with the one thing its state cannot say.
  *
  * Written out rather than folded into the list below, because it is the only row in the whole
- * harness that has to be an object — and it is the row that proves the object form survives a
+ * harness that has to be an object, and it is the row that proves the object form survives a
  * trip through the visual editor.
  */
 const TABLET_ROW: Row = { entity: TABLET, charging_entity: 'binary_sensor.tablet_charging' }
@@ -99,7 +99,7 @@ const TABLET_ROW: Row = { entity: TABLET, charging_entity: 'binary_sensor.tablet
  *
  * One and two are the captioned row at both footprints; three and four are where the square
  * gives its percentages up and the wide card does not. `awkward` is four again with both
- * unhappy paths in it — a device that has stopped reporting, and one with no icon of its own.
+ * unhappy paths in it: a device that has stopped reporting, and one with no icon of its own.
  *
  * `overflow` is six, which is more than either of these footprints draws: four rings and two
  * devices silently undrawn, which is what a config written for the `large` size looks like

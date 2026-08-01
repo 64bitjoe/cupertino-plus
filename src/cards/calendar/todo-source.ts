@@ -1,7 +1,7 @@
 /**
  * Where the widget's reminder rows come from: Home Assistant's to-do lists.
  *
- * `source.ts`'s sibling — same job, same seam, a simpler protocol. Verified the same way,
+ * `source.ts`'s sibling: same job, same seam, a simpler protocol. Verified the same way,
  * by reading `homeassistant/components/todo/__init__.py` and the frontend bundle inside
  * home-assistant 2026.7.4 rather than from documentation:
  *
@@ -12,15 +12,15 @@
  *  - **there is no window.** A to-do list has no span to ask for, so what arrives is the
  *    WHOLE list however far out its due dates reach. `buildFlow` cuts it to the horizon,
  *    which it does to the events as well;
- *  - each push is `{ items: [...] }` — a full snapshot of that one list, never a delta —
+ *  - each push is `{ items: [...] }` (a full snapshot of that one list, never a delta),
  *    so a push replaces that list's rows and leaves the others alone;
  *  - the payload is `{ items: [] }` for a list that cannot be read, not `{ items: null }`:
  *    the handler is `[asdict(i) for i in todo_items or []]`, so unlike the calendar
- *    subscription there is no null case. Guarded anyway, at the cost of one `Array.isArray`
- *    — a push is a socket callback, and a `for … of` over something that turned out not to
+ *    subscription there is no null case. Guarded anyway, at the cost of one `Array.isArray`:
+ *    a push is a socket callback, and a `for … of` over something that turned out not to
  *    be a list would throw where nothing is waiting to catch it;
  *  - the subscribe handler pushes an initial snapshot itself, but only after
- *    `send_result`, so — as with the calendar — there is nothing to await for data;
+ *    `send_result`, so, as with the calendar, there is nothing to await for data;
  *  - a to-do list has no colour anywhere in Home Assistant. There is no `options.todo` in
  *    the entity registry and no colour in the to-do panel (both checked in the bundle), so
  *    the palette is not a fallback here, it is the whole answer.
@@ -28,14 +28,14 @@
  * On the wire an item is `dataclasses.asdict(TodoItem)` with **no dict factory**, which is
  * the one place this differs from the calendar in a way that matters: every field is
  * present, and the unset ones are `null` rather than omitted. `due` is whatever
- * `datetime.date | datetime.datetime` the integration stored, serialised by orjson — so a
+ * `datetime.date | datetime.datetime` the integration stored, serialised by orjson, so a
  * bare `2026-07-26` for a date, an ISO datetime otherwise, and that datetime may be naive
  * (`2026-07-26T10:30:00`) because nothing on the way out makes it aware. `status` is the
  * `TodoItemStatus` enum's value, `needs_action` or `completed`.
  *
  * One detail from `local_todo` worth knowing, because it looks like the calendar's
  * exclusive-end trap and is not: rfc5545 due dates are exclusive, so the store keeps a
- * date-only due a day forward — and shifts it back again on the way out
+ * date-only due a day forward, and shifts it back again on the way out
  * (`due -= timedelta(days=1)` in its `_convert_item`). The date that arrives here is the
  * day the item is due, inclusive, and needs no correction of its own.
  */
@@ -49,7 +49,7 @@ import { paletteColor } from './source'
  * One to-do item, as the subscription pushes it.
  *
  * Typed as loosely as `CalendarEventPayload` and for the same reason: this is the
- * boundary. `description` and `completed` are on the wire too and are not read — a
+ * boundary. `description` and `completed` are on the wire too and are not read: a
  * reminder row has one line for a title and nothing else.
  */
 export interface TodoItemPayload {
@@ -66,7 +66,7 @@ export interface TodoPush {
 
 const TODO_DOMAIN = 'todo.'
 
-/** Same state and the same reasoning as `discoverCalendars` — see `source.ts`. */
+/** Same state and the same reasoning as `discoverCalendars`; see `source.ts`. */
 const UNAVAILABLE = 'unavailable'
 
 /** The one status that means this is no longer a thing you have to do. */
@@ -80,7 +80,7 @@ const COMPLETED = 'completed'
  * Absent means yes, so a dashboard that says nothing about to-do lists gets them the way
  * it gets every calendar. The switch exists because "every list" is not a sensible thing
  * to be unable to opt out of: a shopping list with dates on it is a legitimate thing to
- * keep out of a calendar widget, and the entity picker cannot say *none* — `ha-form`
+ * keep out of a calendar widget, and the entity picker cannot say *none*: `ha-form`
  * reports an emptied list as `[]`, which is exactly what "I chose nothing" and "I chose
  * everything" both look like there (see `applyFormData`).
  *
@@ -148,7 +148,7 @@ export const todoListsFor = (value: unknown, hass: HomeAssistant | undefined): s
  *
  * **No `due`, no row.** A calendar widget files things under days, and an item with no
  * due date has no day to be filed under. That is most of any real to-do list, so this is
- * the filter that keeps a shopping list from becoming a wall of undated rows — not an
+ * the filter that keeps a shopping list from becoming a wall of undated rows, not an
  * error case.
  *
  * **A ticked item is done.** `completed` is dropped, and dropped by name rather than by
@@ -156,8 +156,8 @@ export const todoListsFor = (value: unknown, hass: HomeAssistant | undefined): s
  * that omits it would lose every item to the stricter test, and an item with no status is
  * still an item that has to be drawn.
  *
- * **A date with no time is `allDay`.** It is the same fact the flag carries for an event —
- * this belongs to a day, not to a moment — and it buys the two behaviours that go with it:
+ * **A date with no time is `allDay`.** It is the same fact the flag carries for an event
+ * (this belongs to a day, not to a moment), and it buys the two behaviours that go with it:
  * the row prints no time (there is none to print, and `12:00AM` would be an invention) and
  * sorts to the top of its day with the all-day entries. What it does NOT get is an `end`:
  * a reminder without one is never retired by `isOver`, so an item due at ten this morning
@@ -199,8 +199,8 @@ export const toReminderItem = (
 /**
  * Holds one subscription per to-do list and reports the reminder rows they push.
  *
- * `CalendarFeed`'s counterpart, and it keeps the same three rules — one subscription per
- * entity, one snapshot per entity, nothing torn down that has not moved — while being
+ * `CalendarFeed`'s counterpart, and it keeps the same three rules (one subscription per
+ * entity, one snapshot per entity, nothing torn down that has not moved) while being
  * shorter in two ways that follow from the protocol:
  *
  *  - no window, so no key to compare and no rollover that invalidates everything. The
@@ -210,7 +210,7 @@ export const toReminderItem = (
  *
  * The one place it is deliberately *unlike* `CalendarFeed`: it keeps the wire payloads per
  * list and maps them on the way out, rather than mapping on the way in. A row's colour is
- * a property of the CURRENT list of lists — the palette is positional — so a list
+ * a property of the CURRENT list of lists (the palette is positional), so a list
  * appearing has to re-colour the rows already on screen, and rows mapped when they
  * arrived would keep the old shade until their own list happened to push again.
  */
@@ -284,7 +284,7 @@ export class TodoFeed {
 
   /**
    * Called when the card leaves the DOM, when it is drawing fixtures, and on every
-   * reconcile while reminders are switched off — which is why it answers early when there
+   * reconcile while reminders are switched off, which is why it answers early when there
    * is nothing to stop. Publishing an empty list over an empty list is a repaint for
    * nothing, and this one would be doing it per state change.
    */
@@ -306,7 +306,7 @@ export class TodoFeed {
       )
 
       // Superseded while the handle was in flight, so it is ours to close and nobody
-      // else's — the entry in `_live` now belongs to a newer subscription.
+      // else's; the entry in `_live` now belongs to a newer subscription.
       const live = this._live.get(entityId)
       if (live?.token !== token) {
         await unsubscribe()
@@ -324,7 +324,7 @@ export class TodoFeed {
 
   private _receive(entityId: string, push: TodoPush, token: object): void {
     // A push from a subscription that has been closed or replaced. The socket can still be
-    // delivering for it — an unsubscribe is itself a round trip.
+    // delivering for it. An unsubscribe is itself a round trip.
     if (this._live.get(entityId)?.token !== token) return
 
     this._snapshots.set(entityId, Array.isArray(push?.items) ? push.items : [])

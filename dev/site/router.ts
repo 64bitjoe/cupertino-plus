@@ -17,7 +17,7 @@ const idFromHash = (): string => location.hash.replace(/^#\/?/, '').split('/')[0
  * The widget the URL is asking for.
  *
  * An unknown id falls back to the first widget rather than showing an error, and the
- * URL is corrected on the way — a stale link from an older build should land somewhere
+ * URL is corrected on the way: a stale link from an older build should land somewhere
  * sensible, not on a page explaining that it did not.
  */
 export function startRouter(onRoute: (widget: Widget) => void): void {

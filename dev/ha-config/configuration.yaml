@@ -127,7 +127,7 @@ lovelace:
     # Bump this when the browser will not let go of an old bundle, then:
     #   pnpm ha:up
     # NOT `docker compose restart`: that keeps the existing container, and on Docker
-    # Desktop its bind mount of ./dist comes back stale — the container ends up seeing an
+    # Desktop its bind mount of ./dist comes back stale: the container ends up seeing an
     # empty directory and serving 404 for a bundle that is sitting right there on the
     # host. `ha:up` force-recreates, which re-resolves the mount. Same failure the README
     # warns about for `rm -rf dist`, reached by a different route.

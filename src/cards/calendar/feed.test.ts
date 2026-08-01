@@ -7,17 +7,17 @@ import { CalendarFeed, subscriptionWindow, type CalendarPush } from './source'
 /**
  * The subscription controller, driven through a fake `hass`.
  *
- * The rest of the card is untested for the reason `vitest.config.ts` gives — there is no
- * DOM here — but this is not the card: `HassConnection` is one method, so the whole
- * lifecycle is reachable from node. It is also the part with no pixels to check it, and
- * every rule it keeps is about a sequence rather than a value. A push arriving for a
+ * The rest of the card is untested for the reason `vitest.config.ts` gives: there is no
+ * DOM here. This file is the exception, though, since `HassConnection` is one method, so
+ * the whole lifecycle is reachable from node. It is also the part with no pixels to check
+ * it, and every rule it keeps is about a sequence rather than a value. A push arriving for a
  * calendar the user just deselected cannot be seen by looking at a screenshot.
  */
 
 const WARSAW = 'Europe/Warsaw'
 const NOW = new Date('2026-07-26T12:00:00+02:00')
 const WINDOW = subscriptionWindow(NOW, 14)
-/** A day later, so the window key moves — the midnight-rollover case. */
+/** A day later, so the window key moves: the midnight-rollover case. */
 const NEXT_WINDOW = subscriptionWindow(new Date('2026-07-27T12:00:00+02:00'), 14)
 
 const timed = (summary: string): Record<string, unknown> => ({
@@ -127,7 +127,7 @@ const reconcile = async (h: Harness, ids: string[], window = WINDOW): Promise<vo
  * Let the awaits inside a reconcile run without letting the deferred subscribe finish.
  *
  * There is a real await between `reconcile` being called and `subscribeMessage` being
- * reached — the colour lookup — so a test that released the deferred subscribes
+ * reached (the colour lookup), so a test that released the deferred subscribes
  * immediately would release nothing and then wait forever for a call that had not
  * happened yet.
  */
@@ -137,8 +137,8 @@ const settle = async (): Promise<void> => {
 
 describe('one subscription per calendar', () => {
   /**
-   * `cv.entity_domain` takes exactly one entity — "Expected exactly 1 entity, got 2" —
-   * so a card showing three calendars really does open three subscriptions.
+   * `cv.entity_domain` takes exactly one entity, throwing "Expected exactly 1 entity, got 2"
+   * otherwise, so a card showing three calendars really does open three subscriptions.
    */
   it('opens one per calendar, with the window on each', async () => {
     const h = harness()
@@ -281,7 +281,7 @@ describe('the async gap', () => {
   /**
    * `subscribeMessage` resolves its unsubscribe handle a turn of the event loop after the
    * call. A card torn out of the DOM in that gap would otherwise be left holding a live
-   * subscription with nothing to close it — the leak this guard exists for.
+   * subscription with nothing to close it; that is the leak this guard exists for.
    */
   it('closes a handle that arrives after the card has gone', async () => {
     const h = harness({ defer: true })
@@ -314,8 +314,8 @@ describe('the async gap', () => {
   /**
    * The reconcile that gets overtaken still owes its calendars a subscription.
    *
-   * A second reconcile adding a calendar skips the ones the first already claimed —
-   * that is what stops a double subscribe — so if the first then gave up on being
+   * A second reconcile adding a calendar skips the ones the first already claimed (that
+   * is what stops a double subscribe), so if the first then gave up on being
    * overtaken, those calendars would be claimed by nobody and stay silent for as long as
    * the card lived. Nothing would ever retry them: a later reconcile sees them as taken.
    */
@@ -343,7 +343,7 @@ describe('the async gap', () => {
   /**
    * A window rollover landing in the async gap replaces every claim. The subscribe still
    * in flight for the old window must close its own handle and not overwrite the new
-   * one's — which is why the token is carried in rather than read back.
+   * one's, which is why the token is carried in rather than read back.
    */
   it('does not strand a subscription when the window rolls over mid-flight', async () => {
     const h = harness({ defer: true })
@@ -368,7 +368,7 @@ describe('the async gap', () => {
 
 describe('failure', () => {
   /**
-   * One bad entity id in the config — a calendar the user deleted — costs that
+   * One bad entity id in the config (a calendar the user deleted) costs that
    * calendar's rows and nothing else. The alternative is a card that goes blank because
    * of a line the user forgot to remove.
    */
@@ -393,7 +393,7 @@ describe('failure', () => {
   })
 
   /**
-   * `{ events: null }` is how a failed fetch arrives — on the subscription, not as an
+   * `{ events: null }` is how a failed fetch arrives: on the subscription, not as an
    * error. Emptied rather than forgotten: the next poll may well succeed.
    */
   it('empties a calendar that Home Assistant could not read', async () => {

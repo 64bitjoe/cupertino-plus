@@ -1,15 +1,15 @@
 /**
- * TEMPORARY — goes away with the websocket subscription.
+ * TEMPORARY: goes away with the websocket subscription.
  *
  * Hand-built days that exercise every branch of the layout: an empty today and a
  * finished one, a skipped empty tomorrow, locations that fit and locations that do not,
- * reminders mixed into the same stream as events — due at a time and due on a date, which
- * are two different rows — an all-day entry, and a tail that runs out of column.
+ * reminders mixed into the same stream as events (due at a time and due on a date, which
+ * are two different rows), an all-day entry, and a tail that runs out of column.
  *
  * Times for *today* are anchored to the current clock rather than written out, so the
- * card still has something to show at four in the afternoon — and, since the spacing
+ * card still has something to show at four in the afternoon, and, since the spacing
  * shrinks with what is left of the day, at eleven at night as well. Later days use plain
- * clock times — nothing filters them out.
+ * clock times, so nothing filters them out.
  */
 
 import type { CalendarItem } from './model'
@@ -36,7 +36,7 @@ const on = (now: Date, offset: number, hours: number, minutes = 0): Date => {
   return date
 }
 
-/** `now` rounded up to the next half hour — the anchor for everything happening today. */
+/** `now` rounded up to the next half hour: the anchor for everything happening today. */
 const soon = (now: Date): Date => {
   const date = new Date(now)
   date.setSeconds(0, 0)
@@ -58,12 +58,12 @@ const TODAY_STEPS = 6
  *
  * A fixed hour is right until about six in the evening and then quietly takes the fixture
  * apart. `after(base, 4)` at ten at night is a dentist's appointment at half past two in the
- * MORNING, which the day filter moves to tomorrow — so `a normal day` serves up one event
+ * MORNING, which the day filter moves to tomorrow, so `a normal day` serves up one event
  * and `three events` serves up one, in exactly the hours somebody is most likely to be
  * sitting in front of the harness. Compressed instead: the same shape of day, an evening's
  * worth of it, and every event still on the day the scenario meant.
  *
- * The last half hour before midnight is not rescued and is not worth rescuing — `soon`
+ * The last half hour before midnight is not rescued and is not worth rescuing; `soon`
  * rounds up into tomorrow there, and a day with fifteen minutes left in it has an honest
  * claim to being over.
  */
@@ -91,7 +91,7 @@ type Draft = Omit<CalendarItem, 'id' | 'entityId'>
  * The entities the fixtures pretend to have come out of.
  *
  * One of each kind, filled in centrally rather than written on forty drafts, because no
- * scenario below is about *which* calendar or list a row belongs to — the colours already
+ * scenario below is about *which* calendar or list a row belongs to. The colours already
  * carry that distinction, and a per-draft entity would be a second way to say the same thing
  * and a second way to get it wrong. What they buy is a row that can answer `itemTarget`, so
  * the tap behaviour is the same shape in the harness as in a dashboard.
@@ -159,7 +159,10 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   /** `No Events Today` on the left, the flow starting on the right. */
   'today-empty': now => laterDays(now),
 
-  /** The other empty today: it had events, they are all behind us — `No More Events Today`. */
+  /**
+   * The other empty today: it had events, but they are all behind us, so this is `No More
+   * Events Today`.
+   */
   'today-done': now => [
     { kind: 'event', title: 'Standup', start: earlier(now, 4), end: earlier(now, 3), color: WORK },
     {
@@ -260,7 +263,7 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   },
 
   /**
-   * Reminders and events in one stream, ordered by time rather than by kind — and both
+   * Reminders and events in one stream, ordered by time rather than by kind, and both
    * shapes a to-do arrives in: one due at a time, which reads like an event, and one due on
    * a date, which is a single line at the top of the day with no midnight invented for it.
    */
@@ -288,7 +291,7 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
   },
 
   /**
-   * All-day entries: first in the day, one row, no time — and the reference screenshot
+   * All-day entries: first in the day, one row, no time, and the reference screenshot
    * for what that one row buys. Medium fits the whole flow, `1 + 3` beside `1 + 2+2+2`.
    * Small gets `1 + 2` with a row left over, which goes on the location: two items and a
    * location, which two timed events could never have managed.

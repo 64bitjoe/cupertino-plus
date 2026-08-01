@@ -8,8 +8,8 @@ import { remindersEnabled } from './todo-source'
 export const CALENDAR_EDITOR_TAG = 'cupertino-widgets-calendar-editor'
 
 /**
- * Partly localised: Home Assistant has a translated string for the calendar list — its own
- * calendar card uses it — and one for the to-do lists, which is the name of its own to-do
+ * Partly localised: Home Assistant has a translated string for the calendar list (its own
+ * calendar card uses it) and one for the to-do lists, which is the name of its own to-do
  * panel rather than a card label, but it is the same words in the user's language and the
  * alternative is English. There is nothing for the other two rows. `localize` answers an
  * empty string for a key it does not know, which is what the `||`s are for.
@@ -19,7 +19,7 @@ const TODO_LISTS_KEY = 'panel.todo'
 
 /**
  * Four rows of the card's own, and it took a detour to get here. (A fifth, **Scale**,
- * arrives from `CupertinoCardEditor` — it belongs to every card in the library, not to
+ * arrives from `CupertinoCardEditor`, since it belongs to every card in the library, not to
  * this one.)
  *
  * There was a `size` row as well: two tiles, Small and Medium, each with a line of copy.
@@ -33,7 +33,7 @@ const TODO_LISTS_KEY = 'panel.todo'
  *
  * What remains is the questions the card cannot answer for itself: where its rows come
  * from, and which clock to print them on. The clock is here for a narrower reason than the
- * entities are — see `TIME_FORMAT_OPTIONS`.
+ * entities are. See `TIME_FORMAT_OPTIONS`.
  */
 const CLOCK_LABELS: Record<string, string> = {
   system: 'System',
@@ -44,7 +44,7 @@ const CLOCK_LABELS: Record<string, string> = {
 const CALENDARS_ROW: HaFormSchema = {
   name: 'entities',
   /* `filter` is the current spelling. A bare `domain` still works, but only because
-     `ha-selector` migrates it on the way in — and it drops a `supported_features`
+     `ha-selector` migrates it on the way in, and it drops a `supported_features`
      sitting beside it while it does, silently. */
   selector: { entity: { multiple: true, filter: { domain: 'calendar' } } },
 }
@@ -61,8 +61,8 @@ const TODO_LISTS_ROW: HaFormSchema = {
 
 const CLOCK_ROW: HaFormSchema = {
   name: 'time_format',
-  /* Three options, so `ha-selector` renders radio buttons rather than a dropdown —
-     under six is its own threshold, not ours. */
+  /* Three options, so `ha-selector` renders radio buttons rather than a dropdown: under
+     six is its own threshold, not ours. */
   selector: {
     select: {
       options: TIME_FORMAT_OPTIONS.map(value => ({
@@ -76,10 +76,10 @@ const CLOCK_ROW: HaFormSchema = {
 /**
  * The calendar card's visual editor.
  *
- * Where the card's rows come from and which clock it draws them on — plus the library-wide
+ * Where the card's rows come from and which clock it draws them on, plus the library-wide
  * **Scale** the base adds. The footprint belongs to the Layout tab, and everything else
- * about how the card is drawn it works out from the box it ends up in and that one factor
- * — see `docs/calendar-widget-rules.md`.
+ * about how the card is drawn it works out from the box it ends up in and that one factor;
+ * see `docs/calendar-widget-rules.md`.
  */
 class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig> {
   /**
@@ -107,7 +107,7 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
     return { time_format: 'system', show_reminders: true }
   }
 
-  /** The default branches hand the shared rows back to the base — see `CupertinoCardEditor`. */
+  /** The default branches hand the shared rows back to the base: see `CupertinoCardEditor`. */
   protected override label(schema: HaFormSchema): string {
     switch (schema.name) {
       case 'entities':
@@ -136,7 +136,7 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
         return 'Leave empty to read every to-do list.'
       case 'time_format':
         // Worth spelling out: "System" is the Home Assistant profile setting, not the
-        // operating system's — and the profile's own detection cannot see, for instance,
+        // operating system's, and the profile's own detection cannot see, for instance,
         // macOS's 24-hour switch, which is exactly when the other two earn their place.
         return 'System follows your Home Assistant time format. Pick one to override it.'
       default:

@@ -30,7 +30,7 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
   /** Calendar entities to show. Empty/absent means "every calendar", decided at render. */
   entities?: string[]
   /**
-   * Whether to draw reminders — the to-do items that carry a due date — beside the events.
+   * Whether to draw reminders (the to-do items that carry a due date) beside the events.
    *
    * Absent means yes, so the to-do lists behave like the calendars: say nothing and you
    * get all of them. `false` is the one thing the entity picker below cannot express, since
@@ -53,10 +53,10 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
   /**
    * Which fixture from `demo-data.ts` to draw INSTEAD of the user's calendars.
    *
-   * For the dev harness, and nothing else. Absent — which is what every dashboard has,
-   * in edit mode as much as out of it — means live data, and there is no other way to
-   * reach a fixture: this key quietly defaulting to one is exactly how the card came to
-   * show strangers' lunch plans in a real Home Assistant.
+   * For the dev harness, and nothing else. Absent (which is what every dashboard has, in
+   * edit mode as much as out of it) means live data, and there is no other way to reach a
+   * fixture: this key quietly defaulting to one is exactly how the card came to show
+   * strangers' lunch plans in a real Home Assistant.
    */
   demo_scenario?: string
 }
@@ -78,7 +78,7 @@ const NO_MORE_EVENTS_TODAY = 'No More Events Today'
  *
  * `mdiCalendarMonth` inks x 3–21 and y 1–21, so (12, 11) is its centre and 18 is its
  * width. The transform lands it 10 units wide on a badge whose viewBox is 1:1 with CSS
- * pixels at `scale: 100`, so the calendar draws 10px there — half the disc, and set by
+ * pixels at `scale: 100`, so the calendar draws 10px there: half the disc, and set by
  * what survives being drawn that small rather than by any ratio. Above and below 100% the
  * whole badge is one length like any other and takes the glyph with it; what stays fixed
  * is the proportion, which is what the choice of 10 was about.
@@ -89,17 +89,17 @@ const GLYPH = 'translate(10 10) scale(0.5556) translate(-12 -11)'
  * The all-day badge: a filled circle with a calendar knocked out of it.
  *
  * It replaces the colour bar, and it has to, because an all-day row has nothing else
- * left to identify it by — no time under the title, no location.
+ * left to identify it by: no time under the title, no location.
  *
- * The path comes from `@mdi/js` — the same icon set Home Assistant draws the rest of
- * the dashboard from, so the badge belongs to the surrounding UI rather than to this
+ * The path comes from `@mdi/js` (the same icon set Home Assistant draws the rest of
+ * the dashboard from), so the badge belongs to the surrounding UI rather than to this
  * card. It is a bare path string and tree-shakes down to that one string, which is why
  * the package can be a dependency without the bundle noticing.
  *
  * Inlined rather than handed to `<ha-icon>` though, and that part is not incidental:
  * the row is priced in pixels by `layout.ts`, and an icon arriving a frame late out of
  * HA's icon registry would be measured at the wrong height. The dev harness has no
- * registry at all — `dev/ha-stubs.ts` does not stub one — so `<ha-icon>` there is an
+ * registry at all: `dev/ha-stubs.ts` does not stub one, so `<ha-icon>` there is an
  * empty box, and the README screenshots are taken in that harness.
  */
 const ALL_DAY_BADGE = html`
@@ -112,7 +112,7 @@ const ALL_DAY_BADGE = html`
 /**
  * The calendar widget.
  *
- * The interesting part is not in here — it is in `flow.ts` (what to show, in what
+ * The interesting part is not in here: it is in `flow.ts` (what to show, in what
  * order) and `layout.ts` (how much of it fits). This class measures the card, asks
  * those two, and draws the answer. See `docs/calendar-widget-rules.md`.
  */
@@ -121,7 +121,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     CupertinoCard.styles,
     css`
       /* Every px in this stylesheet is a design unit multiplied by --cw-scale, and
-         layout.ts holds the same numbers unscaled — it divides the measured box by the
+         layout.ts holds the same numbers unscaled; it divides the measured box by the
          factor instead. So the comments below go on naming the sizes the card is drawn at
          at 100%, which are the sizes the budget is priced in. */
       .widget {
@@ -196,11 +196,11 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       /* What did not fit: "2 more events".
 
          A caption, not a card. It borrows the event rail to say which calendar you are
-         missing, and pointedly not the tint behind it — a tinted row would read as one
+         missing, and pointedly not the tint behind it: a tinted row would read as one
          more event, when the whole point of the line is that those did not fit. The
          10px of padding lines its bar up with the bars of the rows above, and the 22px it
-         comes to is one of the three one-row heights layout.ts prices ROW against — a
-         heading is 20px, an all-day chip 24px — so this must stay short. */
+         comes to is one of the three one-row heights layout.ts prices ROW against (a
+         heading is 20px, an all-day chip 24px), so this must stay short. */
       .more {
         flex: none;
         min-width: 0;
@@ -214,8 +214,8 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
       /* ---- What a calendar's colour is worth -------------------------------- */
 
-      /* Four roles out of the one hex Home Assistant holds for a calendar — bar, title,
-         time, chip background — and the hue is the one thing that never moves. Only L and
+      /* Four roles out of the one hex Home Assistant holds for a calendar (bar, title,
+         time, chip background), and the hue is the one thing that never moves. Only L and
          C do, which is what makes the four read as one colour at four strengths.
          docs/calendar-widget-rules.md §1 has the table, the guards and the values these
          were checked against.
@@ -244,8 +244,8 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       }
 
       /* Dark is not light with the numbers nudged, and two of these say so. The bar takes
-         the title's job as well — one lifted colour for both, where the light theme drops
-         the title 0.29 below the bar — and the chip background is a lightness of its own
+         the title's job as well (one lifted colour for both, where the light theme drops
+         the title 0.29 below the bar), and the chip background is a lightness of its own
          rather than the base at low alpha over the surface. It cannot be that: an orange
          event's chip comes out #362714 against a widget on #1C1C1E, so its blue channel
          has to go BELOW the surface's, which no tint of a colour laid over it can do. */
@@ -280,12 +280,12 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       /* An all-day entry keeps the tint of an event and loses everything else: no time
          under the title, so the chip closes up around the one line it has. 22px of title
          inside 1px of padding is the 24px that layout.ts prices a single budget row at
-         (its ROW, less the gap) — this is the tallest one-row node there is, so it must
+         (its ROW, less the gap); this is the tallest one-row node there is, so it must
          not grow.
 
          A reminder reaches this rule too, when its to-do is due on a date with no time on
-         it. It keeps the bullet and the 10px inset the two-line rows use — the badge below
-         is a calendar, which is not what a to-do is — and comes to the same 24px, so the
+         it. It keeps the bullet and the 10px inset the two-line rows use (the badge below
+         is a calendar, which is not what a to-do is) and comes to the same 24px, so the
          budget does not have to know the difference. */
       .row.allday {
         align-items: center;
@@ -295,7 +295,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       /* The 2px on the left is the badge's inset, not a spacing step. A 24px chip with a
          12px inner radius ends in a semicircle of r=12; the badge is r=10 on the same
          centre, so it clears the chip by 2px right around that arc rather than only at the
-         sides. It is the smallest inset that still reads as one shape nested in another —
+         sides. It is the smallest inset that still reads as one shape nested in another:
          flush, the two rims merge into a single edge and the badge stops looking like a
          badge. Both radii and both insets move together or not at all. */
       .row.allday.event {
@@ -303,7 +303,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
       }
 
       /* 20px inside a 24px chip, so the badge clears the chip's edge by 2px on every
-         side — the row's own 1px of padding plus the 1px that centring 20 in 22 leaves
+         side: the row's own 1px of padding plus the 1px that centring 20 in 22 leaves
          over. Nothing here forces the vertical gap; it falls out of those two, which is
          why the width and the row's padding have to move together. */
       .badge {
@@ -407,11 +407,11 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    * The visual editor, which is worth more than the one field inside it.
    *
    * `hui-element-editor` renders its tab strip only inside the GUI branch, so a card
-   * that does not answer this gets no **Visibility** tab and no **Layout** tab either —
+   * that does not answer this gets no **Visibility** tab and no **Layout** tab either:
    * the user is handed a raw YAML box and nothing else.
    *
    * Home Assistant awaits this, so a plain element is as good as a promise. There is no
-   * waiting on the other side though — the deadline it does enforce is on resolving the
+   * waiting on the other side though: the deadline it does enforce is on resolving the
    * *card* tag out of `custom:…`, long before this runs, and whatever comes back here is
    * used as-is. So the editor tag has to be defined already: it is, because importing
    * this module imports the one that defines it.
@@ -425,7 +425,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    *
    * Kept in state and advanced on the minute, because half the rules are about now:
    * an event that has just finished has to leave, midnight has to turn `TOMORROW`
-   * into today. Nothing else would repaint the card — Home Assistant pushes entity
+   * into today. Nothing else would repaint the card: Home Assistant pushes entity
    * states, not the passage of time.
    */
   @state() private _now = new Date()
@@ -460,7 +460,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    *
    * That is worth spelling out, because `preview` reads like the place for it and is not.
    * `hui-section` assigns `preview = lovelace.editMode` to every card it holds, so it is
-   * true for the whole dashboard the moment the pencil is pressed — it means "the user is
+   * true for the whole dashboard the moment the pencil is pressed: it means "the user is
    * editing", not "this is a thumbnail". Keying fixtures off it turned every calendar on
    * the board into strangers' lunch plans on entering edit mode, which is the one moment
    * the user most needs to see which calendars they actually picked. HA's own cards use
@@ -506,7 +506,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    * because that is what puts a newly-appeared entity in the list at the moment its state
    * first differs from `undefined`.
    *
-   * An entity that goes away is the one case this cannot catch — it drops out of the
+   * An entity that goes away is the one case this cannot catch: it drops out of the
    * list before anything compares it. `hass` swaps often enough for another reason that
    * this has never been visible, and a subscription to a deleted entity is closed by
    * Home Assistant regardless.
@@ -598,16 +598,16 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    * Open the page behind an item: the calendar for an event, its own list for a reminder.
    *
    * A missing panel means nothing happens, rather than a navigation to Home Assistant's
-   * not-found page — see `itemTarget` for what `panel` is and `PanelInfo` for why presence is
-   * asked this way. It is a thin guard in a real installation, since a card drawing `todo.…`
-   * rows is one whose `todo` integration is loaded, and it earns its keep in the showcase:
-   * the harness's `hass` has no panels because it is not Home Assistant, so a row there dips
-   * under the finger and goes nowhere.
+   * not-found page; see `itemTarget` for what `panel` is and `PanelInfo` for why presence
+   * is asked this way. It is a thin guard in a real installation, since a card drawing
+   * `todo.…` rows is one whose `todo` integration is loaded, and it earns its keep in the
+   * showcase: the harness's `hass` has no panels because it is not Home Assistant, so a
+   * row there dips under the finger and goes nowhere.
    *
    * Nothing here checks for edit mode. Home Assistant's `hui-card-edit-mode` covers a card
-   * being edited with an overlay that takes `pointer-events: auto` the moment the pointer is
-   * over it and turns the click into "edit this card", so a row cannot be tapped through it
-   * — and a `preview` guard of our own would be dead code claiming otherwise.
+   * being edited with an overlay that takes `pointer-events: auto` the moment the pointer
+   * is over it and turns the click into "edit this card", so a row cannot be tapped
+   * through it; a `preview` guard of our own would be dead code claiming otherwise.
    */
   private _open(item: CalendarItem): void {
     const target = itemTarget(item)
@@ -692,7 +692,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
     // Deliberately not pressable, unlike the rows above it: the line exists to say those
     // events did NOT fit, and giving it the same feedback as a row would make it read as one
-    // more of them. It is a caption — see the `.more` rule in the stylesheet.
+    // more of them. It is a caption: see the `.more` rule in the stylesheet.
     if (row.node.type === 'more') {
       return html`
         <div class="more" style="--item-color: ${row.node.color}">

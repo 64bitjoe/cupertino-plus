@@ -2,7 +2,7 @@
  * Where the widget's event rows come from: Home Assistant's calendars.
  *
  * Everything above this file speaks `CalendarItem` and knows nothing about Home
- * Assistant — see `model.ts`. This file and `todo-source.ts` are the two that do, one per
+ * Assistant; see `model.ts`. This file and `todo-source.ts` are the two that do, one per
  * domain, because the two subscriptions have nothing in common but their shape. This one
  * carries the calendar protocol, verified by reading
  * `homeassistant/components/calendar/__init__.py` and the frontend bundle inside
@@ -10,22 +10,22 @@
  *
  *  - the command is `calendar/event/subscribe`, and its schema is strict
  *    (`vol.PREVENT_EXTRA`): exactly `type`, `entity_id`, `start`, `end`, no more;
- *  - `entity_id` is ONE entity, not a list — `cv.entity_domain` rejects two with
+ *  - `entity_id` is ONE entity, not a list: `cv.entity_domain` rejects two with
  *    "Expected exactly 1 entity, got 2". So a card showing four calendars opens four
  *    subscriptions, which is what Home Assistant's own calendar card does;
  *  - each push is a FULL SNAPSHOT of the window for that one calendar, never a delta,
  *    so a push replaces that calendar's rows and leaves the others alone;
- *  - the payload is `{ events: [...] }` — an object, not a bare list — and on a backend
+ *  - the payload is `{ events: [...] }` (an object, not a bare list), and on a backend
  *    failure it is `{ events: null }` on the same subscription rather than an error, so
  *    `msg.events.map(…)` is a crash waiting for a flaky integration;
  *  - `subscribeMessage` resolves BEFORE the first snapshot arrives (the fetch is wrapped
  *    in `hass.async_create_task`), so there is nothing to await for data;
- *  - events are NOT clipped to the requested window — a platform returns anything that
+ *  - events are NOT clipped to the requested window: a platform returns anything that
  *    OVERLAPS it. `buildFlow` does the clipping, which is where it belongs.
  *
  * On the wire an event is `CalendarEvent.as_dict()`: `start`, `end`, `summary` and
  * `all_day` always present, `description` / `location` / `uid` / `recurrence_id` /
- * `rrule` omitted entirely when unset. `start` and `end` are PLAIN ISO STRINGS — the
+ * `rrule` omitted entirely when unset. `start` and `end` are PLAIN ISO STRINGS. The
  * nested `{ dateTime }` / `{ date }` form belongs to the REST endpoint, which the
  * frontend does not use and neither do we.
  */
@@ -61,7 +61,7 @@ export interface CalendarPush {
  *
  * Only `options`, and only two levels into it. The command answers a map keyed by the
  * entity ids that were asked for, with `null` for an entity that has no registry entry
- * at all — which every YAML and `demo` calendar is, since they carry no unique id.
+ * at all, which every YAML and `demo` calendar is, since they carry no unique id.
  */
 interface RegistryEntry {
   options?: { calendar?: { color?: unknown } }
@@ -87,7 +87,7 @@ const UNAVAILABLE = 'unavailable'
  * the one place that has to be forgiving. A bare `entities:` parses to `null`,
  * `entities: calendar.work` to a string, and the editor can only promise a `string[]` for
  * configs it wrote itself. Anything that comes to nothing answers `undefined` rather than
- * `[]`, because those two mean opposite things here — no key means "every calendar", and
+ * `[]`, because those two mean opposite things here: no key means "every calendar", and
  * an empty list would mean "no calendars", which is not a thing anybody asks a calendar
  * widget for.
  */
@@ -105,7 +105,7 @@ export const configuredCalendars = (value: unknown): string[] | undefined => {
  * The three predicates and the bare `.sort()` are Home Assistant's own, read out of
  * `getCalendars` in the 2026.7.4 bundle: domain, not `unavailable`, not hidden in the
  * entity registry, then sorted by raw entity id. Copied rather than improved on so that
- * a calendar is the same colour here as it is in Home Assistant's calendar panel —
+ * a calendar is the same colour here as it is in Home Assistant's calendar panel,
  * including the awkward part, that adding a calendar re-colours the ones after it.
  */
 export const discoverCalendars = (hass: HomeAssistant): string[] =>
@@ -156,7 +156,7 @@ export const paletteColor = (index: number): string =>
   PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length]
 
 /**
- * Home Assistant's named colour tokens — the 25 its colour picker can produce.
+ * Home Assistant's named colour tokens: the 25 its colour picker can produce.
  *
  * The picker writes one of these; the `google` integration seeds a `#RRGGBB` instead,
  * through `cv.color_hex`. Between them that is every value `options.calendar.color`
@@ -197,7 +197,7 @@ const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
  *
  * Narrower than the frontend's `isValidColor` on purpose, and the difference is worth
  * stating. That one ends in `new Option().style.color = value`, asking the browser
- * whether the string is a colour at all — which needs a DOM this layer does not have and
+ * whether the string is a colour at all, which needs a DOM this layer does not have and
  * the tests do not run in. So the rule here is a token or a hex, which covers everything
  * Home Assistant itself writes, and anything stranger falls through to the palette. A
  * colour that came back looking wrong is a nuisance; an invalid `--item-color` would take
@@ -205,7 +205,7 @@ const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
  *
  * A token becomes `var(--red-color)` rather than a literal, exactly as `computeCssColor`
  * does it, so a user's theme keeps its say over the shade. Note the three text tokens
- * (`primary-text`, `secondary-text`, `disabled`) are not in the set — the frontend maps
+ * (`primary-text`, `secondary-text`, `disabled`) are not in the set; the frontend maps
  * them but its validator rejects them too.
  */
 export const registryColor = (value: unknown): string | undefined => {
@@ -232,7 +232,7 @@ export interface SubscriptionWindow {
  *  - the pad is what lets the window be computed without a timezone at all. A day is
  *    more than the ±14 hours any zone is from UTC, so a window this wide covers local
  *    midnight today through local midnight in `days` days' time, wherever the dashboard
- *    is being read. Precision here would buy nothing — `buildFlow` decides what is
+ *    is being read. Precision here would buy nothing: `buildFlow` decides what is
  *    actually on screen, in the display zone, and it is stricter than this is;
  *  - the key is what stops the re-subscribing. The card's clock ticks every minute, and
  *    a window keyed on the instant would tear down and rebuild every subscription sixty
@@ -271,8 +271,8 @@ export const subscriptionWindow = (now: Date, days: number): SubscriptionWindow 
  * `todo-source.ts`'s subscription and not this one.
  *
  * **The id has to survive a re-render**, because `flow.ts` uses it as the keyed-render
- * identity. `uid` is the natural answer but it is optional on the wire — absent from
- * `demo`'s events, among others — and one uid covers every instance of a recurring
+ * identity. `uid` is the natural answer but it is optional on the wire (absent from
+ * `demo`'s events, among others), and one uid covers every instance of a recurring
  * event, so the start is folded in to tell Tuesday's stand-up from Wednesday's.
  */
 export const toCalendarItem = (
@@ -359,7 +359,7 @@ export class CalendarFeed {
   /**
    * Point the feed at `entityIds` over `window`, doing as little as possible.
    *
-   * A moved window invalidates every subscription — the span is baked into each one — so
+   * A moved window invalidates every subscription (the span is baked into each one), so
    * that case starts over. An unchanged window only adds and drops the calendars that
    * changed, which is what keeps an edit in the entity picker from blanking the card the
    * user is looking at.
@@ -402,7 +402,7 @@ export class CalendarFeed {
       })
 
     // Deliberately NOT a reason to abandon the rest of the reconcile. Only the colour
-    // lookup can be overtaken — the calendars claimed above are this call's to subscribe,
+    // lookup can be overtaken; the calendars claimed above are this call's to subscribe,
     // and a later reconcile has already skipped them as taken. Returning here instead
     // would leave them claimed by nobody and permanently silent.
     await this._loadColors(hass, entityIds, (this._revision += 1))
@@ -422,14 +422,14 @@ export class CalendarFeed {
   /**
    * Colours for the calendars we are about to subscribe to.
    *
-   * `hass.entities` cannot answer this. It is the DISPLAY registry — twelve fields,
-   * decoded from `config/entity_registry/list_for_display` — and `options` is not one of
+   * `hass.entities` cannot answer this. It is the DISPLAY registry (twelve fields,
+   * decoded from `config/entity_registry/list_for_display`), and `options` is not one of
    * them, which is the trap in the sketch this replaces. The colour lives in the full
    * registry, and Home Assistant's own calendar card fetches the whole of it to read
    * two levels into one key. `get_entries` asks for the entities we care about instead:
    * same data, and it is not admin-gated either.
    *
-   * Failure is not fatal — a card that refused to draw because it could not learn a
+   * Failure is not fatal: a card that refused to draw because it could not learn a
    * shade would be worse than one drawing the palette. So the fallback is the palette,
    * by position in the list, which is what Home Assistant falls back to as well.
    */
@@ -467,7 +467,7 @@ export class CalendarFeed {
     window: SubscriptionWindow,
     timeZone: string | undefined,
   ): Promise<void> {
-    // Superseded before this even started — the colour lookup is awaited first, and a
+    // Superseded before this even started: the colour lookup is awaited first, and a
     // window rollover in that gap closes every claim and makes fresh ones.
     if (this._live.get(entityId)?.token !== token) return
 
@@ -484,7 +484,7 @@ export class CalendarFeed {
       )
 
       // Superseded while the handle was in flight, so it is ours to close and nobody
-      // else's — the entry in `_live` now belongs to a newer subscription, and writing
+      // else's: the entry in `_live` now belongs to a newer subscription, and writing
       // this handle onto it would strand that one with nothing to close it.
       const live = this._live.get(entityId)
       if (live?.token !== token) {
@@ -494,7 +494,7 @@ export class CalendarFeed {
       live.unsubscribe = unsubscribe
     } catch (error) {
       // A rejection here is Home Assistant refusing the command, not a dropped
-      // connection — `not_found` for a calendar that no longer exists, `invalid_format`
+      // connection: `not_found` for a calendar that no longer exists, `invalid_format`
       // for one the schema will not take. The card carries on with the calendars that
       // did work; a config pointing at a deleted calendar should cost that calendar's
       // rows and nothing else.
@@ -510,7 +510,7 @@ export class CalendarFeed {
     token: object,
   ): void {
     // A push from a subscription that has been closed or replaced. The socket can still
-    // be delivering for it — an unsubscribe is itself a round trip.
+    // be delivering for it: an unsubscribe is itself a round trip.
     if (this._live.get(entityId)?.token !== token) return
 
     const events = push?.events

@@ -135,7 +135,7 @@ describe('clock preference', () => {
 
   /**
    * The card's own `time_format`, which exists because the profile's `system` cannot see
-   * macOS's 24-hour switch through any browser API — see `TIME_FORMAT_OPTIONS`.
+   * macOS's 24-hour switch through any browser API; see `TIME_FORMAT_OPTIONS`.
    */
   describe("a card's own override", () => {
     const profile24: FrontendLocaleData = {
@@ -189,7 +189,7 @@ describe('clock preference', () => {
     })
 
     /**
-     * A profile set to `system` still drops the language, override or not — the override
+     * A profile set to `system` still drops the language, override or not: the override
      * pins the clock and must not also move the card into the Home Assistant language,
      * which `locale` would do to the date block and the section headings as well.
      */

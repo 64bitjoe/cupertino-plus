@@ -12,7 +12,7 @@ import {
   toCalendarItem,
 } from './source'
 
-/** Sunday, 26 July 2026, one minute past midnight in Warsaw — the awkward end of a day. */
+/** Sunday, 26 July 2026, one minute past midnight in Warsaw: the awkward end of a day. */
 const NOW = new Date('2026-07-26T00:01:00+02:00')
 
 const WARSAW = 'Europe/Warsaw'
@@ -52,7 +52,7 @@ describe('configuredCalendars', () => {
 
   /**
    * The distinction the card is built on: nothing configured means EVERY calendar, so
-   * "the user chose none" has to be indistinguishable from "the user chose nothing" —
+   * "the user chose none" has to be indistinguishable from "the user chose nothing", and
    * `[]` is what `ha-form` sends when the last entity is removed from the picker.
    */
   it('answers nothing for every shape of blank', () => {
@@ -90,7 +90,7 @@ describe('discoverCalendars', () => {
   })
 
   /**
-   * `unknown` is a quiet calendar, not a broken one — Home Assistant's own helper tests
+   * `unknown` is a quiet calendar, not a broken one: Home Assistant's own helper tests
    * `unavailable` and nothing else, and filtering this would empty the card on a day
    * with no events in it.
    */
@@ -118,7 +118,7 @@ describe('calendarsFor', () => {
 
   /**
    * A card is given its config before its `hass`, so this is the state of every card for
-   * a moment — and it must not be an exception.
+   * a moment, and it must not be an exception.
    */
   it('has nothing to show before hass arrives', () => {
     expect(calendarsFor(undefined, undefined)).toEqual([])
@@ -229,7 +229,7 @@ describe('toCalendarItem', () => {
     })
 
     expect(item).toMatchObject({
-      // The calendar it was subscribed from, not anything in the payload — a tap on the row
+      // The calendar it was subscribed from, not anything in the payload: a tap on the row
       // is answered from this.
       entityId: 'calendar.work',
       kind: 'event',
@@ -245,7 +245,7 @@ describe('toCalendarItem', () => {
   /**
    * The mapping that pays for itself. An all-day end is exclusive, and passing it
    * through untouched is what lets `isOver` retire the entry at midnight and `buildFlow`
-   * carry a multi-day one into today — neither of which works if it is translated to an
+   * carry a multi-day one into today, neither of which works if it is translated to an
    * inclusive last day or dropped.
    */
   it('keeps an all-day event’s exclusive end and files it on the right day', () => {
@@ -313,8 +313,8 @@ describe('toCalendarItem', () => {
   })
 
   /**
-   * `id` is the keyed-render identity, so two instances of one recurring event — same
-   * `uid`, different day — must not collide, and the id must not move between pushes.
+   * `id` is the keyed-render identity, so two instances of one recurring event (same
+   * `uid`, different day) must not collide, and the id must not move between pushes.
    */
   it('gives each occurrence of a recurring event its own stable id', () => {
     const monday = { summary: 'Standup', uid: 'abc', start: '2026-07-27T09:00:00Z' }
@@ -327,7 +327,7 @@ describe('toCalendarItem', () => {
 
   /**
    * The boundary has to hold. An integration is free to be odd, and one malformed event
-   * costs its own row — not the card, and not the dashboard around it.
+   * costs its own row, not the card, and not the dashboard around it.
    */
   it('drops what it cannot draw rather than throwing', () => {
     expect(map({ start: '2026-07-26T09:00:00Z' })).toBeUndefined()

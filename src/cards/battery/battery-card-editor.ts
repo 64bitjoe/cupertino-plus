@@ -16,13 +16,13 @@ export const BATTERY_EDITOR_TAG = 'cupertino-widgets-battery-editor'
  * The battery card's visual editor: the device list, then the **Scale** every card shares.
  *
  * There is no `ha-form` row of this card's own, and that is the point of it. The one question
- * it asks — which devices, and what to draw for each — is a list whose rows are each a small
+ * it asks, which devices and what to draw for each, is a list whose rows are each a small
  * config, so it is a control rather than a field: `device-list-editor.ts` draws it, and the
  * long note there says why an entity picker and a stack of form panels could not.
  *
  * Everything the card reads is reachable from here. The icon, the charging sensor and the
  * name were YAML-only in earlier versions because `ha-entities-picker` reports a list of ids
- * and nothing else — which is a fact about that one selector, not about the option.
+ * and nothing else, which is a fact about that one selector, not about the option.
  */
 class CupertinoBatteryCardEditor extends CupertinoCardEditor<BatteryCardConfig> {
   /**
@@ -36,7 +36,7 @@ class CupertinoBatteryCardEditor extends CupertinoCardEditor<BatteryCardConfig> 
    * The device list, handed the config's rows and trusted to report the whole list back.
    *
    * `deviceConfigs` is what makes the list element simple: it takes `entities` however
-   * somebody wrote it — a bare id, an object, a scalar where a list was meant — and answers
+   * somebody wrote it (a bare id, an object, a scalar where a list was meant) and answers
    * with normalised rows, so the control only ever deals with one shape and a hand-written
    * config cannot make it throw.
    */
@@ -44,7 +44,7 @@ class CupertinoBatteryCardEditor extends CupertinoCardEditor<BatteryCardConfig> 
     if (!this.hass || !this._config) return nothing
 
     // The tag is written out rather than interpolated, because a lit template's tag names
-    // are part of the template rather than values in it — `<${TAG}>` does not compile. The
+    // are part of the template rather than values in it: `<${TAG}>` does not compile. The
     // constant beside it is what `defineElement` was given, and the two have to agree.
     return html`
       <cupertino-widgets-battery-devices

@@ -49,7 +49,7 @@ const titles = (flow: FlowNode[], budgets: number[], mode: 'small' | 'medium'): 
  * drawn row belongs to, and nothing at all from the days past it.
  *
  * The drawn rows are always a prefix of the flow, so where they end is where the tail
- * begins — a row the indicator evicted included, that being undrawn like any other.
+ * begins. That includes a row the indicator evicted, since it too counts as undrawn.
  */
 const unfinishedSection = (flow: FlowNode[], columns: LayoutColumn[]): FlowNode[] => {
   const drawn = columns.flatMap(column => column.rows).filter(r => r.node.type !== 'more').length
@@ -84,8 +84,8 @@ describe('the reference screenshots', () => {
   it('three plain events today: the third flows into the right column', () => {
     const flow = [row('A'), row('B'), row('C'), TOMORROW, ...REST_OF_TOMORROW]
     // The column came out exactly full with a third item of tomorrow still to draw, so
-    // `T2` buys the row that says so — the one place this card departs from the
-    // screenshots, where that item vanished with nothing to mark it.
+    // `T2` buys the row that says so (the one place this card departs from the
+    // screenshots, where that item vanished with nothing to mark it).
     expect(costs(flow, [4, 7], 'medium')).toEqual([
       [2, 2],
       [2, 1, 2, 1],
@@ -161,7 +161,7 @@ describe('the reference screenshots', () => {
   })
 })
 
-describe('medium — packing rules', () => {
+describe('medium: packing rules', () => {
   it('drops the location rather than the event when only the location will not fit', () => {
     // Two rows left, an event that wants three: the event stays, compacted.
     const flow = [row('A'), row('B', 'somewhere')]
@@ -173,7 +173,7 @@ describe('medium — packing rules', () => {
   it('draws a heading that fits and lets its first event cross without it', () => {
     // Two rows left after the events, and a heading with a timed entry under it needs
     // three. The heading is worth the row it stands in regardless, and `S1` reads on from
-    // it at the top of the next column — the reservation this replaced moved both.
+    // it at the top of the next column; the reservation this replaced moved both.
     const flow = [row('A'), row('B'), heading('SUNDAY, 26 JUL'), row('S1')]
     expect(titles(flow, [6, 7], 'medium')).toEqual([['A', 'B', 'SUNDAY, 26 JUL'], ['S1']])
   })
@@ -191,7 +191,7 @@ describe('medium — packing rules', () => {
 
   it('takes back a heading that came out the last row on the card', () => {
     // It fits at the foot of the right column, none of Sunday does, and there is no row
-    // left for a count either — so what it heads is nothing at all.
+    // left for a count either, so what it heads is nothing at all.
     const flow = [row('A'), row('B'), TOMORROW, row('T1'), heading('SUNDAY, 26 JUL'), row('S1')]
     expect(titles(flow, [4, 4], 'medium')).toEqual([
       ['A', 'B'],
@@ -256,8 +256,8 @@ describe('medium — packing rules', () => {
   /**
    * A to-do due on a date with no time carries `allDay` for exactly this: there is no time
    * to print under its title, so it is one line, and the budget must not be charged for
-   * two. The kind is what changes the row's anatomy — a bullet rather than the calendar
-   * badge — and not what it costs.
+   * two. The kind is what changes the row's anatomy (a bullet rather than the calendar
+   * badge), not what it costs.
    */
   it('prices a dated reminder with no time at one row, like any all-day entry', () => {
     // Built out rather than spread from `item`: a reminder has no `end` at all, which is
@@ -393,7 +393,7 @@ describe('the tail indicator', () => {
 
   /**
    * The appearance rule itself, rather than one case of it: over every budget pair the
-   * card can actually produce, an unfinished section means the indicator — and a section
+   * card can actually produce, an unfinished section means the indicator, and a section
    * that finished means no indicator, whatever is undrawn further down the week.
    *
    * The one excuse for silence is having nothing to pay with, and after packing that is
@@ -447,7 +447,7 @@ describe('the tail indicator', () => {
   })
 })
 
-describe('small — count first, locations out of the slack', () => {
+describe('small: count first, locations out of the slack', () => {
   it('shows the location of a lone event', () => {
     expect(costs([row('A', 'Długa 36, Warsawa')], [4], 'small')).toEqual([[COST.expanded]])
   })
@@ -467,7 +467,7 @@ describe('small — count first, locations out of the slack', () => {
   it('gives up the second of three events to admit that a third exists', () => {
     // Four rows and three timed events: two of them fit exactly, and the row the count
     // needs can only come out of one of the two. This is "count wins" at its most
-    // expensive — one event you can read for two you know are there — and it is the whole
+    // expensive (one event you can read for two you know are there), and it is the whole
     // of the small size's argument, that four rows are too few to be quietly wrong in.
     const columns = packFlow([row('A'), row('B'), row('C')], [4], 'small')
     expect(columns[0]!.rows.map(r => r.cost)).toEqual([2, 1])
@@ -491,8 +491,8 @@ describe('small — count first, locations out of the slack', () => {
   /**
    * The same taste one row further down, where there is no event to keep either.
    *
-   * A single row is a real budget rather than a curiosity — the 3-row footprint at 110% and
-   * up — and it is the one place the count could be had for nothing, since no event fitted
+   * A single row is a real budget rather than a curiosity (the 3-row footprint at 110% and
+   * up), and it is the one place the count could be had for nothing, since no event fitted
    * there to be given up for it. Taken, it would make the size non-monotonic in its own
    * argument: three rows draw the event and the count, two draw the event and go quiet, and
    * one would drop the event to announce it. So the rule is the column's rather than the
@@ -517,7 +517,7 @@ describe('invariants, over twenty thousand random flows', () => {
     const flow: FlowNode[] = []
     const length = random(9)
     for (let i = 0; i < length; i += 1) {
-      // Headings only ever arrive before an item, and never two in a row — that is
+      // Headings only ever arrive before an item, and never two in a row, which is
       // all `buildFlow` can produce.
       const heads = random(4) === 0 && (flow.length === 0 || flow[flow.length - 1]!.type === 'item')
       if (heads) {
@@ -619,7 +619,7 @@ describe('geometry', () => {
   /**
    * The shortest footprint the Layout tab hands out, which the card has to be able to draw.
    *
-   * 184px is 3 grid rows — `min_rows` in `core/size.ts` — so these budgets are not a
+   * 184px is 3 grid rows (`min_rows` in `core/size.ts`), so these budgets are not a
    * curiosity at the edge of the arithmetic, they are what a user who drags the card all
    * the way down is looking at: the date and one event beside it, with the second column
    * carrying the day. It is thin at 100% and comfortable at 80%, which is the reason the
@@ -631,7 +631,7 @@ describe('geometry', () => {
     expect(geometryFor('small', FLOOR_HEIGHT, false).budgets).toEqual([2])
     expect(geometryFor('medium', FLOOR_HEIGHT, false, 0.8).budgets).toEqual([3, 6])
     // The other end of the trade, and the one worth knowing about: at 130% the date block
-    // takes the whole of the left column, so the flow starts in the second one — the same
+    // takes the whole of the left column, so the flow starts in the second one: the same
     // shape an empty today produces, arrived at from the other direction. The small size
     // has no second column to start in, which is the one combination the widget has nothing
     // to say in: the floor and the largest type together leave room for the date and
@@ -647,7 +647,7 @@ describe('geometry', () => {
    * Which is the honest exchange and the one the editor's helper line promises: the card
    * cannot draw larger type and the same amount of it without more height, so at 130% the
    * default footprint is worth two rows beside the date instead of four. The numbers are
-   * the same arithmetic as above with the box divided by the factor — the extreme scales
+   * the same arithmetic as above with the box divided by the factor: the extreme scales
    * rather than a sample, because those are the two ends anything else lands between.
    */
   it('spends rows on size: nine at the smallest scale, five at the largest', () => {
@@ -662,7 +662,7 @@ describe('geometry', () => {
   /**
    * The budget is only worth anything if a full column actually fits in the box.
    *
-   * The numbers below are measured, not assumed — every one of them is a rendered height
+   * The numbers below are measured, not assumed; every one of them is a rendered height
    * out of the card's own CSS, taken through the dev harness at a device pixel ratio of
    * 1, which is the unkindest rounding. Two of them are the reason this test exists at
    * all: the box is 2px shorter than the card, because `ha-card` draws a border and is
@@ -670,12 +670,12 @@ describe('geometry', () => {
    * keeps its hands off the line box (see the `.meridiem` rule).
    *
    * The tallest way to spend N rows is on compact rows, which are the dearest per row,
-   * and — for an odd budget — on the tallest of the nodes that cost a single row.
+   * and, for an odd budget, on the tallest of the nodes that cost a single row.
    *
    * Run at every scale the option offers, and this is where the CSS and the arithmetic are
    * held to each other: those measured heights are all `calc(… * var(--cw-scale))` now, so
    * the whole rendering scales by the factor while `ha-card`'s border does not. Divide the
-   * border along with the rest — the easy version of `geometryFor` — and the column is
+   * border along with the rest (the easy version of `geometryFor`), and the column is
    * credited with a couple of design units it never gets, which at 80% is most of a row and
    * lands on a boundary soon enough. That failure is invisible on screen until a column
    * packed exactly full clips its last descender.
@@ -689,7 +689,7 @@ describe('geometry', () => {
     /**
      * The tallest of the one-row nodes: an all-day chip, 22px of title inside 1px of
      * padding. A `2 more events` is 22px, a heading 20px, and a dated reminder with no time
-     * is the same chip with a bullet in it — 24px as well, since the bullet is 13px and the
+     * is the same chip with a bullet in it, 24px as well, since the bullet is 13px and the
      * title line is what sets the height.
      */
     const ONE_ROW = 24

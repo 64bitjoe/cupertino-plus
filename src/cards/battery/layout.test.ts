@@ -9,7 +9,7 @@ import { RING_MAX, RING_MIN, gridFor, type Box } from './layout'
 const SMALL: Box = { width: 246, height: 248 }
 const MEDIUM: Box = { width: 500, height: 248 }
 
-/** The shortest and the narrowest the Layout tab hands out — `min_rows` / `min_columns`. */
+/** The shortest and the narrowest the Layout tab hands out: `min_rows` / `min_columns`. */
 const SHORT: Box = { width: 246, height: 184 }
 const NARROW: Box = { width: 150, height: 248 }
 
@@ -50,7 +50,7 @@ describe('the reference table', () => {
    *
    * The wide card in particular never stacks a second row: 4 + 2 fits perfectly well and
    * reads as a card that ran out of something, where one row of four reads as the widget it
-   * is. Six devices are still worth configuring — they are for the `large` footprint, which
+   * is. Six devices are still worth configuring; they are for the `large` footprint, which
    * is the one with two rows of four to give them.
    */
   it('draws four and no more, however many devices are configured', () => {
@@ -80,7 +80,7 @@ describe('the reference table', () => {
   })
 
   it('reproduces the reference proportion at both design footprints', () => {
-    // 96 of a 246px square is the reference's 62 of 158pt — see RING_MAX. The wide footprint
+    // 96 of a 246px square is the reference's 62 of 158pt (see RING_MAX). The wide footprint
     // has four columns of ~106 to spend and the cap is what stops it spending them.
     expect(ring('small', 2, SMALL)).toBe(RING_MAX)
     expect(ring('small', 4, SMALL)).toBe(RING_MAX)
@@ -91,7 +91,7 @@ describe('the reference table', () => {
 describe('the caption', () => {
   it('is dropped when a column is too narrow to print a full reading under it', () => {
     // Four columns is the narrowest footprint Home Assistant allows, and two rings across
-    // it leave 51 design units each — `100%` needs 64, so the percentages come off rather
+    // it leave 51 design units each: `100%` needs 64, so the percentages come off rather
     // than being clipped or set in a size of their own.
     expect(shape('small', 2, NARROW)).toBe('compact 2×1, 2 of 2')
     // One device has the whole width to itself, so it keeps its caption in the same box.
@@ -101,7 +101,7 @@ describe('the caption', () => {
   it('survives the shortest footprint, and the largest type in it', () => {
     expect(shape('small', 2, SHORT)).toBe('labeled 2×1, 2 of 2')
     expect(shape('small', 2, SHORT, 1.3)).toBe('labeled 2×1, 2 of 2')
-    // Shorter box, smaller ring — the caption is a fixed size and comes off the ring's share.
+    // Shorter box, smaller ring: the caption is a fixed size and comes off the ring's share.
     expect(ring('small', 2, SHORT, 1.3)).toBe(70)
   })
 
@@ -124,7 +124,7 @@ describe('the caption', () => {
 describe('the grid', () => {
   /**
    * A card dragged taller gets bigger rings, not more of them, and that is the row cap doing
-   * its job: the rows are the devices, so there is nothing to fill extra height *with* —
+   * its job: the rows are the devices, so there is nothing to fill extra height *with*,
    * unlike the calendar, which always has more of the week to pour in.
    */
   it('spends extra height on the rings rather than on another row', () => {
@@ -140,14 +140,14 @@ describe('the grid', () => {
     expect(ring('small', 4, SHORT, 1.3)).toBe(47)
     // Squash it past that and the second row goes, taking two devices with it. The one corner
     // where the widget cannot say everything it was asked to, and the answer is the editor's
-    // own advice — drag it taller.
+    // own advice: drag it taller.
     expect(shape('small', 4, { width: 246, height: 110 })).toBe('labeled 2×1, 2 of 4')
   })
 
   it('leaves an odd ring in the left column of two, and centred under four', () => {
     // Centring it between two columns parks it over the gap in the row above, which reads
     // as a pyramid; under four there is no such alignment to lose. Only the square can have
-    // an incomplete row below a full one, but the rule is the grid's either way — a short
+    // an incomplete row below a full one, but the rule is the grid's either way: a short
     // single row of four is centred by it too.
     expect(gridFor('small', 3, SMALL).tail).toBe('start')
     expect(gridFor('medium', 2, MEDIUM).tail).toBe('center')
@@ -167,7 +167,7 @@ describe('the grid', () => {
 /**
  * `scale` is spent out of the ring rather than out of the row budget, which is where this
  * card and the calendar part company: the calendar answers larger type with fewer rows of it,
- * and there is no equivalent here — the rows are the devices. So the same footprint holds the
+ * and there is no equivalent here: the rows are the devices. So the same footprint holds the
  * same devices at every scale and draws them smaller, until the shortest box runs out.
  */
 describe('scale', () => {
@@ -178,7 +178,7 @@ describe('scale', () => {
     // out first, so the ring comes down to fit one.
     expect(ring('medium', 4, MEDIUM, 1.3)).toBe(77)
     expect(shape('medium', 4, MEDIUM, 1.3)).toBe('labeled 4×1, 4 of 4')
-    // The square is 2 × 2 either way, so both directions run out together — 70.8 units of
+    // The square is 2 × 2 either way, so both directions run out together: 70.8 units of
     // column against 71.6 of row, which is what a square footprint means.
     expect(ring('small', 4, SMALL, 1.3)).toBe(70)
     expect(shape('small', 4, SMALL, 1.3)).toBe('compact 2×2, 4 of 4')
@@ -191,12 +191,12 @@ describe('scale', () => {
  * card's insets.
  *
  * The one exemption is a ring standing on `RING_MIN`, which is the floor deliberately allowed
- * to overflow — a box that cannot hold one legible row gets one anyway and is clipped, rather
+ * to overflow: a box that cannot hold one legible row gets one anyway and is clipped, rather
  * than being answered with a blank card. So the sweep asserts the fit everywhere else and
  * separately proves that both sides of that line were actually reached.
  */
 describe('invariants, over every footprint the Layout tab offers', () => {
-  /** The stylesheet's own numbers, transcribed rather than imported — that is the point. */
+  /** The stylesheet's own numbers, transcribed rather than imported: that is the point. */
   const INSET = 16
   const BORDER = 1
   const GAP = 14

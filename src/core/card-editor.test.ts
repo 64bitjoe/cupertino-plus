@@ -30,7 +30,7 @@ describe('formData', () => {
 
   /**
    * Hand-written YAML is not typechecked, and `ha-entities-picker` maps over whatever it
-   * is given — a bare string would throw on the editor's very first render, which is the
+   * is given: a bare string would throw on the editor's very first render, which is the
    * one render the selector's own coercion sits out.
    */
   it('widens a scalar into a list for a multiple field', () => {
@@ -49,7 +49,7 @@ describe('formData', () => {
    * A row whose selector is neither of the two kinds this started out knowing about.
    *
    * `scale` is a `number` selector and has no `multiple` to read, which the first version
-   * of the widening loop discovered by throwing on it — so every editor in the library went
+   * of the widening loop discovered by throwing on it, so every editor in the library went
    * blank the moment a number row was added to the shared schema. Cheap to pin, and the
    * failure was total.
    */
@@ -68,7 +68,7 @@ describe('formData', () => {
 /**
  * The one part of an editor with no pixels in it: what the form reports becomes what
  * the user's YAML says. Everything the rule exists for is a shape `ha-form` really
- * produces — an emptied entity picker sends `[]`, a cleared dropdown sends `undefined`,
+ * produces: an emptied entity picker sends `[]`, a cleared dropdown sends `undefined`,
  * and every untouched field comes back on every change.
  */
 describe('applyFormData', () => {
@@ -78,7 +78,7 @@ describe('applyFormData', () => {
    * A number the form reports goes in as a number.
    *
    * Worth its own case because the config is read by `scaleFactor` and by anybody looking
-   * at their YAML, and a `scale: "110"` would satisfy neither — the editor is the one place
+   * at their YAML, and a `scale: "110"` would satisfy neither: the editor is the one place
    * that can guarantee the type, since it is the only one that is not hand-written.
    */
   it('writes a number through as a number, and forgets one the user cleared', () => {
@@ -106,7 +106,7 @@ describe('applyFormData', () => {
 
   /**
    * The reason this function exists. `entities: []` and no `entities` key mean the same
-   * thing to the card — every calendar — so only one of them belongs in a config the
+   * thing to the card (every calendar), so only one of them belongs in a config the
    * user has to read.
    */
   it('drops a field the user has emptied rather than writing an empty one', () => {
@@ -127,7 +127,7 @@ describe('applyFormData', () => {
 
   /**
    * `ha-form` is handed the whole config as its data, so everything else in there comes
-   * back out of it — including the keys Home Assistant owns. `visibility: []` is the one
+   * back out of it, including the keys Home Assistant owns. `visibility: []` is the one
    * that pins the rule: an empty array IS blank, so widening the loop from `fields` to
    * every key of `data` would quietly delete it.
    */

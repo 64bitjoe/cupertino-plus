@@ -33,7 +33,7 @@ export interface HassEntityRegistryDisplayEntry {
 
 /**
  * Note the wire values. The frontend's enum reads
- * `am_pm="12", twenty_four="24"` — the member names never travel, and a card
+ * `am_pm="12", twenty_four="24"`: the member names never travel, and a card
  * comparing against `"am_pm"` silently never matches.
  */
 export type TimeFormat = 'language' | 'system' | '12' | '24'
@@ -49,7 +49,7 @@ export interface FrontendLocaleData {
   language: string
   time_format: TimeFormat
   first_weekday: FirstWeekday
-  /** Absent on older cores, which had no such setting — treat that as `local`. */
+  /** Absent on older cores, which had no such setting; treat that as `local`. */
   time_zone?: TimeZoneSetting
 }
 
@@ -74,7 +74,7 @@ export interface HassConnection {
 }
 
 /**
- * One entry of `hass.panels`, keyed by its own `url_path` — `hass.panels.todo` is the
+ * One entry of `hass.panels`, keyed by its own `url_path`: `hass.panels.todo` is the
  * To-do lists panel at `/todo`, and its absence means the integration behind it is not
  * loaded.
  *
@@ -160,14 +160,14 @@ export interface EntitySelector {
      * A list rather than a predicate, which is the whole of its usefulness: what a card
      * editor wants to hide is the entities its own config has already taken, and that is
      * a set of ids rather than a property of any entity. `ha-selector-entity` forwards it
-     * to the picker's `excludeEntities`. Note it hides them from the *list* — a value
+     * to the picker's `excludeEntities`. Note it hides them from the *list*: a value
      * already selected still shows, which is what lets a row exclude its siblings without
      * blanking itself.
      */
     exclude_entities?: string[]
     /**
      * Turns the picker into a list of pickers. The value it reports is then a
-     * `string[]` — and, once the user removes the last entity, an empty array rather
+     * `string[]`, and once the user removes the last entity, it is an empty array rather
      * than `undefined`. See `applyFormData` in `core/card-editor.ts`.
      */
     multiple?: boolean
@@ -188,7 +188,7 @@ export interface SelectSelector {
     options: SelectOption[]
     /**
      * Omit it and the option count decides: under six renders `list` (radio buttons),
-     * six or more `dropdown`. `box` — labelled tiles — is never chosen for you.
+     * six or more `dropdown`. `box` (labelled tiles) is never chosen for you.
      */
     mode?: 'dropdown' | 'list' | 'box'
     /** `box` mode only. */
@@ -204,7 +204,7 @@ export interface NumberSelector {
     step?: number
     /**
      * Omit it and `min`/`max` decide: `ha-selector-number` draws a box unless both are
-     * given, and a slider — with the value and its unit beside it — when they are.
+     * given, and a slider (with the value and its unit beside it) when they are.
      */
     mode?: 'box' | 'slider'
     /** Shown after the value, and only ever cosmetic: the config carries the bare number. */
@@ -220,8 +220,8 @@ export interface IconSelector {
      *
      * `ha-selector-icon` prefers this over the icon it would otherwise work out for
      * itself, which is the reason to pass one: its own guess comes from Home Assistant's
-     * state icon, and for a `device_class: battery` sensor that is computed from the level
-     * — so it would offer `mdi:battery-70` where this card actually draws `mdi:battery`.
+     * state icon, and for a `device_class: battery` sensor that is computed from the level,
+     * so it would offer `mdi:battery-70` where this card actually draws `mdi:battery`.
      * A placeholder is a promise about what happens when the field is left empty, so it
      * has to be made by whoever keeps it.
      */
@@ -229,7 +229,7 @@ export interface IconSelector {
   }
 }
 
-/** A line of text. `ha-selector-text` reports `undefined` — not `''` — when it is emptied. */
+/** A line of text. `ha-selector-text` reports `undefined` (not `''`) when it is emptied. */
 export interface TextSelector {
   text: {
     /** Same arrangement as the icon selector's: a suggestion, not a value. */
@@ -241,7 +241,7 @@ export interface TextSelector {
  * A switch. Nothing to configure, and the empty object is what selects it.
  *
  * `ha-selector-boolean` renders `.checked=${this.value ?? this.placeholder === true}` and
- * reports `target.checked`, so it always sends a real boolean — `false` included, which is
+ * reports `target.checked`, so it always sends a real boolean: `false` included, which is
  * what lets an off switch survive `applyFormData` rather than being read as a blank.
  */
 export interface BooleanSelector {
@@ -251,7 +251,7 @@ export interface BooleanSelector {
 /**
  * A selector, as `ha-selector` reads it.
  *
- * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful —
+ * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful;
  * hence a union rather than a bag of optional keys. The shipped build knows 57 of
  * these; these are the six our editors ask for.
  */
@@ -261,9 +261,9 @@ export type Selector =
 /**
  * One row of an `ha-form`.
  *
- * `ha-form` also takes nodes carrying a `type` instead of a `selector` — `grid`,
+ * `ha-form` also takes nodes carrying a `type` instead of a `selector` (`grid`,
  * `expandable` and nine others, dispatched to `ha-form-${type}` and lazily imported when
- * it first sees one — but a selector node is the only shape our editors need. The battery
+ * it first sees one), but a selector node is the only shape our editors need. The battery
  * card's accordions are `ha-expansion-panel`s of its own rather than `expandable` nodes,
  * because a panel it owns is one it can hang a drag handle and a delete button off;
  * `docs/ha-api-notes.md` records how the `expandable` node nests its data, for whoever
@@ -288,7 +288,7 @@ export interface LovelaceCardEditor extends HTMLElement {
 }
 
 /**
- * The static side of a card class — what Home Assistant reaches for on the constructor
+ * The static side of a card class: what Home Assistant reaches for on the constructor
  * rather than on the element. `hui-card-element-editor` looks up exactly this, so the
  * dev harness can drive the same path the dashboard does.
  */
@@ -300,7 +300,7 @@ export interface LovelaceCardConstructor {
 export interface LovelaceCard extends HTMLElement {
   hass?: HomeAssistant
   /**
-   * Set by Home Assistant while the dashboard is in EDIT mode — `hui-section` assigns
+   * Set by Home Assistant while the dashboard is in EDIT mode: `hui-section` assigns
    * `lovelace.editMode` to it, so it is true for every card at once. Not the same thing
    * as `CustomCardEntry.preview` below, despite the name.
    */
@@ -308,7 +308,7 @@ export interface LovelaceCard extends HTMLElement {
   /**
    * The view's layout type (`"grid"`, `"panel"`, …), set by Home Assistant. Wrapper
    * cards forward it to their child card, so this name is NOT available for a card's
-   * own use — see the note on `CupertinoCard.cwLayout`.
+   * own use; see the note on `CupertinoCard.cwLayout`.
    */
   layout?: string
   setConfig(config: LovelaceCardConfig): void

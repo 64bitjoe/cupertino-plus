@@ -8,7 +8,7 @@
    The one rule worth stating: a preview's body is painted with Home Assistant's own
    background and the site sets nothing else inside it. That is why the cards look here
    exactly as they look on a dashboard, and it is what the border and header row around
-   each preview are for — chrome outside, product inside. */
+   each preview are for: chrome outside, product inside. */
 
 /* ---- Tokens ------------------------------------------------------------------- */
 
@@ -55,7 +55,7 @@ body {
 
   --ui-nav: 240px;
   /* Wider than the nav, because a select and a row of checkboxes need more room than a
-     link does — but still a column you read down, not a panel you scan across. */
+     link does, but still a column you read down, not a panel you scan across. */
   --ui-inspector: 300px;
 }
 
@@ -80,7 +80,7 @@ body {
 }
 
 /* Nav down the left, widgets in the middle, their settings down the right. The widgets
-   are narrow and tall, so the settings sit beside them rather than under them — a control
+   are narrow and tall, so the settings sit beside them rather than under them: a control
    you are dragging should not be off the screen from the card it changes. */
 .site {
   display: grid;
@@ -114,7 +114,7 @@ body {
 
 /* Painted with Home Assistant's own background, so every widget on the page stands on
    one plane of dashboard rather than in a box of its own. The site sets nothing else
-   inside it beyond each card's width and height — see the note at the top. */
+   inside it beyond each card's width and height; see the note at the top. */
 .canvas {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -272,7 +272,7 @@ body {
   color: var(--ui-muted-fg);
 }
 
-/* A ghost icon button — the only control up here. */
+/* A ghost icon button, the only control up here. */
 .icon-button {
   flex: none;
   display: grid;
@@ -332,7 +332,7 @@ body {
 
 /* Exactly a width and a height. A plain block, because `base-styles.ts` gives a card
    `display: block; height: 100%` and no width, so it stretches to a block parent for
-   free — make this a flex container and the card shrinks to its content and then draws
+   free: make this a flex container and the card shrinks to its content and then draws
    narrower than the footprint says it is. */
 .box {
   display: block;
@@ -342,7 +342,7 @@ body {
   position: relative;
   resize: both;
   overflow: hidden;
-  /* Home Assistant's own floor — `min_columns: 4, min_rows: 3` — which moves with the
+  /* Home Assistant's own floor (`min_columns: 4, min_rows: 3`), which moves with the
      section width, so it arrives from the template. The fallbacks are that floor at a
      500px section, for the frame before the first render. */
   min-width: var(--drag-min-w, 161px);

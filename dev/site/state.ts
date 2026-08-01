@@ -3,8 +3,8 @@
  *
  * The site draws itself as a function of this: change a field, and the whole page is
  * re-rendered from it. That is affordable because lit-html diffs, and it is worth it
- * because the alternative — a dozen little update functions, each responsible for
- * remembering which labels its control also changes — is how the old harness ended up
+ * because the alternative (a dozen little update functions, each responsible for
+ * remembering which labels its control also changes) is how the old harness ended up
  * with a `layoutPresets()` that had to be called by hand from four places.
  *
  * Nothing here reaches into the DOM. `stage.ts` owns the elements that outlive a render,
@@ -33,13 +33,13 @@ export type Theme = 'light' | 'dark'
 interface SiteState {
   theme: Theme
   widget: Widget
-  /** Whether the Advanced section is open. Shut on arrival — see `views/canvas.ts`. */
+  /** Whether the Advanced section is open. Shut on arrival; see `views/canvas.ts`. */
   advanced: boolean
   /** The dashboard knobs, shared by every widget. */
   env: Record<string, ArgValue>
   /**
    * The card options, per widget, so switching routes does not lose them. Both the
-   * widget's own and the ones every card has — one record, because they end up in one
+   * widget's own and the ones every card has: one record, because they end up in one
    * config and are edited in one group of the panel.
    */
   args: Record<string, Record<string, ArgValue>>
@@ -99,7 +99,7 @@ export const currentArgs = (): Args => state.args[state.widget.id] ?? {}
 export const envArgs = (): Args => state.env
 
 /**
- * The wire values of `TimeFormat`, which are not its member names — see `types/ha.ts`.
+ * The wire values of `TimeFormat`, which are not its member names; see `types/ha.ts`.
  *
  * Only the three the Clock control offers. `language` is a real profile value and the card
  * handles it; it is simply not one this page lets anybody pick, so a value claiming to be
@@ -122,7 +122,7 @@ let cachedFor = ''
  * The `hass` the cards are given.
  *
  * A whole new object whenever the theme or the clock moves, exactly as Home Assistant
- * does it — `hass` is replaced rather than mutated, which is the entire reason cards
+ * does it: `hass` is replaced rather than mutated, which is the entire reason cards
  * filter their own updates, and a page that edited one in place would let a broken
  * filter through.
  *

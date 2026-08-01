@@ -36,7 +36,7 @@ describe('the page behind a row', () => {
   })
 
   it('sends every event to the calendar, whichever calendar it came from', () => {
-    // The panel takes no parameter for one — see `itemTarget` — so two calendars have to
+    // The panel takes no parameter for one (see `itemTarget`), so two calendars have to
     // arrive at the same page, and a test that let them differ would be describing a
     // deep link that does not exist.
     expect(itemTarget(anEventFrom('calendar.work'))).toEqual({
@@ -52,7 +52,7 @@ describe('the page behind a row', () => {
   })
 
   it('escapes an id that would otherwise break out of the query string', () => {
-    // No real entity id needs it — the domain and object id are both `[a-z0-9_]` — and the
+    // No real entity id needs it (the domain and object id are both `[a-z0-9_]`), and the
     // encoding is here so that the day something hands this a stranger id, the worst case
     // is a list that does not open rather than a URL with somebody else's parameters on it.
     expect(itemTarget(aReminderFrom('todo.a&b=c')).path).toBe('/todo?entity_id=todo.a%26b%3Dc')

@@ -42,12 +42,12 @@ const STATES: Record<string, HassEntity> = {
     supported_features: 7,
   }),
   /*
-   * Two to-do lists, which `demo` does not provide at all — it has no `todo` platform, so
+   * Two to-do lists, which `demo` does not provide at all: it has no `todo` platform, so
    * the dev Home Assistant needs the Local To-do integration adding by hand and the
    * showcase needs these.
    *
    * A to-do entity's state is its count of unfinished items, and `supported_features: 127`
-   * is every `TodoListEntityFeature` — what `local_todo` reports. The card reads neither:
+   * is every `TodoListEntityFeature` (what `local_todo` reports). The card reads neither:
    * the count is not what it draws, and the flags say what can be written to a list rather
    * than what it holds. They are here because a state a real one would not have is a way to
    * find out that something is quietly reading it.
@@ -60,7 +60,7 @@ const STATES: Record<string, HassEntity> = {
     friendly_name: 'Shopping',
     supported_features: 127,
   }),
-  // The battery card's devices, which are a list of their own — see `battery-devices.ts`,
+  // The battery card's devices, which are a list of their own; see `battery-devices.ts`,
   // where the config that points at them lives beside them.
   ...Object.fromEntries(BATTERY_STATES.map(one => [one.entity_id, one])),
 }
@@ -71,7 +71,7 @@ const STATES: Record<string, HassEntity> = {
  * One named token and one calendar with no entry at all, which is the pair worth having:
  * the token proves the registry lookup and its `var(--red-color)` mapping, and the
  * missing entry proves the fallback to the palette. `demo`'s real calendars have no
- * registry entry either — no unique id — so the second case is the common one.
+ * registry entry either (no unique id), so the second case is the common one.
  */
 const REGISTRY_OPTIONS: Record<string, { calendar?: { color?: string } }> = {
   'calendar.calendar_1': { calendar: { color: 'red' } },
@@ -90,7 +90,7 @@ const wireDate = (offsetDays: number): string => {
 const wireTime = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString()
 
 /**
- * The same instant as a local wall clock with no zone on it — `2026-07-26T10:30:00`.
+ * The same instant as a local wall clock with no zone on it: `2026-07-26T10:30:00`.
  *
  * Only a `todo` list sends these: Home Assistant requires a calendar event's datetimes to
  * be aware, while a to-do's `due` is serialised as whatever the integration stored.
@@ -107,7 +107,7 @@ const naiveTime = (minutes: number): string => {
  * Not the `CalendarItem` fixtures. This is what `demo_scenario` cannot cover: the
  * fixtures start life on the far side of the mapper, so they exercise the layout rules
  * and nothing about the mapping. These are hand-written the way the subscription sends
- * them — bare `YYYY-MM-DD` with an EXCLUSIVE end for the all-day entry, a full ISO
+ * them: bare `YYYY-MM-DD` with an EXCLUSIVE end for the all-day entry, a full ISO
  * datetime for the rest, `summary` rather than `title`, and `location` absent rather
  * than empty where there is none.
  *
@@ -145,7 +145,7 @@ const WIRE_EVENTS: Record<string, () => Record<string, unknown>[]> = {
  * Written the way `todo/item/subscribe` sends them, which is `asdict` with no dict
  * factory: every field present, the unset ones `null`, `status` spelled out, and `due`
  * either a bare `YYYY-MM-DD` or an ISO datetime. Between them the two lists cover every
- * branch of the mapper — a timed item, a dated one with no time, a naive datetime with no
+ * branch of the mapper: a timed item, a dated one with no time, a naive datetime with no
  * offset on it (which is what an integration that stored a wall clock sends), a completed
  * item and an undated one. The last two must never appear on the card: one is done, and the
  * other has no day to be drawn on.
@@ -222,7 +222,7 @@ const WIRE_TODOS: Record<string, () => Record<string, unknown>[]> = {
 /**
  * The handful of Home Assistant strings our editors reuse, copied out of the `en` table
  * the frontend ships. `localize` answers `''` for anything else, which is what the real
- * one does with a key it does not have — the fallback path an editor has to survive.
+ * one does with a key it does not have, the fallback path an editor has to survive.
  */
 const TRANSLATIONS: Record<string, string> = {
   'ui.panel.lovelace.editor.card.calendar.calendar_entities': 'Calendar entities',
@@ -246,7 +246,7 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
      * a page with cards on it, not a Home Assistant, so there is no `/calendar` and no
      * `/todo` behind this document to send anybody to.
      *
-     * A card asks before it navigates — `_open` in the calendar card — so this is also what
+     * A card asks before it navigates (`_open` in the calendar card), so this is also what
      * keeps a tap in the harness to its press effect instead of pushing a history entry the
      * showcase cannot serve on reload. Fill it in the day the harness grows something worth
      * navigating to.
@@ -275,7 +275,7 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
 
         if (message.type === 'todo/item/subscribe') {
           const entityId = String(message.entity_id)
-          // `items: []` for a list nobody wrote fixtures for, never `items: null` — the real
+          // `items: []` for a list nobody wrote fixtures for, never `items: null`; the real
           // handler maps over `todo_items or []`, so there is no null case to imitate.
           queueMicrotask(() => callback({ items: WIRE_TODOS[entityId]?.() ?? [] } as never))
         }

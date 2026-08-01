@@ -7,7 +7,7 @@
  * width and a height and not one other property. That is what makes a preview here worth
  * looking at: it is the card a dashboard would draw, at the size it would draw it.
  *
- * A footprint is named in the Layout tab's own units — `6 × 4` — because that is what a
+ * A footprint is named in the Layout tab's own units (`6 × 4`) because that is what a
  * user drags in Home Assistant. Pixels are only what those units happen to resolve to on
  * one particular dashboard, so they would be a number nobody could act on.
  */

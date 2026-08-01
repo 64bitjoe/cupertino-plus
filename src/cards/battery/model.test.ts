@@ -65,7 +65,7 @@ describe('the config, however it was written', () => {
   })
 
   /**
-   * The domain is deliberately not checked — see `deviceConfig`. A battery percentage is a
+   * The domain is deliberately not checked; see `deviceConfig`. A battery percentage is a
    * `sensor` almost always and not always, and rejecting the exception would cost a working
    * setup to enforce a convention this card has no stake in.
    */
@@ -158,7 +158,7 @@ describe('what an edited list writes back', () => {
 
 /**
  * Everything about a drag except the dragging. `ha-sortable` rolls its own DOM change back
- * and reports two indices, so this is what actually reorders the rings — and the order of
+ * and reports two indices, so this is what actually reorders the rings, and the order of
  * `entities` is the order of the rings, with nothing sorting them afterwards.
  */
 describe('a row moved', () => {
@@ -189,7 +189,7 @@ describe('a row moved', () => {
 /**
  * The two values the editor greys into its Icon and Name fields. A placeholder is a promise
  * about what happens when the field is left empty, so these are read off the same expressions
- * `readDevice` keeps it with — see the pair of tests on its own fallbacks below.
+ * `readDevice` keeps it with. See the pair of tests on its own fallbacks below.
  */
 describe('what a device inherits when the config overrides nothing', () => {
   it('answers the entity’s own name and icon', () => {
@@ -229,7 +229,7 @@ describe('a level, as a state', () => {
   it('answers nothing at all for a state that is not a number', () => {
     expect(level('unavailable')).toBe(null)
     expect(level('unknown')).toBe(null)
-    // The entity is not in `hass` at all — a config pointing at something deleted.
+    // The entity is not in `hass` at all: a config pointing at something deleted.
     expect(readDevice(withStates(), { entity: PHONE }).level).toBe(null)
     // And with no `hass` yet, which is the card's first paint.
     expect(readDevice(undefined, { entity: PHONE }).level).toBe(null)
@@ -300,7 +300,7 @@ describe('a device’s name and icon', () => {
   })
 
   /**
-   * The entity id rather than an empty string, because it is what the user typed — the one
+   * The entity id rather than an empty string, because it is what the user typed: the one
    * name that always identifies the row they meant.
    */
   it('falls back to the entity id, and to a battery glyph', () => {

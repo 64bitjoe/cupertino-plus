@@ -1,11 +1,11 @@
 # Development
 
 How to work on the cards: the fast loop, the loop that proves it, and where everything
-lives. The [README](../README.md) is the shop window — this is the workshop behind it.
+lives. The [README](../README.md) is the shop window; this is the workshop behind it.
 
 ```bash
 pnpm install
-pnpm dev          # the showcase at http://localhost:5173 — no Home Assistant needed
+pnpm dev          # the showcase at http://localhost:5173, no Home Assistant needed
 pnpm test         # the layout rules, as unit tests
 ```
 
@@ -19,18 +19,18 @@ given it. This is the fast loop.
 The top of it is what a visitor sees: **Small** and **Medium**, each labelled with the
 footprint the Layout tab would give it, plus a box whose corner drags. They stand on a
 plane painted with Home Assistant's own background, and the site gives each card a width
-and a height and not one other property — so a card there is a card on a dashboard.
+and a height and not one other property, so a card there is a card on a dashboard.
 
 The settings column down the right-hand side leads with the config to paste and a Copy
 button, then every knob that changes it, grouped by whether it belongs to the card. The Card
 group is what ends up in the YAML above it; the Demo group stands in for Home Assistant.
 
-**Scale** is in the Card group whichever widget is on screen — every card in the library has
+**Scale** is in the Card group whichever widget is on screen: every card in the library has
 it. So is the battery card's **Devices**, and that is the honest grouping rather than an
 oversight: that card has no fixtures at all. It reads `hass.states` exactly as it would on a
 dashboard, so the only thing the harness supplies is which of the mock installation's sensors
 to point it at, and the YAML above the control is genuinely the config that produced what is on
-screen. `dev/battery-devices.ts` holds both halves — the mock entities and the named sets — and
+screen. `dev/battery-devices.ts` holds both halves (the mock entities and the named sets), and
 its sets are chosen for the layout branch each one lands on: the captioned row, the grid that
 gives the percentages up, two rows of rings, a device that has stopped reporting.
 
@@ -45,8 +45,8 @@ only the rest can reach every layout rule, and none of them is a config anybody 
 emulates a wider or narrower dashboard section, which re-boxes every footprint on the page.
 
 **Advanced** is the part that is there for working on a card rather than for choosing one:
-the in-between footprints, and the card's real editor — reached the way Home Assistant
-reaches it, through `getConfigElement()` — driving a live card beside the config it writes.
+the in-between footprints, and the card's real editor (reached the way Home Assistant
+reaches it, through `getConfigElement()`), driving a live card beside the config it writes.
 That editor's `ha-form` is a stand-in (`dev/ha-stubs.ts`): the behaviour is real, the widget
 is not, so check how it _reads_ in the dev Home Assistant below.
 
@@ -59,8 +59,8 @@ The site is published to GitHub Pages by `.github/workflows/pages.yml` on every 
 `main`. It is served from a subdirectory, so the build hard-codes that prefix; a fork
 serving it from a domain root wants `SITE_BASE=/ pnpm build:site`.
 
-`pnpm test` covers the parts with no pixels in them — selection, ordering, column
-packing, time formatting — including the worked examples at the bottom of the rules
+`pnpm test` covers the parts with no pixels in them: selection, ordering, column
+packing, time formatting, including the worked examples at the bottom of the rules
 document.
 
 ## Against a real Home Assistant
@@ -71,13 +71,13 @@ output is served without any copy step: `./dist` is mounted into the container's
 `dev/ha-config/configuration.yaml`.
 
 ```bash
-pnpm ha:up        # http://localhost:8123 — create an account on first run
-pnpm verify       # build, bust the cache, restart — the one command to trust
+pnpm ha:up        # http://localhost:8123, create an account on first run
+pnpm verify       # build, bust the cache, restart (the one command to trust)
 ```
 
 **`pnpm verify` is the answer to "am I looking at my change?"** It builds, bumps the `?v=`
 on the resource URL, and force-recreates the container. Nothing else is reliable, and it is
-worth knowing why, because the failure mode is not "stale" — it is _one build behind_,
+worth knowing why, because the failure mode is not "stale": it is _one build behind_,
 which reads as flaky rather than as cached.
 
 Two caches sit in front of that file and cover for each other:
@@ -90,13 +90,13 @@ plugins: [new ExpirationPlugin({ maxAgeSeconds: 86400 })] }))`. Stale-while-reva
   the current one appears on the reload after that.
 
 A hard reload (⌘⇧R) does not rescue you, and the reason is specific: Home Assistant loads
-a dashboard resource by appending a `<script type="module">` at runtime — `loadModule` in
+a dashboard resource by appending a `<script type="module">` at runtime: `loadModule` in
 the bundle is `url => appendScript('script', url, 'module')`. A force-reload takes the
 service worker off the navigation and the subresources the parser found in the HTML; it has
 no bearing on a fetch a script issues afterwards. So the worker answers the bundle from its
 own copy, and the revalidation it fires behind you is served by the month-old HTTP entry.
 
-Changing the URL misses both caches — they key on the full URL including the query, since
+Changing the URL misses both caches; they key on the full URL including the query, since
 that catch-all route sets no `ignoreSearch`. A reload of some kind is unavoidable
 regardless: a custom element cannot be redefined in a page that already registered it.
 Which is the real argument for the showcase above being the loop you live in, and this one
@@ -119,12 +119,12 @@ pnpm ha:reset     # wipe the instance completely (onboarding, state, dashboards)
 both halves: the instance lives in a bind mount rather than in a volume, so `down -v` has
 nothing of it to remove. The clean is the wipe. It is safe because `.gitignore` ignores
 everything under `dev/ha-config/` except the one tracked `configuration.yaml`, which
-`git clean` therefore leaves alone — so the next `pnpm ha:up` comes back to first-run
+`git clean` therefore leaves alone, so the next `pnpm ha:up` comes back to first-run
 onboarding with the dashboard resource already registered.
 
 One sharp edge worth knowing: the bind mount of `dist` is fragile, and when it breaks
 the container serves 404 for a bundle that is visibly there on the host. Two ways to
-break it — deleting the _directory_ (Vite is configured never to, via
+break it: deleting the _directory_ (Vite is configured never to, via
 `emptyOutDir: false`), and `docker compose restart`, which keeps the existing container
 and brings its mount back stale. `pnpm ha:up` force-recreates the container and
 re-resolves the mount, so it is the fix for both, and it is what to use instead of
@@ -136,7 +136,7 @@ the **Local Calendar** integration in the UI.
 
 ## Screenshots
 
-The README is the first shop window — before the site, before installing anything — which
+The README is the first shop window, before the site, before installing anything, which
 means the pictures in it have to be as cheap to regenerate as the code is to rebuild, or
 they will quietly go out of date. One command, run by hand whenever the cards change:
 
@@ -147,21 +147,21 @@ pnpm shots
 It starts the same Vite dev server the showcase runs on, opens `dev/shots.html` in
 headless Chromium, and clips one PNG into `docs/images/` per entry in `dev/shots.ts`'s
 `SHOTS` list. That list is the whole edit surface: a shot is a fixture, a footprint in
-Layout-tab columns and rows, and a theme. Nothing is cropped by hand — a hand-cropped
+Layout-tab columns and rows, and a theme. Nothing is cropped by hand: a hand-cropped
 screenshot is a screenshot nobody can reproduce.
 
 Two things the script does that a manual screenshot cannot:
 
 - **Freezes the clock**, at Friday 24 July 2026, 09:41, in `Europe/Warsaw`. Half the
   calendar's rules are about `now`, so unfrozen, every run would produce different pixels
-  in every file and each one would land in `git diff` — which is how a generated gallery
+  in every file and each one would land in `git diff`, which is how a generated gallery
   stops being regenerated. The date is a Friday so that both heading forms appear across
   the set, and 09:41 because the fixtures anchor today to the next half hour, so
   everything today starts at a round 10:00.
 - **Waits to be told.** The page sets `__SHOTS_READY__` only once every card has settled
   into the layout its box implies. A card guesses `medium` for its first frame and learns
   better when its ResizeObserver reports, so a camera firing on `load` would photograph
-  the two-column layout inside a small box — reliably, and only in the one place nobody
+  the two-column layout inside a small box, reliably, and only in the one place nobody
   looks before committing.
 
 Chromium is a one-off download:
@@ -174,8 +174,8 @@ Run it on macOS if you have the choice. The cards ask for `-apple-system` first,
 is where the type comes out as SF rather than as whatever the machine has instead.
 
 One rule for how the README then shows them: each `<img>` is pinned to a width in the same
-proportion as its footprint — currently 420px for the 12-column shots against 222px for the
-6-column one, the same ratio as the 540 and 286 they were clipped at — and both are small
+proportion as its footprint (currently 420px for the 12-column shots against 222px for the
+6-column one, the same ratio as the 540 and 286 they were clipped at), and both are small
 enough to fit a half-width table cell on GitHub. Pin them at their full clipped widths
 instead and the wide shot alone is capped by the cell while the square is not, so the pair
 stops being to scale: the square reads about a fifth larger against the medium than the two
@@ -185,7 +185,7 @@ cards really are.
 
 ```
 src/
-  index.ts              bundle entry — imports every card, which self-register
+  index.ts              bundle entry: imports every card, which self-register
   core/
     base-card.ts        hass/config contract, sizing, dark mode, re-render filter
     card-editor.ts      the visual-editor half of that contract, over ha-form
@@ -198,13 +198,13 @@ src/
     base-styles.ts      structural CSS shared by every card
   cards/<widget>/       one directory per widget
 dev/
-  site/                 the showcase — one entry per widget in catalog.ts
+  site/                 the showcase, one entry per widget in catalog.ts
   ha-stubs.ts           stand-ins for the Home Assistant elements cards use
   mock-hass.ts          a `hass` object good enough to develop against
   battery-devices.ts    the battery card's mock devices, and the sets that point at them
   shots.ts              the README's screenshots, as a page a camera can point at
   ha-config/            the throwaway Home Assistant instance
-docs/images/            the README's screenshots — generated, never hand-edited
+docs/images/            the README's screenshots, generated, never hand-edited
 ```
 
 Both cards are split so that the rules can be read and tested without a browser:
@@ -213,7 +213,7 @@ Both cards are split so that the rules can be read and tested without a browser:
 cards/calendar/
   calendar-card.ts         the element: measure the box, draw it, derive the event palette
   calendar-card-editor.ts  its own two rows; Scale is added by the base editor
-  flow.ts                  what to show and in what order — one stream of rows
+  flow.ts                  what to show and in what order: one stream of rows
   layout.ts                how much of that stream fits, in columns of a row budget
   format.ts                times, section headings, the date block
   datetime.ts              day arithmetic in the display timezone
@@ -226,7 +226,7 @@ cards/battery/
   battery-card-editor.ts   one row, plus the fold that keeps a hand-written override
   layout.ts                how many rings, in how many rows, captioned or not, how big
   ring.ts                  the arc: its coordinate space, and why it is always green
-  model.ts                 a Home Assistant state as a device — level, icon, charging
+  model.ts                 a Home Assistant state as a device: level, icon, charging
 ```
 
 The battery card has no `demo-data.ts` and needs none: everything it draws comes out of
@@ -240,14 +240,14 @@ is the single place that bridge lives, so a user's theme restyles every card for
 
 A card that measures its own box has to survive being put somewhere Home Assistant never
 puts it. People nest these widgets in `button-card` custom fields, in `layout-card`, in
-stacks — and the container a card ends up in there is routinely laid out with grid or
+stacks, and the container a card ends up in there is routinely laid out with grid or
 flex rather than as a block.
 
 That distinction has teeth. A grid or flex item gets `min-height: auto`, an automatic
 minimum size taken from its own content, where a block child's minimum is zero. Our
 content is an `ha-card` carrying the `--cw-min-height` floor, so under such a parent the
 floor lifted the element itself, the ResizeObserver measured the lifted height, and the
-floor was set from that measurement — a card sitting in a 184px area, measuring 248px,
+floor was set from that measurement: a card sitting in a 184px area, measuring 248px,
 budgeting nine rows where six fit, and clipping the difference. `:host { min-height: 0 }`
 in `base-styles.ts` is the whole fix and carries the argument.
 
@@ -276,12 +276,12 @@ different way than it is. Keep the tab in front, or take a screenshot to bring i
 
 ## The rest of the documentation
 
-- [`calendar-widget-rules.md`](calendar-widget-rules.md) — what the calendar card decides
+- [`calendar-widget-rules.md`](calendar-widget-rules.md): what the calendar card decides
   to show and in what order, written down as rules with worked examples. The tests are
   transcribed from it.
-- [`battery-widget-rules.md`](battery-widget-rules.md) — the same for the battery card: how
+- [`battery-widget-rules.md`](battery-widget-rules.md). The same for the battery card: how
   many rings, when they get a percentage, and why the ring is never red. Its §8 table is
   `layout.test.ts`'s first two cases.
-- [`ha-api-notes.md`](ha-api-notes.md) — the Home Assistant APIs this library depends on,
+- [`ha-api-notes.md`](ha-api-notes.md): the Home Assistant APIs this library depends on,
   each verified against the frontend bundle shipped in the HA image rather than against
   documentation, including several points where the widely-repeated advice is now wrong.

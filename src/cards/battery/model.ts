@@ -2,7 +2,7 @@
  * What the battery widget draws, and how a Home Assistant state becomes one.
  *
  * The layout layers (`layout.ts`, `ring.ts`) only ever see a `BatteryDevice`, so this is
- * the whole of the card's contact with Home Assistant — and it is a much shorter contact
+ * the whole of the card's contact with Home Assistant, and it is a much shorter contact
  * than the calendar's: a battery level is a number sitting in `hass.states`, pushed to
  * every card on every change, so there is no subscription, no window and no wire mapper.
  * Everything below is normalisation.
@@ -21,13 +21,13 @@ import type { HassEntity, HomeAssistant } from '../../core/types/ha'
  *
  * Two forms, and both are load-bearing. A bare entity id is what the visual editor writes
  * and what nearly every config holds; the object is for the things Home Assistant cannot tell
- * us — which entity says whether the device is on a charger, what to call a device whose
+ * us: which entity says whether the device is on a charger, what to call a device whose
  * sensor is named `Kirill's Phone Battery Level`, and which icon says which device it is.
  */
 export interface BatteryDeviceConfig {
   entity: string
   /**
-   * A `binary_sensor` that is `on` while the device is charging — the
+   * A `binary_sensor` that is `on` while the device is charging: the
    * `battery_charging` device class, which is what integrations that know use.
    *
    * Explicit because the alternative is guessing, and the guesses disagree: some
@@ -42,7 +42,7 @@ export interface BatteryDeviceConfig {
 
 /** One ring's worth of device, normalised. */
 export interface BatteryDevice {
-  /** The battery entity's id — the identity of the row, and what a tap opens. */
+  /** The battery entity's id: the identity of the row, and what a tap opens. */
   id: string
   /** For the tooltip and the accessible name. Never drawn: see `docs/battery-widget-rules.md`. */
   name: string
@@ -57,7 +57,7 @@ export interface BatteryDevice {
  *
  * A battery glyph, which is a placeholder and reads as one. The card cannot do better and
  * should not try: the icon's job is to say *which device*, and the only honest source for
- * that is the config — HA's icon for a `device_class: battery` sensor is computed from the
+ * that is the config: HA's icon for a `device_class: battery` sensor is computed from the
  * level, so it would draw the ring's own reading a second time in the middle of it.
  * `battery-unknown` for an entity that is missing or unreadable, which is the one case
  * where a glyph does have something to add.
@@ -71,8 +71,8 @@ const fallbackIcon = (state: HassEntity | undefined): string =>
  * One config row, however it was written, or `undefined` if there is nothing usable in it.
  *
  * Forgiving on purpose, and for the reason the calendar's `configuredCalendars` is: a card
- * config is not typechecked on its way in. `entities: sensor.phone_battery` — a scalar
- * where a list is meant — is what somebody writes first, and a row that came to nothing is
+ * config is not typechecked on its way in. `entities: sensor.phone_battery` (a scalar
+ * where a list is meant) is what somebody writes first, and a row that came to nothing is
  * better skipped than turned into a ring with no entity behind it.
  *
  * The domain is deliberately NOT checked. A battery percentage is a `sensor` almost always
@@ -107,7 +107,7 @@ export const deviceConfigs = (value: unknown): BatteryDeviceConfig[] => {
   return configs
 }
 
-/** The rows as a plain list of ids — what a multiple entity picker can be shown. */
+/** The rows as a plain list of ids: what a multiple entity picker can be shown. */
 export const entityIds = (value: unknown): string[] =>
   deviceConfigs(value).map(config => config.entity)
 
@@ -116,14 +116,14 @@ export const entityIds = (value: unknown): string[] =>
  *
  * Two things it is careful about, both of them about not churning somebody's YAML. An
  * `{ entity: … }` and its bare id mean the same thing, so a row with nothing to add is
- * written as the plain string — a config of four ids must not turn into four objects
+ * written as the plain string: a config of four ids must not turn into four objects
  * because somebody opened the editor. And it goes through `deviceConfig`, so a field the
  * user emptied is dropped rather than written as `icon: ''`, which would shadow the
  * entity's own icon with nothing.
  *
  * `undefined` is what an editor row with no entity chosen comes to. That is deliberate and
- * it is Home Assistant's own reading of the gesture — clearing the entity on a row of its
- * entities card deletes the row — because a device with no sensor behind it is not a device
+ * it is Home Assistant's own reading of the gesture: clearing the entity on a row of its
+ * entities card deletes the row, because a device with no sensor behind it is not a device
  * the card could draw.
  */
 export const deviceRow = (row: unknown): string | BatteryDeviceConfig | undefined => {
@@ -148,7 +148,7 @@ export const deviceRows = (rows: readonly unknown[]): (string | BatteryDeviceCon
 }
 
 /**
- * A row moved from one place in the list to another — everything about a drag except the
+ * A row moved from one place in the list to another: everything about a drag except the
  * dragging, which is `ha-sortable`'s and reaches the editor as a pair of indices.
  *
  * Written over any list rather than over devices, because there is nothing about a battery
@@ -180,7 +180,7 @@ export const watchedIds = (value: unknown): string[] =>
 /**
  * The level, clamped to the range a ring can draw.
  *
- * `unavailable` and `unknown` are `NaN` through `Number`, which is the whole test — there
+ * `unavailable` and `unknown` are `NaN` through `Number`, which is the whole test: there
  * is no need to name them. The clamp is for the sensor that reports 105 after a firmware
  * update, or −1 while it works out what it has: an arc longer than the circle wraps back
  * over itself and reads as nearly empty.
@@ -194,7 +194,7 @@ const readLevel = (state: HassEntity | undefined): number | null => {
 /**
  * Whether the device is on a charger.
  *
- * A named entity wins outright — somebody who has said where to look has said it. Failing
+ * A named entity wins outright: somebody who has said where to look has said it. Failing
  * that, the two attribute conventions that travel on the battery sensor itself, and
  * `battery_state` is compared lower-cased because integrations write `Charging`, `charging`
  * and `CHARGING` between them.
@@ -222,7 +222,7 @@ export const readCharging = (
  * overrode neither.
  *
  * Exported because the editor shows exactly these two as the placeholders in the two fields
- * that override them — a placeholder is a promise about what happens when the field is left
+ * that override them: a placeholder is a promise about what happens when the field is left
  * empty, so it has to be read off the same expression that keeps the promise. The entity id
  * as the last resort for the name rather than an empty string: it is what the user typed,
  * so it is the one name that always identifies the row they meant.

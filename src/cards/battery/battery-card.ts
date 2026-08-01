@@ -14,7 +14,7 @@ export interface BatteryCardConfig extends CupertinoCardConfig {
   /**
    * The devices to draw, in the order they are drawn.
    *
-   * A row is an entity id, or an object when it has to carry more than one — see
+   * A row is an entity id, or an object when it has to carry more than one: see
    * `BatteryDeviceConfig`. Empty or absent means the placeholder, and it deliberately does
    * NOT mean "every battery in the installation": the calendar can show every calendar
    * because a calendar is a thing you want to see all of, while an installation's battery
@@ -26,7 +26,7 @@ export interface BatteryCardConfig extends CupertinoCardConfig {
 }
 
 /**
- * Not localised, like the rest of the library's own words — Home Assistant has no string
+ * Not localised, like the rest of the library's own words: Home Assistant has no string
  * for it. The widget being copied says exactly this.
  */
 const NO_DEVICES = 'No Devices'
@@ -35,15 +35,15 @@ const NO_DEVICES = 'No Devices'
  * An em dash for a level that cannot be read, and it is doing a job the ring cannot.
  *
  * An empty track means 0% and it means "no reading", which are opposite facts about a
- * battery. The percentage is where they are told apart — `0%` against `—` — and it is why a
- * device with nothing to say is still given a ring.
+ * battery. The percentage is where they are told apart: `0%` against the dash, and it is
+ * why a device with nothing to say is still given a ring.
  */
 const LEVEL_DASH = '—'
 
 /**
  * The bolt, and the one glyph in this library that does not come from `@mdi/js`.
  *
- * It is Material's own `Bolt` — the path Material Symbols ships and `@mui/icons-material`
+ * It is Material's own `Bolt`: the path Material Symbols ships and `@mui/icons-material`
  * re-exports, on the same 24-unit grid as MDI, taken verbatim from that package's
  * `Bolt.js`. Apache-2.0, which is compatible with this repository's licence, and one path
  * string rather than a dependency: `@mui/icons-material` is a React package of some ten
@@ -52,8 +52,8 @@ const LEVEL_DASH = '—'
  * MDI's own bolts were the obvious first answer and are not this shape. `mdiFlash` and
  * `mdiLightningBolt` are both harder-edged, with a flat top and a straight leading edge;
  * Material's tapers and kinks, which is what makes it read as a charging mark next to a
- * round gauge rather than as a hazard sign. Everything else about how it is drawn — inlined
- * rather than handed to `<ha-icon>`, so nothing waits on the icon registry — is the same
+ * round gauge rather than as a hazard sign. Everything else about how it is drawn (inlined
+ * rather than handed to `<ha-icon>`, so nothing waits on the icon registry) is the same
  * arrangement as the calendar's all-day badge.
  */
 const BOLT_PATH =
@@ -63,8 +63,8 @@ const BOLT_PATH =
 /**
  * How that bolt is centred in its badge.
  *
- * It inks x 7.1–17.5 and y 3–21, so its centre is (12.3, 12) rather than the grid's (12, 12)
- * — the glyph leans right, and centring it on the nominal middle leaves the badge visibly
+ * It inks x 7.1–17.5 and y 3–21, so its centre is (12.3, 12) rather than the grid's (12, 12):
+ * the glyph leans right, and centring it on the nominal middle leaves the badge visibly
  * lopsided. Its furthest corner is 10.4 units from that centre, and 0.95 brings it to 9.9
  * inside a disc of radius 12: a bolt that fills the badge without its tips touching the rim.
  */
@@ -75,7 +75,7 @@ const BOLT = 'translate(12 12) scale(0.95) translate(-12.3 -12)'
  *
  * The disc is what makes it work at all. The badge sits at twelve o'clock, which is where
  * the arc starts, so a green bolt laid straight on it is invisible at exactly the moment it
- * matters most — a device left on the charger overnight, at 100%, whose arc runs all the way
+ * matters most: a device left on the charger overnight, at 100%, whose arc runs all the way
  * round. Punching the surface through first costs a notch out of the arc and buys a badge
  * that reads at every level. It is drawn over the arc rather than replacing part of it, so
  * the length of the arc still means what it means.
@@ -100,7 +100,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
     CupertinoCard.styles,
     css`
       /* Every px in this stylesheet is a design unit multiplied by --cw-scale, and
-         layout.ts holds the same numbers unscaled — it divides the measured box by the
+         layout.ts holds the same numbers unscaled: it divides the measured box by the
          factor instead. The one length that arrives already scaled is --cw-ring-size,
          which the template sets from the grid: it is the only number the two halves share,
          and it travels rather than being restated. */
@@ -134,7 +134,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
         gap: var(--cw-ring-gap);
       }
 
-      /* The ring's width, unless the caption under it is wider — a 40px ring with a full
+      /* The ring's width, unless the caption under it is wider: a 40px ring with a full
          hundred per cent beneath it is a 61px cell. Taken from max-content rather than from
          a number, so the two never disagree about the type: layout.ts only has to keep a
          captioned column wide enough for the wider of them, which is its LABEL_WIDTH. */
@@ -191,7 +191,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
         position: absolute;
         left: 50%;
         /* Centred on the stroke's centreline, which is RING_STROKE / 2 / RING_BOX of the
-           diameter down from the top — see ring.ts. Straddling it that way leaves about an
+           diameter down from the top (see ring.ts). Straddling it that way leaves about an
            eighth of the ring's width standing above the box, which the card's inset absorbs. */
         top: calc(var(--cw-ring-size) * 0.05);
         width: var(--cw-bolt-size);
@@ -199,7 +199,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
         transform: translate(-50%, -50%);
       }
 
-      /* 22px semibold, and it does not shrink for a three-digit reading — which is why
+      /* 22px semibold, and it does not shrink for a three-digit reading, which is why
          layout.ts prices a captioned column against the width that reading needs. Tabular
          figures so the numeral does not shift between 9% and 90%. */
       .level {
@@ -229,7 +229,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
     `,
   ]
 
-  /** The `custom:` prefix is load-bearing — see the calendar card's note on it. */
+  /** The `custom:` prefix is load-bearing (see the calendar card's note on it). */
   public static getStubConfig(): BatteryCardConfig {
     return { type: `custom:${BATTERY_CARD_TAG}` }
   }
@@ -238,7 +238,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
    * Worth more here than anywhere else in the library: this is the one card that draws
    * nothing at all until it has been told which devices, so the picker is not a convenience
    * but the only route to a working card short of writing YAML. And a card that answered
-   * this with nothing would lose its **Visibility** and **Layout** tabs as well — see the
+   * this with nothing would lose its **Visibility** and **Layout** tabs as well; see the
    * calendar card, where the contract is written up.
    */
   public static getConfigElement(): LovelaceCardEditor {
@@ -260,7 +260,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
    * Open the device's own more-info dialog.
    *
    * `hass-more-info` with an `entityId`, which is the event Home Assistant's own cards fire
-   * for this — verified in the 2026.7.4 bundle rather than taken from documentation, and
+   * for this (verified in the 2026.7.4 bundle rather than taken from documentation), and
    * `bubbles`/`composed` are what carry it out of this shadow root to the dashboard that
    * listens for it.
    *
@@ -287,7 +287,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
    * The arc uses lit's **`svg`** tag rather than `html`, and that is not a nicety. A nested
    * lit template is parsed on its own, so an `html` one creates this circle in the HTML
    * namespace: it lands in the DOM with every attribute set and every *presentation*
-   * attribute ignored — `stroke-width` reads back as 1px, `stroke-dasharray` as `none` — and
+   * attribute ignored: `stroke-width` reads back as 1px, `stroke-dasharray` as `none`, and
    * the card draws a bare track at every level, with nothing anywhere to say why.
    */
   private _renderRing(device: BatteryDevice): TemplateResult {
@@ -328,7 +328,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
   /**
    * One device.
    *
-   * The name is never drawn — it is the tooltip and the accessible name, and §6 of the rules
+   * The name is never drawn: it is the tooltip and the accessible name, and §6 of the rules
    * says why: six device names at a size that fits under a ring are six lines of truncated
    * text, and the icon inside the ring is already the answer to "which one is this".
    */

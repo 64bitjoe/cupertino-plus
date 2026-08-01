@@ -17,11 +17,11 @@
  * chronological, so today is drawn before tomorrow is drawn before Sunday, and what falls
  * off the bottom is always the far end of the week.
  *
- * What is left over is summarised as `2 more events`, and that row speaks for ONE DAY —
+ * What is left over is summarised as `2 more events`, and that row speaks for ONE DAY:
  * the section it lands in, never the whole loaded fortnight behind it. It costs a row
  * like everything else, and on a column that came out exactly full it buys one: a
  * location line gives way first, and failing that the last event drawn steps aside and
- * joins the count. What it will not buy is its own section's last visible row — that trade
+ * joins the count. What it will not buy is its own section's last visible row: that trade
  * spends the one event of the day the reader could actually read.
  *
  * A heading is allowed to end a column, then, but not the card: a heading with the count
@@ -30,9 +30,9 @@
  *
  * The two sizes disagree about locations, and the disagreement is deliberate:
  *
- *   Medium  greedy — a location wins even when it costs the next event its place.
+ *   Medium  greedy: a location wins even when it costs the next event its place.
  *           There is a second column to catch the overflow.
- *   Small   count first — everything is packed compactly, then locations are added
+ *   Small   count first: everything is packed compactly, then locations are added
  *           back top-down out of whatever budget is left over. With four rows total,
  *           a location is a luxury that must not cost you an entire event.
  */
@@ -45,7 +45,7 @@ export const COST = { header: 1, compact: 2, expanded: 3, more: 1, allday: 1 } a
 export type LayoutMode = 'small' | 'medium'
 
 /**
- * What an item costs with no location line on it — the least it can be drawn for.
+ * What an item costs with no location line on it: the least it can be drawn for.
  *
  * An all-day entry is one line and only ever one line: no time to print under the
  * title, and no expanded form to print a location on. Anything else is two.
@@ -58,7 +58,7 @@ const plainCost = (node: FlowNode): number =>
  *
  * Not something `buildFlow` can produce: it is packing that discovers there was more
  * than would fit, so packing is what invents the row. It carries a colour because the
- * bar down its left says which calendar you are missing — the first one you cannot see.
+ * bar down its left says which calendar you are missing: the first one you cannot see.
  */
 export interface MoreNode {
   type: 'more'
@@ -96,7 +96,7 @@ export function packFlow(
 ): LayoutColumn[] {
   const columns: LayoutColumn[] = budgets.map(budget => ({ budget, used: 0, rows: [] }))
   let index = 0
-  /** The first node that has not been placed — where the tail begins. */
+  /** The first node that has not been placed: where the tail begins. */
   let cursor = 0
 
   const room = (): number => {
@@ -118,7 +118,7 @@ export function packFlow(
     if (node.type === 'header') {
       // Its own row and nothing reserved behind it. What this replaces held back the cost
       // of the first event as well and moved the whole section on if that would not fit,
-      // which cost the widget headings it was perfectly able to draw — and the screenshots
+      // which cost the widget headings it was perfectly able to draw; the screenshots
       // do not do it either: `WEDNESDAY, 29 JUL` appears above a `1 more event` with not
       // one of that day's events drawn. `dropTrailingHeader` is all that is left of it.
       if (room() < COST.header) {
@@ -150,7 +150,7 @@ export function packFlow(
 
   // The indicator before the slack, and in that order for a reason: in the small size a
   // spare row spent admitting that an event is missing beats one spent on a location.
-  // "Count wins" is about how much of the day you know about, not how much is drawn — and
+  // "Count wins" is about how much of the day you know about, not how much is drawn, and
   // it is why the indicator may take a row back off the packing above, never the reverse.
   addMoreRow(columns, flow.slice(cursor), Math.min(index, columns.length - 1))
   dropTrailingHeader(columns)
@@ -168,7 +168,7 @@ export function packFlow(
  *
  * **It counts one day, not the window.** `N` is the rest of the section the row lands in,
  * so the tail is read only as far as the next heading. A card that said `19 more events`
- * was answering a question nobody asked — how busy the loaded fortnight is — while the
+ * was answering a question nobody asked (how busy the loaded fortnight is) while the
  * line sits inside `TOMORROW`, where it reads as a statement about tomorrow. Two events
  * of five drawn under that heading is `3 more events`, whatever the rest of the month
  * holds. The days past the cut are not mentioned at all, and that is the honest answer:
@@ -198,12 +198,12 @@ function addMoreRow(columns: LayoutColumn[], tail: readonly FlowNode[], index: n
   // about the trade: `evictLast` below refuses to leave "a column holding a count and no
   // calendar", and a column too short to have fitted an event in the first place is the
   // same shape reached without giving anything up. Same answer, and it is what keeps the
-  // small size monotonic — one row more room draws the event and says nothing, so one row
+  // small size monotonic: one row more room draws the event and says nothing, so one row
   // less must not drop the event and announce it instead.
   if (!column.rows.some(placed => placed.node.type === 'item')) return
 
   if (column.budget - column.used < COST.more) {
-    // Nothing was spare, so the row is bought — cheapest first, and a location line is
+    // Nothing was spare, so the row is bought: cheapest first, and a location line is
     // always cheaper than an event. Either way it is exactly the one row that is short,
     // never two: `used` cannot exceed `budget`, so the shortfall is `COST.more` at most.
     const hidden = reclaimLocation(column) ? undefined : evictLast(column)
@@ -235,8 +235,8 @@ function addMoreRow(columns: LayoutColumn[], tail: readonly FlowNode[], index: n
  * reading.
  *
  * After `addMoreRow`, therefore, and nothing is retried once the heading goes. The row it
- * gives back belongs to the section just removed — the tail begins with that section's
- * first event — so a count bought with it would sit under the previous day's rows and be
+ * gives back belongs to the section just removed (the tail begins with that section's
+ * first event), so a count bought with it would sit under the previous day's rows and be
  * read as that day's.
  *
  * The last drawn row is enough to test: rows are a prefix of the flow, so a heading with
@@ -258,7 +258,7 @@ function dropTrailingHeader(columns: LayoutColumn[]): void {
  *
  * The last rather than the first: locations are handed out top-down, so the one given
  * last is the one given most cheaply, and taking it back leaves the top of the column
- * where the reader last saw it. This only ever finds anything in the medium size — the
+ * where the reader last saw it. This only ever finds anything in the medium size: the
  * small size packs compactly and expands out of the slack afterwards, which is the same
  * priority arrived at from the other direction (§5, §6).
  */
@@ -278,7 +278,7 @@ function reclaimLocation(column: LayoutColumn): boolean {
  * Give up the last event drawn in `column`, and answer with what is now hidden.
  *
  * The trade the indicator is allowed to make: one event you can see for the knowledge
- * that several exist. Refused — `undefined`, and the widget says nothing — when the row
+ * that several exist. Refused (`undefined`, and the widget says nothing) when the row
  * above is not an event of its own, which is the two cases where the trade costs more than
  * the row is worth. Nothing above would leave a column holding a count and no calendar. A
  * heading above would spend the only event of a day the reader can read on a number: the
@@ -299,7 +299,7 @@ function evictLast(column: LayoutColumn): CalendarItem | undefined {
  * Spend a small column's leftover rows on locations, top-down.
  *
  * Runs after packing, which is the whole point: one event in a four-row column shows
- * its location, two events do not — neither of them, even though the first one would
+ * its location, two events do not: neither of them, even though the first one would
  * have fitted, because a lopsided pair reads worse than a tidy one.
  *
  * It runs after the indicator too, so a row the indicator freed and did not need is slack
@@ -321,10 +321,10 @@ function expandFromSlack(column: LayoutColumn | undefined): void {
 //
 // Apple can hardcode "4 rows here, 7 rows there" because an iPhone widget is always
 // the same number of points tall. A Home Assistant card is whatever the user dragged
-// it to, so the budgets are measured instead — and the constants below are chosen so
+// it to, so the budgets are measured instead, and the constants below are chosen so
 // that a card at its default 4-grid-row height lands on exactly Apple's 4 and 7.
 //
-// Every number here is in **design units** — pixels at `scale: 100`. `config.scale`
+// Every number here is in **design units**: pixels at `scale: 100`. `config.scale`
 // multiplies what the card actually draws, so `geometryFor` divides the box it measured
 // by the same factor and the rest of this section needs to know nothing about it. That is
 // the whole reason for dividing rather than for scaling each constant in turn: there is
@@ -353,8 +353,8 @@ const COMPACT_PX = 56
 /**
  * What one row of the budget is allowed to cost in pixels, gap included.
  *
- * The kinds of row are not equally dear per row — a heading is 26px for its one, a
- * `2 more events` 28px, an all-day chip 30px, an expanded item 82px for its three — so
+ * The kinds of row are not equally dear per row (a heading is 26px for its one, a
+ * `2 more events` 28px, an all-day chip 30px, an expanded item 82px for its three), so
  * the budget is priced at the most expensive of them, half of a compact row. Charging at
  * that rate means no mix of rows can overflow the column it was packed into.
  */
@@ -375,7 +375,7 @@ export interface Geometry {
  * Row budgets for a card `height` pixels tall, drawn at `scale`.
  *
  * The left column is short by the date block sitting above it; the right column has
- * the full height to itself. At the default 248px that is 4 and 7 — the numbers
+ * the full height to itself. At the default 248px that is 4 and 7: the numbers
  * Apple's own widget uses.
  *
  * The border is subtracted in pixels and the inset in design units, which looks like an

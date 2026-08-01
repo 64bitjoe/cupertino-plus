@@ -3,7 +3,7 @@
  *
  * The calendar's equivalent is a *budget*: a stream of rows arriving to be cut somewhere,
  * priced against the box. This card has no stream. Its content is exactly the devices the
- * config names, so nothing is ever cut for lack of anything better to draw — and the
+ * config names, so nothing is ever cut for lack of anything better to draw, and the
  * questions the box settles are different ones:
  *
  *   how many columns    from `cwLayout`, so the same measured width that gives the calendar
@@ -15,7 +15,7 @@
  *   how big a ring is   the cell it landed in, capped.
  *
  * The order matters, and it is a priority: the count decides the grid, the grid decides the
- * cell, and the ring fits the cell. Nothing goes the other way — a ring is never the reason
+ * cell, and the ring fits the cell. Nothing goes the other way: a ring is never the reason
  * a device is not drawn, until the box is too small to hold the row it would be in.
  *
  * Every number below is in **design units**, pixels at `scale: 100`, exactly as in the
@@ -45,7 +45,7 @@ const GAP = 14
 /** Must match `--cw-ring-label-gap`, between a ring and the percentage under it. */
 const LABEL_GAP = 8
 
-/** The percentage's line box — the `line-height` of the `.level` rule. */
+/** The percentage's line box: the `line-height` of the `.level` rule. */
 const LABEL = 28
 
 /**
@@ -54,13 +54,13 @@ const LABEL = 28
  * Measured rather than reasoned about, in the harness at a device pixel ratio of 1: the
  * `.level` rule's 22px semibold sets `100%` at 61.0 design units against `72%` at 47.3 and
  * `0%` at 33.6. 64 is that rounded up with a unit or two for a font stack that is not the
- * one it was measured in — the type here is San Francisco where it can be had and whatever
+ * one it was measured in: the type here is San Francisco where it can be had and whatever
  * the theme asked for where it cannot, and the fallback is not guaranteed to be narrower.
  *
  * It is the widest reading that has to fit, which is the point: the type does not shrink for
  * it (§6), so a cell measured against `72%` would clip only on the day the device was full.
  * Below this the percentages come off altogether rather than being set in a size of their
- * own — a widget with two type sizes for one number is a worse answer than a widget that
+ * own; a widget with two type sizes for one number is a worse answer than a widget that
  * admits the column is too narrow to caption.
  */
 const LABEL_WIDTH = 64
@@ -71,7 +71,7 @@ const LABEL_WIDTH = 64
  * The widget being copied draws a 62pt ring in a 158pt square with 16pt of inset: 39% of
  * the widget's width, two of them nearly filling the space between the insets. Home
  * Assistant's small footprint is a ~246px square rather than 158pt, and 39% of that is
- * this — so a card at the design footprint reproduces the reference's proportion, and the
+ * this, so a card at the design footprint reproduces the reference's proportion, and the
  * cap only starts to bite on a card dragged wider than the shape the rings were laid out
  * for. Which is what a cap is for: past that the rings would grow to fill a box that no
  * longer looks like a widget.
@@ -81,11 +81,11 @@ export const RING_MAX = 96
 /**
  * The smallest, and this one is a legibility floor.
  *
- * An icon is drawn at 45% of the ring, so this is a 18px glyph — about where an `mdi`
+ * An icon is drawn at 45% of the ring, so this is a 18px glyph, about where an `mdi`
  * outline stops being a silhouette you can name. It is a floor in two senses: no row is
  * added whose cell could not hold a ring this big, and a box too small even for one row of
  * them gets the ring anyway and is clipped by `ha-card`. Clipping is the right failure
- * there — `min_rows` and `min_columns` keep the Layout tab well clear of it, and a card
+ * there: `min_rows` and `min_columns` keep the Layout tab well clear of it, and a card
  * that answered a squashed box by drawing nothing would be a card that looked broken
  * rather than cramped.
  */
@@ -107,14 +107,14 @@ const COLUMNS: Record<WidgetLayout, number> = { small: 2, medium: 4 }
  * Four devices is what either of these two footprints draws, and that number is the design
  * rather than an arithmetic consequence: the square holds its 2 × 2, and the wide card holds
  * one row of four and does **not** stack a second under it. A wide card with 4 + 2 fits
- * perfectly well and looks wrong — a full row with a stub centred beneath it reads as a card
+ * perfectly well and looks wrong: a full row with a stub centred beneath it reads as a card
  * that ran out of something, where one row of four reads as the widget it is.
  *
  * So a config may name six devices and see four. That is deliberate and it is not the end of
  * the story: the six exist for a `large` footprint, which is the one that has two rows of
  * four to give them, and which will arrive here as a third entry in this record.
  *
- * The other direction — fewer rows than this when the box is too short for them — is still
+ * The other direction (fewer rows than this when the box is too short for them) is still
  * the measurement's call, below.
  */
 const MAX_ROWS: Record<WidgetLayout, number> = { small: 2, medium: 1 }
@@ -139,7 +139,7 @@ export interface BatteryGrid {
    *
    * `start` in two columns, `center` in four, and the asymmetry is deliberate. Centring a
    * lone ring between two columns parks it exactly over the gap in the row above, which
-   * reads as a pyramid rather than as a grid with a corner missing — so the two-column
+   * reads as a pyramid rather than as a grid with a corner missing, so the two-column
    * grid stays a grid and the odd ring keeps the left column. In four columns there is no
    * such alignment to lose, and a pair packed left under a full row of four reads as
    * lopsided instead.
@@ -150,8 +150,8 @@ export interface BatteryGrid {
 /**
  * The grid for `count` devices in the box the card was measured in.
  *
- * `scale` is the factor from `config.scale`, and it is divided out of the box exactly once
- * — see the module comment. Everything returned is either a count or a design unit.
+ * `scale` is the factor from `config.scale`, and it is divided out of the box exactly once,
+ * as the module comment explains. Everything returned is either a count or a design unit.
  */
 export const gridFor = (mode: WidgetLayout, count: number, box: Box, scale = 1): BatteryGrid => {
   const columns = COLUMNS[mode]
@@ -165,14 +165,14 @@ export const gridFor = (mode: WidgetLayout, count: number, box: Box, scale = 1):
   const cellWidth = (width - (across - 1) * GAP) / across
 
   // How many rows the height holds, priced at a compact cell. The last row has no gap under
-  // it, hence the `+ GAP` — the same shape as the calendar's `rowsIn`. At least one row
+  // it, hence the `+ GAP`, the same shape as the calendar's `rowsIn`. At least one row
   // always, so a box too short to be honest about still draws something and is clipped
   // rather than left blank.
   //
   // Priced without the caption on purpose, which is what keeps this out of a circle: the
   // caption depends on how many rings are drawn, which depends on the rows, which would then
   // depend on the caption. It is safe because a captioned grid is one row by definition and
-  // one captioned row fits every footprint the Layout tab offers — the shortest is 3 grid
+  // one captioned row fits every footprint the Layout tab offers: the shortest is 3 grid
   // rows, which is 108 design units even at the largest scale, against the 76 a ring and its
   // caption need.
   const fits = Math.max(1, Math.floor((height + GAP) / (RING_MIN + GAP)))
@@ -180,7 +180,7 @@ export const gridFor = (mode: WidgetLayout, count: number, box: Box, scale = 1):
   const visible = Math.min(count, columns * rows)
 
   // Both halves are required, and they fail differently. More rings than one row holds is
-  // the reference's own rule — the percentages come off and the grid closes up. Too little
+  // the reference's own rule: the percentages come off and the grid closes up. Too little
   // width is this card's addition, for the footprints Home Assistant permits and a phone has
   // no equivalent of: `100%` clipped in half is worse than no caption at all.
   //

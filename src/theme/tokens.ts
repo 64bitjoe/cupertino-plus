@@ -5,7 +5,7 @@ import { css } from 'lit'
  *
  * Every token falls back through a Home Assistant theme variable first, so a user's
  * theme restyles these cards for free, and only then to an Apple-ish default. Cards
- * must never read `--primary-text-color` and friends directly — they read `--cw-*`,
+ * must never read `--primary-text-color` and friends directly: they read `--cw-*`,
  * and this file is the single place where the bridge lives.
  *
  * Dark values hang off `:host([dark])`, which the base card reflects from
@@ -17,7 +17,7 @@ export const tokens = css`
     /* ---- Scale ------------------------------------------------------------- */
     /* Set inline on the element by the base card, from config.scale. Every length below
        that belongs to the widget's own design is multiplied by it; the ones bridged
-       straight from Home Assistant — the card radius, the font family — are not.
+       straight from Home Assistant (the card radius, the font family) are not.
        core/scale.ts has the whole story, including why a stylesheet must not set this
        itself. The 1 here is what a card renders at before it is configured. */
     --cw-scale: 1;
@@ -29,7 +29,7 @@ export const tokens = css`
       var(--ha-font-family-body, Roboto), 'Helvetica Neue', Arial, sans-serif;
 
     /* Apple's text styles, trimmed to what widgets use. size / line-height, both
-       scaled — a size that grew while its line-height stood still would re-space the
+       scaled: a size that grew while its line-height stood still would re-space the
        paragraph rather than resize it, and layout.ts prices rows off the line box. */
     --cw-text-large-title: 700 calc(34px * var(--cw-scale)) / calc(41px * var(--cw-scale))
       var(--cw-font);
@@ -61,7 +61,7 @@ export const tokens = css`
     /* The system "fill" greys: the tint behind chips, dividers and empty slots. */
     --cw-fill: rgba(120, 120, 128, 0.12);
     --cw-fill-strong: rgba(120, 120, 128, 0.2);
-    /* The unfilled part of a gauge — the battery card's rings run on this. Deliberately
+    /* The unfilled part of a gauge: the battery card's rings run on this. Deliberately
        not the fill above, and not a shade of it either: a fill sits behind content and
        reads as a surface, while a track is the part of a measurement that has not been
        reached. It has to stay quieter than the arc drawn over it, or the ring reads as
@@ -85,13 +85,13 @@ export const tokens = css`
        beside it would read as a mistake rather than as a setting. */
     --cw-radius: var(--ha-card-border-radius, 22px);
     /* Scaled, unlike the one above: this radius is inside the card, and the all-day
-       badge is drawn concentric with it — see the .row.allday rule. */
+       badge is drawn concentric with it; see the .row.allday rule. */
     --cw-radius-inner: calc(12px * var(--cw-scale));
     --cw-radius-pill: 999px;
 
     /* ---- Spacing ----------------------------------------------------------- */
     /* Home Assistant's own scale is 4px-stepped (--ha-space-1 is 4px), the same
-       grid Apple uses, so we ride on it and inherit any theme that rescales it —
+       grid Apple uses, so we ride on it and inherit any theme that rescales it;
        and then scale that, so a theme's grid and the card's own stay in step. */
     --cw-space-1: calc(var(--ha-space-1, 4px) * var(--cw-scale));
     --cw-space-2: calc(var(--ha-space-2, 8px) * var(--cw-scale));

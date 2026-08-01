@@ -208,7 +208,7 @@ const root = document.getElementById('app') as HTMLElement
 const draw = (): void => {
   const state = site()
   // The theme classes are Home Assistant's, and they go on `body` so that a card anywhere
-  // on the page — including the one inside the editor panel — inherits the same dashboard
+  // on the page (including the one inside the editor panel) inherits the same dashboard
   // tokens it would inherit from a real dashboard.
   document.body.className = state.theme === 'dark' ? 'theme-dark' : 'theme-light'
 

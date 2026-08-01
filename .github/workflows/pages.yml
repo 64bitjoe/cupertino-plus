@@ -1,6 +1,6 @@
 name: Pages
 
-# Publishes the showcase site — dev/index.html, built by `pnpm build:site` — to
+# Publishes the showcase site (dev/index.html, built by `pnpm build:site`) to
 # https://sabbaken.github.io/cupertino-widgets/
 #
 # One manual step before the first run: in Settings -> Pages, set Source to

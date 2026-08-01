@@ -2,7 +2,7 @@
  * Stand-ins for the Home Assistant frontend elements our cards use.
  *
  * `ha-card`'s CSS is copied from the one that ships inside home-assistant 2026.7.4, so
- * the harness shows the same surface the real dashboard does — including the 1px border
+ * the harness shows the same surface the real dashboard does, including the 1px border
  * that is easy to forget about, which `layout.ts` prices its row budget against. The one
  * departure is marked below. `ha-form` and `ha-icon` are the opposite: a working shape,
  * not a copy. See the notes on them.
@@ -44,7 +44,7 @@ const entityName = (hass: HomeAssistant | undefined, entityId: string): string =
  * installation into a list of batteries, and the exclusions are what stop it offering a device
  * that is already in the list.
  *
- * Shared by the two stubs that need it — the form's entity rows and the picker below — because
+ * Shared by the two stubs that need it (the form's entity rows and the picker below) because
  * the real ones share it too, and a harness where one of them filtered differently would be
  * answering a question Home Assistant does not ask.
  */
@@ -74,7 +74,7 @@ const HA_CARD_CSS = `
     backdrop-filter: var(--ha-card-backdrop-filter, none);
     box-shadow: var(--ha-card-box-shadow, none);
     box-sizing: border-box;
-    /* The real rule has no 12px here — it leans on --ha-border-radius-lg, which is set
+    /* The real rule has no 12px here: it leans on --ha-border-radius-lg, which is set
        by a theme the harness does not load. The card overrides this anyway. */
     border-radius: var(--ha-card-border-radius, var(--ha-border-radius-lg, 12px));
     border-width: var(--ha-card-border-width, 1px);
@@ -88,7 +88,7 @@ const HA_CARD_CSS = `
 `
 
 /**
- * Not copied from anywhere — the real `ha-form` is a stack of `ha-selector`s and looks
+ * Not copied from anywhere: the real `ha-form` is a stack of `ha-selector`s and looks
  * nothing like this. Enough to tell the rows apart and read the helper lines.
  */
 const HA_FORM_CSS = `
@@ -118,7 +118,7 @@ const HA_FORM_CSS = `
 
   /* A plain row. The real selector draws a searchable picker with friendly names, area
      breadcrumbs and drag handles, and no amount of border-radius here would get any
-     closer to it — so this stays out of the way instead of imitating a card. */
+     closer to it, so this stays out of the way instead of imitating a card. */
   .option {
     display: flex;
     align-items: center;
@@ -168,15 +168,15 @@ const HA_FORM_CSS = `
 /**
  * A stand-in for the Home Assistant icon registry, which is a much bigger thing than this.
  *
- * The real `ha-icon` resolves any of the ~7500 `mdi:` names — and a custom icon set, and an
- * entity's computed icon — out of an IndexedDB cache it fills over the network. Here it is a
+ * The real `ha-icon` resolves any of the ~7500 `mdi:` names (and a custom icon set, and an
+ * entity's computed icon) out of an IndexedDB cache it fills over the network. Here it is a
  * lookup table, deliberately: importing all of `@mdi/js` would put a megabyte of path strings
  * into the showcase that GitHub Pages then serves to every visitor, for the sake of icons only
  * this file's own mock devices ever ask for.
  *
  * So: add an entry when `battery-devices.ts` grows one. A name with no entry draws the
  * question mark rather than nothing, on the same grounds as the `ha-form` stub's unsupported
- * row — a silently blank icon reads as a broken card, and the cards are what this page is for.
+ * row: a silently blank icon reads as a broken card, and the cards are what this page is for.
  */
 const ICONS: Record<string, string> = {
   'mdi:battery': mdiBattery,
@@ -227,7 +227,7 @@ class HaIconStub extends HTMLElement {
     this._root.append(style)
   }
 
-  /** Both a property and an attribute, because the real one is — cards use either. */
+  /** Both a property and an attribute, because the real one is too, and cards use either. */
   public static get observedAttributes(): string[] {
     return ['icon']
   }
@@ -274,7 +274,7 @@ class HaCardStub extends HTMLElement {
 /**
  * `ha-svg-icon`: the same glyph as `ha-icon`, given as a path rather than by name.
  *
- * A property and not an attribute, because that is how it is used — `.path=${mdiDrag}`.
+ * A property and not an attribute, because that is how it is used, as in `.path=${mdiDrag}`.
  */
 class HaSvgIconStub extends HTMLElement {
   private readonly _root: ShadowRoot
@@ -432,7 +432,7 @@ const CHEVRON = 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z'
  *
  * The one behaviour worth copying rather than approximating is the toggle guard. The real
  * `_toggleContainer` opens with `if (e.defaultPrevented) return`, which is the whole reason a
- * button can live inside a clickable summary at all — the editor's delete handler calls
+ * button can live inside a clickable summary at all; the editor's delete handler calls
  * `preventDefault`, and a stub without this check would delete a device and open the panel
  * below it in the same click.
  */
@@ -564,7 +564,7 @@ const HA_ENTITY_PICKER_CSS = `
  *
  *  - **`add-button`**: with it the real picker renders `ha-button` with the label from
  *    `addButtonLabel` and `@click=${this.open}`, and passes `undefined` down as its value
- *    whatever it holds — so it is a button before the press, opens the list on the press, and
+ *    whatever it holds, so it is a button before the press, opens the list on the press, and
  *    is a button again afterwards, with nothing to reset. Both halves matter and one of them
  *    is what two earlier attempts at this control got wrong.
  *  - **`value-changed` carrying a bare id string**, not the `{ [name]: value }` object an
@@ -704,7 +704,7 @@ class HaEntityPickerStub extends HTMLElement {
  * The real one loads sortablejs and makes its first child's children draggable by a handle,
  * then rolls its own DOM change back and reports `item-moved` with two indices so the
  * framework can re-render the new order. Reproducing that is not what this harness is for,
- * so this renders its children and drags nothing — the reorder *rule* is `moveRow` in
+ * so this renders its children and drags nothing: the reorder *rule* is `moveRow` in
  * `model.ts`, which a test covers, and the drag itself is one of the things `pnpm ha:up` is
  * for. Light DOM rather than a shadow root, like the real one, so the editor's own CSS still
  * reaches the rows inside it.
@@ -714,7 +714,7 @@ class HaSortableStub extends HTMLElement {}
 /**
  * A stand-in for `ha-form`, so a card editor can be developed here too.
  *
- * It implements the API surface our editors actually touch — the `.hass` / `.data` /
+ * It implements the API surface our editors actually touch: the `.hass` / `.data` /
  * `.schema` / `.computeLabel` / `.computeHelper` properties, and a `value-changed`
  * event whose detail carries the WHOLE data object rather than the field that moved,
  * which is the part that is easy to get wrong. Behind that it is plain form controls.
@@ -725,7 +725,7 @@ class HaSortableStub extends HTMLElement {}
  * behaviour here, then look at it in the dev Home Assistant (`pnpm ha:up`) before
  * believing anything about how it reads.
  *
- * Its own shadow root, like the real one — an editor puts this inside *its* shadow
+ * Its own shadow root, like the real one. An editor puts this inside *its* shadow
  * root, where the harness stylesheet cannot reach it anyway.
  */
 class HaFormStub extends HTMLElement {
@@ -743,7 +743,7 @@ class HaFormStub extends HTMLElement {
     super()
     // `delegatesFocus` is the real one's (`shadowRootOptions = {mode:'open', delegatesFocus:true}`)
     // and it is not decoration: it is how an editor gets the keyboard into a control it has
-    // just revealed — `form.focus()` lands on the field inside, and a keydown there bubbles
+    // just revealed; `form.focus()` lands on the field inside, and a keydown there bubbles
     // back out to the editor's own handler. A stub without it swallows both.
     this._root = this.attachShadow({ mode: 'open', delegatesFocus: true })
     const style = document.createElement('style')
@@ -922,7 +922,7 @@ class HaFormStub extends HTMLElement {
    *
    * The real icon picker is a searchable combo box over the whole MDI set and this is a
    * field you type `mdi:watch` into, which is the one thing worth having here: the value
-   * the editor writes. Both report `undefined` rather than `''` for an emptied field —
+   * the editor writes. Both report `undefined` rather than `''` for an emptied field:
    * that is what makes an override disappear from the config instead of shadowing the
    * entity's own value with nothing, so the stub reports it the same way.
    */
@@ -1004,12 +1004,12 @@ class HaFormStub extends HTMLElement {
 
   /**
    * One entity, or none. A blank option rather than a required choice, because that is what
-   * clearing the real picker does — and an editor is judged as much on what it removes from
+   * clearing the real picker does, and an editor is judged as much on what it removes from
    * a config as on what it puts there.
    *
    * It also answers to **`open()`**, which is the one thing about the real picker an editor
-   * can call. `ha-entity-picker` has such a method — its own add button is
-   * `@click=${this.open}` — and the battery card's device list finds it by walking the shadow
+   * can call. `ha-entity-picker` has such a method (its own add button is
+   * `@click=${this.open}`) and the battery card's device list finds it by walking the shadow
    * trees under its `ha-form` so that its Add button opens the list in one press. A stub
    * without an `open` would send that search down its fallback path, and the harness would
    * quietly stop exercising the thing being developed.

@@ -16,7 +16,7 @@ import type {
  * `ha-form` reports every field it knows about on every change, including the ones the
  * user has just emptied, and a multiple entity picker says "nothing selected" with `[]`
  * rather than by dropping the key. Home Assistant strips `undefined` out of a config it
- * is handed and nothing else, so an `entities: []` would survive into the user's YAML —
+ * is handed and nothing else, so an `entities: []` would survive into the user's YAML,
  * where it means exactly what its absence means, only louder.
  */
 const isBlank = (value: unknown): boolean =>
@@ -42,8 +42,8 @@ const isMultiple = (selector: Selector): boolean => {
  * What `ha-form` is handed: the config, with the defaults showing through where it is
  * silent, and a scalar widened to a list wherever the schema says `multiple`.
  *
- * That last part is not decoration. A hand-written `entities: calendar.work` — a scalar
- * where the schema says `multiple` — reaches `ha-entities-picker`, which maps over the
+ * That last part is not decoration. A hand-written `entities: calendar.work` (a scalar
+ * where the schema says `multiple`) reaches `ha-entities-picker`, which maps over the
  * value and throws on a string. The selector does know how to coerce, but only inside
  * `willUpdate` and only when the *selector* has changed:
  *
@@ -75,7 +75,7 @@ export const formData = (
  * Fold what the form reported back into the card config.
  *
  * Only the `fields` the form owns are touched. The data object also carries every other
- * key of the config — because that is what we put in it — and a `grid_options` or a
+ * key of the config (because that is what we put in it), and a `grid_options` or a
  * `visibility` that came along for the ride has to come back out untouched, including
  * when it happens to be empty.
  */
@@ -103,11 +103,11 @@ export const applyFormData = <C extends LovelaceCardConfig>(
  * `hui-element-editor` in the 2026.7.4 frontend:
  *
  *  - the host sets `hass` first, then calls `setConfig(config)`, and calls `setConfig`
- *    again on every later change — including the ones this editor itself emitted, and
+ *    again on every later change, including the ones this editor itself emitted, and
  *    including edits made in the YAML tab;
  *  - the element is built once and kept; only a change of `config.type` replaces it;
  *  - a change is reported with a `config-changed` event carrying the WHOLE config in
- *    `detail.config`, dispatched on the editor element itself — that is where the host
+ *    `detail.config`, dispatched on the editor element itself: that is where the host
  *    added its listener;
  *  - keys whose value is `undefined` are stripped out of that config. Nothing else is;
  *  - throwing out of `setConfig` is how an editor says "I cannot edit this": the host
@@ -115,7 +115,7 @@ export const applyFormData = <C extends LovelaceCardConfig>(
  *
  * Worth knowing what else this buys, beyond the fields themselves: the tab strip in the
  * edit dialog is rendered only inside the GUI branch, so a card with no config element
- * gets no **Visibility** and no **Layout** tab either — just the YAML box.
+ * gets no **Visibility** and no **Layout** tab either: just the YAML box.
  *
  * Subclasses supply a schema and the words around it; the plumbing lives here.
  */
@@ -154,7 +154,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * one widget gets to answer differently from another, and an option that has to be
    * re-added by hand to each new editor is an option the third card will ship without.
    *
-   * The shared rows go last. A card's own subject — which calendars, which clock — is why
+   * The shared rows go last. A card's own subject (which calendars, which clock) is why
    * somebody opened the dialog; how big to draw it is a decision taken after that.
    */
   private schema(): readonly HaFormSchema[] {
@@ -180,7 +180,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * What the form should show for a field the config does not carry.
    *
    * A card that treats a missing `size` as medium should show medium in the editor
-   * rather than an empty control — an unset radio group reads as broken, not as a
+   * rather than an empty control: an unset radio group reads as broken, not as a
    * default. The first edit then writes the value through into the config, which is
    * what Home Assistant's own card editors do with theirs.
    *
@@ -195,13 +195,13 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * The config as `ha-form` should see it, and its answer folded back into the config.
    *
    * Both are the identity for a card whose config is exactly what its rows say, which is
-   * most of them — `toForm` hands the config straight over, `fromForm` writes the named
+   * most of them: `toForm` hands the config straight over, `fromForm` writes the named
    * fields back with `applyFormData`. The pair exists for the one shape that cannot round
    * trip: a list whose rows carry more than the selector can express.
    *
    * No card in the library needs either at the moment: the one shape that could not round
    * trip was the battery card's `entities`, whose rows carry `{ entity, charging_entity,
-   * name, icon }` objects that `ha-entities-picker` can only report as a list of ids — and
+   * name, icon }` objects that `ha-entities-picker` can only report as a list of ids, and
    * that list is no longer a form row at all. It is a control of its own, drawn by
    * `beforeForm` below, which is the same answer Home Assistant reaches for its entities
    * card. The pair stays because it is the cheaper answer whenever a list's rows are only
@@ -222,7 +222,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * Not an optimisation, and it would be wrong to describe it as one: `ha-form` compares
    * every property by identity, and the `.data` beside these is a fresh object on every
    * render, so `ha-form` updates each time this editor does either way. The reason is
-   * plainer — a stable callback is one less thing changing under a component that is
+   * plainer: a stable callback is one less thing changing under a component that is
    * diffing its inputs, and it is what the reference implementations do.
    */
   private readonly _computeLabel = (schema: HaFormSchema): string => this.label(schema)
@@ -242,7 +242,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config },
-        // Not strictly needed — the host listens on this very element, so its handler
+        // Not strictly needed: the host listens on this very element, so its handler
         // runs at the target whatever these say. They match what Home Assistant's own
         // `fireEvent` puts on this event, which is the point: an editor nested inside
         // another one, or a host that ever listens further up, keeps working.
@@ -270,7 +270,7 @@ export abstract class CupertinoCardEditor<C extends LovelaceCardConfig = Lovelac
    * For the one question an `ha-form` row cannot answer: a list whose rows are each a small
    * config of their own, which wants adding, reordering and deleting as well as editing.
    * Home Assistant's own entities card hand-rolls exactly this and so does the battery card,
-   * and both put it *above* the shared rows for the reason `schema()` gives — the card's
+   * and both put it *above* the shared rows for the reason `schema()` gives: the card's
    * subject is why somebody opened the dialog, and how big to draw it comes after.
    *
    * Anything drawn here reports with `emitConfig`; nothing about it goes through

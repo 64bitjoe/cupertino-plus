@@ -1,15 +1,15 @@
 /**
  * Regenerate the README's screenshots. Run by hand, from `pnpm shots`.
  *
- * The README is the first place anyone sees the widgets — before the showcase site,
- * before installing anything — and an image in a README rots exactly as fast as a
+ * The README is the first place anyone sees the widgets (before the showcase site,
+ * before installing anything), and an image in a README rots exactly as fast as a
  * comment does. This is the answer: the pictures are built from the cards themselves, by
  * the same Vite dev server the site runs on, so regenerating them is one command and
  * never a cropping session.
  *
  * What the page cannot do for itself, and this does:
  *
- *  - **Freezes the clock.** Half the calendar's rules are about `now` — which day is
+ *  - **Freezes the clock.** Half the calendar's rules are about `now`: which day is
  *    today, whether an event has already finished, whether the next day is `TOMORROW`.
  *    Unfrozen, every run would produce different pixels in every file and each one would
  *    turn up in `git diff`, which is how a generated gallery stops being regenerated.
@@ -80,7 +80,7 @@ try {
   )
 
   const refused = await page.evaluate(() => window.__SHOTS_ERROR__)
-  if (refused) throw new Error(`${PAGE} refused to be photographed —\n${refused}`)
+  if (refused) throw new Error(`${PAGE} refused to be photographed:\n${refused}`)
 
   // `ha-card` carries `transition: all .3s` inside its own shadow root, where a style tag
   // injected into the document cannot reach it. Cheaper to outwait than to defeat.

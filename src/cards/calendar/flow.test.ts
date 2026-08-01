@@ -4,7 +4,7 @@ import { buildFlow } from './flow'
 import type { FormatContext } from './format'
 import type { CalendarItem } from './model'
 
-/** Friday, 24 July 2026, midday in Warsaw — the day the rules were reconstructed on. */
+/** Friday, 24 July 2026, midday in Warsaw: the day the rules were reconstructed on. */
 const NOW = new Date('2026-07-24T12:00:00+02:00')
 
 const ctx: FormatContext = { locale: 'en-GB', timeZone: 'Europe/Warsaw', hour12: true }
@@ -35,7 +35,7 @@ describe('selection', () => {
     expect(labels(items)).toEqual(['Running', 'Later'])
   })
 
-  it('keeps a reminder whose moment has passed — it is still a thing to do', () => {
+  it('keeps a reminder whose moment has passed, since it is still a thing to do', () => {
     const overdue: CalendarItem = {
       id: 'r',
       entityId: 'todo.reminders',

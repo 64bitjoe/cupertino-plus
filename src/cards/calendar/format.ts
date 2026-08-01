@@ -102,8 +102,8 @@ const timeToken = (date: Date, ctx: FormatContext): TimeToken => {
 /**
  * How an item's time reads on the card.
  *
- * All-day items print no time at all, and anything without a real duration — a
- * reminder, a zero-length event — prints a single time.
+ * All-day items print no time at all, and anything without a real duration (a
+ * reminder, a zero-length event) prints a single time.
  */
 export const itemTime = (
   item: { start: Date; end?: Date; allDay?: boolean },
@@ -118,7 +118,7 @@ export const itemTime = (
   const to = timeToken(item.end, ctx)
 
   // `12 – 1PM`: one meridiem is enough while both ends share a half of the same day.
-  // Across days it is not — `5 – 6PM` for a five-day trip would read as one hour.
+  // Across days it is not: `5 – 6PM` for a five-day trip would read as one hour.
   const sameDay = dayNumber(item.start, ctx.timeZone) === dayNumber(item.end, ctx.timeZone)
   if (sameDay && from.meridiem && from.meridiem === to.meridiem) {
     // Locales that print the day period first keep it in front of the range, not
@@ -134,7 +134,7 @@ export const itemTime = (
 /**
  * A section heading inside the flow: `TOMORROW`, else `SUNDAY, 26 JUL`.
  *
- * Never called for today — today's section is implicitly headed by the widget's own
+ * Never called for today: today's section is implicitly headed by the widget's own
  * date block.
  */
 export const sectionHeading = (date: Date, today: Date, ctx: FormatContext): string => {
@@ -163,7 +163,7 @@ export const sectionHeading = (date: Date, today: Date, ctx: FormatContext): str
 /**
  * The tail indicator: `1 more event`, `2 more events`.
  *
- * English-only, like `No Events Today` — Home Assistant has no string for either and the
+ * English-only, like `No Events Today`: Home Assistant has no string for either and the
  * widget being copied says exactly this. Kept in one place because one open question ends
  * here: whether a tail of nothing but reminders should read `2 more items`. It is always
  * `events`, uglier though that is when everything hidden is a to-do.

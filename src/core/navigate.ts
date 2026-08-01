@@ -2,8 +2,8 @@
  * Going to another Home Assistant page from inside a card.
  *
  * The frontend is a single-page app whose router listens for one event, so a card cannot
- * just assign to `location.href`: that reloads the whole dashboard — the app, the theme, the
- * websocket, every custom resource — to reach a page the browser already has. What a tap on
+ * just assign to `location.href`: that reloads the whole dashboard (the app, the theme, the
+ * websocket, every custom resource) to reach a page the browser already has. What a tap on
  * a widget should cost is a history entry.
  *
  * `navigate()` in the frontend's `common/navigate` is the function that does it, and this is
@@ -23,13 +23,13 @@
  * ```
  *
  * Two omissions, both deliberate. The dialog preamble guards navigation *out of an open
- * dialog* — it reads `history.state.dialog` and needs the frontend's own dialog registry to
- * close one — and a card sitting on a dashboard has no dialog of its own to close. And
+ * dialog* (it reads `history.state.dialog` and needs the frontend's own dialog registry to
+ * close one), and a card sitting on a dashboard has no dialog of its own to close. And
  * `replace` stays false: a tap on a widget is somewhere the back button has to bring the
  * user home from.
  *
- * An `<a href>` would have been the better answer — a real link, with middle-click, focus
- * semantics and "copy link address" for free — and it does not work here. Nothing in the
+ * An `<a href>` would have been the better answer: a real link, with middle-click, focus
+ * semantics and "copy link address" for free. It does not work here, though. Nothing in the
  * main app delegates anchor clicks. The one `document.body` listener that turns an `A` in a
  * click's composed path into a route lives in `custom-panel.js`, which is the iframe wrapper
  * around third-party *panels*; inside a dashboard the browser handles the anchor itself, and
@@ -44,8 +44,8 @@ const MAIN_WINDOW_NAME = 'ha-main-window'
  * That window, resolved the way the frontend resolves it.
  *
  * It is `window` on a dashboard, and the frontend still does not assume so, because a
- * dashboard can be inside an iframe — Home Assistant's own `iframe` card will put one there
- * — and then the history entry belongs to the window whose router will act on it rather than
+ * dashboard can be inside an iframe (Home Assistant's own `iframe` card will put one there),
+ * and then the history entry belongs to the window whose router will act on it rather than
  * to the frame that asked. Reading `parent.name` across origins throws, which is what the
  * catch is for.
  *

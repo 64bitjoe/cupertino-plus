@@ -4,10 +4,10 @@
  * `dev/screenshots.mjs` serves this, freezes the clock, and clips one PNG per entry in
  * `SHOTS` below. So this file is the gallery's edit surface: to change what the README
  * shows, change the list and re-run `pnpm shots`. Nothing else needs touching, and in
- * particular the images are not hand-cropped — a hand-cropped screenshot is a screenshot
+ * particular the images are not hand-cropped: a hand-cropped screenshot is a screenshot
  * nobody can reproduce.
  *
- * Deliberately NOT the showcase site. That page exists to be used — navigation, a settings
+ * Deliberately NOT the showcase site. That page exists to be used: navigation, a settings
  * column, a label over every card, four more footprints in its Advanced section. This one
  * renders each card once, in a box the sections grid would have given it, with a margin of
  * dashboard around it and no chrome at all.
@@ -15,8 +15,8 @@
  * Three rules for anything added here:
  *
  *  - **Only fixtures that read like somebody's real week.** Several scenarios in
- *    `demo-data.ts` exist to probe one layout branch — two events, three events, an
- *    all-day entry on its own — and a day assembled to hit a branch reads as assembled
+ *    `demo-data.ts` exist to probe one layout branch (two events, three events, an
+ *    all-day entry on its own), and a day assembled to hit a branch reads as assembled
  *    however plausible its rows are. Those are the right fixtures for the harness and the
  *    wrong ones for a shop window.
  *  - **Only behaviour that actually works.** The rule that kept reminders out of the
@@ -57,7 +57,7 @@ const SHOT_MARGIN = 20
 interface Shot {
   /** File stem under `docs/images/`. */
   name: string
-  /** Printed beside the frame on this page. Never inside it — see `shots.css`. */
+  /** Printed beside the frame on this page. Never inside it: see `shots.css`. */
   caption: string
   /** The card to draw. */
   tag: string
@@ -74,7 +74,7 @@ interface Shot {
   /**
    * The footprint, in the Layout tab's own units, and **only ever 6×4 or 12×4 here.**
    *
-   * Those are the two Apple shapes — the square and the 2:1 — and they are what a
+   * Those are the two Apple shapes (the square and the 2:1), and they are what a
    * screenshot is for. Everything between them lays out perfectly well, which is the
    * point of measuring the box rather than reading a preset, but the in-between
    * footprints are the flexibility rather than the design: shipping one in the README
@@ -97,7 +97,7 @@ const batteryShot = (set: string): Partial<LovelaceCardConfig> => ({
 const SHOTS: readonly Shot[] = [
   {
     name: 'calendar-medium',
-    caption: 'medium — a full day, and what follows it',
+    caption: 'medium: a full day, and what follows it',
     tag: CALENDAR_CARD_TAG,
     config: calendarShot('default'),
     columns: 12,
@@ -106,7 +106,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'calendar-small',
-    caption: 'small — today only, led by an all-day event',
+    caption: 'small: today only, led by an all-day event',
     tag: CALENDAR_CARD_TAG,
     config: calendarShot('all-day-busy'),
     columns: 6,
@@ -115,7 +115,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'calendar-empty-today',
-    caption: 'medium — nothing today, so the flow starts in the second column',
+    caption: 'medium: nothing today, so the flow starts in the second column',
     tag: CALENDAR_CARD_TAG,
     config: calendarShot('today-empty'),
     columns: 12,
@@ -124,7 +124,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'calendar-dark',
-    caption: 'medium, dark — tomorrow is empty and gets skipped',
+    caption: 'medium, dark: tomorrow is empty and gets skipped',
     tag: CALENDAR_CARD_TAG,
     config: calendarShot('skip-empty-day'),
     columns: 12,
@@ -133,7 +133,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'battery-medium',
-    caption: 'medium — four devices, so the rings keep their percentages',
+    caption: 'medium: four devices, so the rings keep their percentages',
     tag: BATTERY_CARD_TAG,
     config: batteryShot('four'),
     columns: 12,
@@ -142,7 +142,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'battery-small',
-    caption: 'small — two devices, the left half of the medium card',
+    caption: 'small: two devices, the left half of the medium card',
     tag: BATTERY_CARD_TAG,
     config: batteryShot('two'),
     columns: 6,
@@ -151,7 +151,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'battery-compact',
-    caption: 'small — four devices, so the percentages come off and the grid closes up',
+    caption: 'small: four devices, so the percentages come off and the grid closes up',
     tag: BATTERY_CARD_TAG,
     config: batteryShot('four'),
     columns: 6,
@@ -160,7 +160,7 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'battery-dark',
-    caption: 'medium, dark — four devices, one of them not reporting',
+    caption: 'medium, dark: four devices, one of them not reporting',
     tag: BATTERY_CARD_TAG,
     config: batteryShot('awkward'),
     columns: 12,
@@ -219,13 +219,13 @@ for (const shot of SHOTS) {
   slot.style.height = `${height}px`
 
   const card = document.createElement(shot.tag) as LovelaceCard
-  // `hass` first, then `setConfig` — the order Home Assistant uses.
+  // `hass` first, then `setConfig`, in the order Home Assistant uses.
   card.hass = createMockHass({ dark: shot.theme === 'dark', timeFormat: '12' })
   card.setConfig({ type: shot.tag, ...shot.config })
 
   const caption = document.createElement('div')
   caption.className = 'caption'
-  caption.textContent = `${shot.name} — ${shot.caption} · ${width}×${height}`
+  caption.textContent = `${shot.name} (${shot.caption}) · ${width}×${height}`
 
   slot.append(card)
   frame.append(slot)
@@ -261,7 +261,7 @@ const nextFrame = (): Promise<void> =>
  *
  * Both matter, and for the same reason: a card starts at `DEFAULT_LAYOUT` and only learns
  * its real shape when the ResizeObserver reports, a frame later. A camera that fired on
- * `load` would catch the medium layout inside a small box — reliably, and only in the
+ * `load` would catch the medium layout inside a small box, reliably, and only in the
  * one place nobody looks before committing. So the page says when it is ready rather
  * than the script guessing with a sleep.
  */
@@ -289,7 +289,7 @@ const settle = async (): Promise<void> => {
  * plausible: the card declares no width of its own and stretches only because a block
  * child does, so one `display: flex` on the slot shrinks it to its content and the
  * screenshot is simply a bit narrow. It still shows the right layout, the right fixtures
- * and the right theme, which is exactly why nobody notices — the wide footprint hides it
+ * and the right theme, which is exactly why nobody notices: the wide footprint hides it
  * completely, since its content fills the space anyway.
  */
 const checkBoxes = (): void => {

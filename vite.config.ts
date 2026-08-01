@@ -41,7 +41,7 @@ export default defineConfig(({ command, mode }) => {
       __CW_VERSION__: JSON.stringify(version),
     },
 
-    // dev/ is the root for everything that renders a page — the dev server and the
+    // dev/ is the root for everything that renders a page: the dev server and the
     // site build alike. The library build has no HTML in it and keeps the repo root.
     ...(command === 'serve' || site ? { root: 'dev' } : {}),
     ...(site ? { base: SITE_BASE } : {}),
@@ -54,7 +54,7 @@ export default defineConfig(({ command, mode }) => {
 
     build: site
       ? {
-          // Relative to `root`, which is dev/ — so this lands at the repo root, beside
+          // Relative to `root`, which is dev/, so this lands at the repo root, beside
           // dist/ rather than inside the source tree.
           outDir: '../dist-site',
           // Safe to wipe, unlike dist/: nothing is bind-mounted here, and a stale

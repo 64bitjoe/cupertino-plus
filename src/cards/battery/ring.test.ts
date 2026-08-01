@@ -15,7 +15,7 @@ describe('the arc', () => {
   })
 
   /**
-   * Two ways of having no arc, and they are not the same statement — an empty battery against
+   * Two ways of having no arc, and they are not the same statement: an empty battery against
    * a device that is not reporting. The ring cannot tell them apart and does not try: the
    * caption says `0%` for one and a dash for the other, and where there is no caption the
    * dimmed icon does it.

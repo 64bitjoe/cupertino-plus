@@ -1,4 +1,4 @@
-/* Home Assistant's own themes and colour tokens — the surface the cards are drawn on.
+/* Home Assistant's own themes and colour tokens: the surface the cards are drawn on.
 
    Its own file because two pages need it and neither owns it: `site/` renders the
    showcase around the cards, `shots.ts` photographs them for the README. Everything
@@ -33,7 +33,7 @@
    a colour set on a calendar in Home Assistant's entity settings is stored as one of
    these names, and `source.ts` resolves it to `var(--<name>-color)` exactly as the
    frontend's `computeCssColor` does. Without them here that variable resolves to nothing,
-   and a calendar with a colour renders with NO tint at all — which looks precisely like a
+   and a calendar with a colour renders with NO tint at all, which looks precisely like a
    broken colour path rather than a missing theme.
 
    Theme-independent in the real bundle too: there is no dark override for any of them. */

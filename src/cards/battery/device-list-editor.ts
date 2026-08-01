@@ -1,15 +1,15 @@
 /**
  * The battery card's device list, as one control.
  *
- * A device is four things — which sensor, which icon, which charging sensor, what to call it
- * — and this draws each of them as one row of a sortable list: an `ha-expansion-panel`
+ * A device is four things (which sensor, which icon, which charging sensor, what to call it),
+ * and this draws each of them as one row of a sortable list: an `ha-expansion-panel`
  * carrying the four fields, with a drag handle beside it and a delete button in its summary.
  * A picker at the bottom adds the next one.
  *
  * ## Why an element of its own rather than `ha-form` rows
  *
- * `ha-form` can nest — a named `expandable` node draws a panel and its rows read an object
- * of their own (`docs/ha-api-notes.md` has the mechanism) — and the card was built that way
+ * `ha-form` can nest: a named `expandable` node draws a panel and its rows read an object
+ * of their own (`docs/ha-api-notes.md` has the mechanism), and the card was built that way
  * first, with a multiple entity picker above the panels for adding and reordering. It worked
  * and it read as two controls for one list: the device's identity in the picker, the rest of
  * it in a panel further down, and a delete that meant unticking a checkbox somewhere else.
@@ -19,25 +19,25 @@
  * Home Assistant hand-rolls this same element for its entities card
  * (`hui-entities-card-row-editor`), and everything below is borrowed from it: `ha-sortable`
  * around a wrapper the rows sit in, an `item-moved` event carrying two indices, an empty
- * picker as the add control — behind a button, as theirs is once the list is not empty — and
+ * picker as the add control (behind a button, as theirs is once the list is not empty), and
  * clearing a row's entity as the way to say delete. Its own rows open a dialog to be edited;
  * ours expand in place, which is the one departure and the reason this exists.
  *
  * ## What it may render
  *
- * Only elements Home Assistant has already defined by the time an editor is open —
+ * Only elements Home Assistant has already defined by the time an editor is open:
  * `ha-sortable`, `ha-expansion-panel`, `ha-icon-button`, `ha-svg-icon`, `ha-icon` and
  * `ha-form` all ride in the `lovelace` panel's own chunk group, checked with the script in
  * `docs/ha-api-notes.md`. `ha-entity-picker` and `ha-icon-picker` do **not**: a bare
  * `<ha-entity-picker>` is an undefined element until something has caused its chunk to load,
  * and an undefined element renders as nothing at all, which looks like a bug in this file.
  *
- * Inside a device's panel that is somebody else's problem — those pickers are `ha-form` rows,
+ * Inside a device's panel that is somebody else's problem: those pickers are `ha-form` rows,
  * and `ha-selector` does the lazy import it exists to do. The **add** control is the one place
  * it matters, because what it wants is the picker's own `addButton` mode: a button that opens
  * the list on one press, which is a property of `ha-entity-picker` and cannot be reached
  * through a selector. So `_pickerReady` below waits for the definition rather than assuming
- * it, and until then the add control is the same picker as a plain field — through `ha-form`,
+ * it, and until then the add control is the same picker as a plain field, through `ha-form`,
  * which is also the thing that causes the definition to arrive.
  */
 
@@ -79,7 +79,7 @@ const BATTERY_FILTER = { domain: 'sensor', device_class: 'battery' } as const
  *
  * `entity` first because it is what the row *is*; the icon next because it is the one thing
  * on this card that says which device a ring belongs to; the name last because it is the
- * only one of the four that changes nothing on screen (§6 of the rules — it is the tooltip).
+ * only one of the four that changes nothing on screen (§6 of the rules: it is the tooltip).
  *
  * The two placeholders are what the card would draw if the fields were left empty, so the
  * panel reads as "this is what you will get" rather than as a blank to be guessed at. They
@@ -96,7 +96,7 @@ const deviceSchema = (
     name: 'entity',
     required: true,
     // Every other device's sensor is left out of the list, so a row cannot be edited into
-    // a duplicate of its neighbour. Its own is not excluded — `exclude_entities` hides
+    // a duplicate of its neighbour. Its own is not excluded: `exclude_entities` hides
     // candidates rather than values, but a row that hid its own sensor would still be
     // showing it as the one thing the list denies exists.
     selector: {
@@ -120,7 +120,7 @@ const deviceSchema = (
  * The add picker: the same filter, minus everything the list already holds.
  *
  * The exclusion is the point. Without it the picker offers a sensor that is already a ring,
- * picking it is refused — two rings for one sensor is not something anybody means — and the
+ * picking it is refused (two rings for one sensor is not something anybody means), and the
  * only thing the user sees is a picker that filled itself in and did nothing. A candidate
  * that cannot be added should not be offered.
  */
@@ -139,11 +139,11 @@ const LABELS: Record<string, string> = {
 }
 
 /**
- * Not localised, like the rest of the library's own words — Home Assistant has a translated
+ * Not localised, like the rest of the library's own words: Home Assistant has a translated
  * string for a list of entities and none for any of this.
  */
 const HELPERS: Record<string, string> = {
-  icon: 'Says which device this is — the ring already says the level.',
+  icon: 'Says which device this is; the ring already says the level.',
   charging_entity:
     'A binary sensor that is on while this device is charging. Only needed when the ' +
     'battery sensor does not report it itself.',
@@ -154,12 +154,12 @@ const ADD_LABEL = 'Add a device'
 
 const ADD_HELPER =
   'Pick a battery sensor and it joins the list. One already in the list is not offered ' +
-  'again, and a sensor published without the battery device class is not offered at all — ' +
+  'again, and a sensor published without the battery device class is not offered at all; ' +
   'that one still works if you add it in YAML.'
 
 class CupertinoBatteryDevices extends LitElement {
   /**
-   * Home Assistant's own furniture, not ours — no `--cw-*` token appears here, for the
+   * Home Assistant's own furniture, not ours: no `--cw-*` token appears here, for the
    * reason `CupertinoCardEditor` gives: a widget that looks like a phone's should still have
    * a config panel that looks like the dialog it is sitting in. The spacing scale, the
    * divider and the secondary text colour are all HA's.
@@ -275,8 +275,8 @@ class CupertinoBatteryDevices extends LitElement {
   /**
    * Ask for the picker, once, and re-render as the button when it arrives.
    *
-   * `whenDefined` cannot be relied on to settle by itself — nothing in Home Assistant loads
-   * `ha-entity-picker` unless something asks for one — so the field this renders in the
+   * `whenDefined` cannot be relied on to settle by itself: nothing in Home Assistant loads
+   * `ha-entity-picker` unless something asks for one, so the field this renders in the
    * meantime is not merely a fallback: it is what makes the promise resolve. If it somehow
    * never does, the field stays, which is a working control and was this editor's own
    * behaviour one version ago.
@@ -303,7 +303,7 @@ class CupertinoBatteryDevices extends LitElement {
    * One row's form reported. It carries the whole row, so it replaces the whole row.
    *
    * A row whose entity has been cleared is dropped rather than kept as a device with no
-   * sensor — see `deviceRow`, and note that `deviceRows` would drop it anyway. Doing it here
+   * sensor (see `deviceRow`, and note that `deviceRows` would drop it anyway). Doing it here
    * as well is not belt-and-braces: it keeps `_open` from holding an id nothing will render.
    */
   private readonly _rowChanged = (
@@ -331,7 +331,7 @@ class CupertinoBatteryDevices extends LitElement {
 
   private readonly _remove = (event: Event, index: number): void => {
     // `ha-expansion-panel` toggles on any click inside its summary unless the event has
-    // been defaulted away — `_toggleContainer` opens with `if (e.defaultPrevented) return`.
+    // been defaulted away: `_toggleContainer` opens with `if (e.defaultPrevented) return`.
     // Without this the row would be deleted and the panel above it would open.
     event.preventDefault()
     event.stopPropagation()
@@ -369,8 +369,8 @@ class CupertinoBatteryDevices extends LitElement {
   }
 
   /**
-   * Nothing happens for the empty value a cleared picker reports, and a duplicate is refused
-   * — neither control offers one, and this is the rule behind that rather than a second guess
+   * Nothing happens for the empty value a cleared picker reports, and a duplicate is refused:
+   * neither control offers one, and this is the rule behind that rather than a second guess
    * at it: two rings for one sensor is not something anybody means, and the rows are keyed by
    * entity id.
    *
@@ -395,7 +395,7 @@ class CupertinoBatteryDevices extends LitElement {
     index: number,
     taken: readonly string[],
   ): TemplateResult {
-    // Name and icon as the card is drawing them right now, overrides included — so a row is
+    // Name and icon as the card is drawing them right now, overrides included, so a row is
     // recognisable in the editor by the same glyph it has on the widget.
     const device = readDevice(this.hass, config)
 
@@ -445,13 +445,13 @@ class CupertinoBatteryDevices extends LitElement {
     return html`
       ${
         this.devices.length === 0
-          ? html`<p class="empty">No devices yet — the card will say so too.</p>`
+          ? html`<p class="empty">No devices yet. The card will say so too.</p>`
           : nothing
       }
       <!-- The wrapper is required rather than tidy: ha-sortable makes its FIRST child
            sortable, so without one the rows would not be the things being dragged. The rows
            are keyed by entity id so that a drag moves the row rather than rewriting every
-           row's contents — which is what keeps an open panel open and the caret where it
+           row's contents, which is what keeps an open panel open and the caret where it
            was. ha-sortable rolls its own DOM change back on drop and leaves the reordering
            to this render, so the key is the whole of what makes a drag land. -->
       <ha-sortable handle-selector=".handle" @item-moved=${this._moved}>
@@ -468,7 +468,7 @@ class CupertinoBatteryDevices extends LitElement {
           this._pickerReady
             ? // Home Assistant's own add control, and the reason for the wait above: with
               // `add-button` the picker renders as a button whose press opens the list, all
-              // inside the one element. Nothing here reaches into it — the filter, the
+              // inside the one element. Nothing here reaches into it: the filter, the
               // exclusions and the label are its own properties, and `includeDomains` /
               // `includeDeviceClasses` are the picker's spelling of the selector's `filter`.
               html`

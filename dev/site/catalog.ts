@@ -3,7 +3,7 @@
  *
  * One entry per card in the library, and the sidebar is that list. A card that is not
  * in here does not exist as far as the site is concerned, so adding a widget means
- * adding an entry — the shell, the routing, the controls table and the YAML pane all
+ * adding an entry: the shell, the routing, the controls table and the YAML pane all
  * read from this and need no further help.
  *
  * The split that matters is between `toConfig` and `toFixture`. `toConfig` is the
@@ -35,7 +35,7 @@ export type Args = Readonly<Record<string, ArgValue>>
 
 /**
  * Which half of the controls panel a knob belongs in: the card's own options, or the
- * Home Assistant the page is standing in for. That is the only question a visitor has —
+ * Home Assistant the page is standing in for. That is the only question a visitor has:
  * which of these survive installation.
  */
 export type ControlGroup = 'card' | 'preview'
@@ -47,15 +47,15 @@ interface ControlBase {
   /**
    * Second column: one line, in the interface's voice, about what the control does.
    *
-   * Optional, for the control whose label already says it — a line that only repeats the
-   * label is noise in a table read top to bottom.
+   * Optional, for the control whose label already says it, because a line that only repeats
+   * the label is noise in a table read top to bottom.
    */
   description?: string
   group: ControlGroup
   /**
    * Why this control is currently inert, if it is.
    *
-   * A control that visibly does nothing is worse than one that says why — picking
+   * A control that visibly does nothing is worse than one that says why; picking
    * calendars while the preview is drawing a fixture changes nothing, and a visitor
    * who does not know that concludes the picker is broken.
    */
@@ -109,7 +109,7 @@ export interface Widget {
   /** The card's own options, as rows of the Controls table. `CARD_OPTIONS` joins them. */
   props: readonly Control[]
   /**
-   * This widget's half of the config a real dashboard would hold — `widgetConfig` adds the
+   * This widget's half of the config a real dashboard would hold; `widgetConfig` adds the
    * half every card shares. Goes into the Config tab as it comes.
    */
   toConfig(args: Args): Partial<LovelaceCardConfig>
@@ -125,7 +125,7 @@ export interface Widget {
  *
  * Every other option sets `demo_scenario`, which hands the card a ready-made
  * `CalendarItem[]` and exercises the layout rules. This one leaves the key off, which is
- * what a real dashboard looks like — so the card resolves `entities` and `todo_entities`,
+ * what a real dashboard looks like, so the card resolves `entities` and `todo_entities`,
  * opens both subscriptions over `mock-hass`'s websocket, and runs both wire mappers on the
  * way in. The only option that would have caught the card drawing fixtures in Home
  * Assistant, and the only one where an undated to-do can be seen not being drawn.
@@ -137,7 +137,7 @@ export const LIVE_DATA = 'live'
  *
  * `demo-data.ts` names its scenarios for the branch each one exercises, which is right
  * for a test fixture and reads like a bug tracker in a dropdown. A scenario with no
- * entry here still appears — its key is title-cased — so this can never be the reason a
+ * entry here still appears (its key is title-cased), so this can never be the reason a
  * new fixture is invisible.
  */
 const SCENARIO_LABELS: Record<string, string> = {
@@ -159,7 +159,7 @@ const titleCase = (key: string): string =>
   key.replace(/-/g, ' ').replace(/^./, first => first.toUpperCase())
 
 const DATA_OPTIONS = [
-  { value: LIVE_DATA, label: 'Live — from Home Assistant' },
+  { value: LIVE_DATA, label: 'Live: from Home Assistant' },
   ...DEMO_SCENARIOS.map(key => ({ value: key, label: SCENARIO_LABELS[key] ?? titleCase(key) })),
 ]
 
@@ -202,16 +202,16 @@ const calendar: Widget = {
 
 /**
  * Readable names for the device sets, and each one names the layout it lands on rather than
- * the devices in it — that is what a visitor is choosing between.
+ * the devices in it, which is what a visitor is choosing between.
  */
 const DEVICE_LABELS: Record<string, string> = {
   none: 'Nothing configured',
   one: 'One device',
-  two: 'Two — with percentages',
+  two: 'Two (with percentages)',
   three: 'Three',
-  four: 'Four — one on a charger',
-  awkward: 'Four — one not reporting',
-  overflow: 'Six — more than these sizes draw',
+  four: 'Four: one on a charger',
+  awkward: 'Four (one not reporting)',
+  overflow: 'Six: more than these sizes draw',
 }
 
 const battery: Widget = {
@@ -237,7 +237,7 @@ const battery: Widget = {
   ],
 
   /**
-   * In the **Card** group and printed in the Config pane, unlike the calendar's Data knob —
+   * In the **Card** group and printed in the Config pane, unlike the calendar's Data knob,
    * because there is nothing preview-only about it. This card has no fixtures: it reads
    * `hass.states` like it would on a dashboard, and the only thing the harness supplies is
    * which entities to point it at. So the YAML above the control is the config that produced
@@ -261,7 +261,7 @@ export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => 
 /**
  * The rest of the library, as the README's table has it.
  *
- * Listed but not linked — a route to a page saying "not built yet" is a worse answer
+ * Listed but not linked; a route to a page saying "not built yet" is a worse answer
  * than a greyed row that already says it. They are here because the first question a
  * visitor asks a two-widget library is whether there will be more.
  */
@@ -274,7 +274,7 @@ export const PLANNED: readonly { name: string; icon: string }[] = [
 /**
  * The knobs that belong to `CupertinoCardConfig` rather than to one widget's config.
  *
- * In the **Card** group with a widget's own props, and rightly — unlike the Demo knobs
+ * In the **Card** group with a widget's own props, and rightly: unlike the Demo knobs
  * these do survive installation, and the Config pane above prints them. Kept as a separate
  * list only because the card that has none of its own still has these.
  */
@@ -294,18 +294,18 @@ export const CARD_OPTIONS: readonly Control[] = [
 ]
 
 /**
- * What `CARD_OPTIONS` came to, as config — every key, always, including one sitting at its
- * default.
+ * What `CARD_OPTIONS` came to, as config (every key, always, including one sitting at its
+ * default).
  *
  * It dropped the defaults at first, on the grounds that a `scale: 100` says exactly what
  * its absence says and the pane is a thing to paste. What that overlooked is where the pane
  * is: directly above the controls. A key appearing and disappearing changes the height of
- * the YAML, which moves every control below it — so dragging the Scale slider off 100
+ * the YAML, which moves every control below it, so dragging the Scale slider off 100
  * pushed the slider itself down a line, out from under the cursor, and back up again on the
  * way home. Tidy output is not worth a control that flinches when you use it.
  *
  * So the rule for this panel is that the set of keys it writes never changes: whatever it
- * prints, it prints at every setting. Which is honest about the config anyway — Home
+ * prints, it prints at every setting. Which is honest about the config anyway; Home
  * Assistant's own editor writes `scale` into the YAML the moment anything in the form is
  * touched, default or not.
  */
@@ -346,7 +346,7 @@ export const ENVIRONMENT: readonly Control[] = [
     /**
      * The three Home Assistant's own profile offers that anybody reasons about. Its fourth,
      * `language`, follows the Home Assistant language rather than the browser and differs
-     * from `system` only for a user whose two settings disagree — a distinction with no
+     * from `system` only for a user whose two settings disagree, a distinction with no
      * place on a page about widgets.
      */
     options: [
@@ -356,7 +356,7 @@ export const ENVIRONMENT: readonly Control[] = [
     ],
     /**
      * The browser's own convention, which is very likely the one the visitor reads times
-     * in — so the cards arrive already speaking their clock. The other three are here to
+     * in, so the cards arrive already speaking their clock. The other three are here to
      * be switched to; this one is here to be right without being touched.
      */
     initial: 'system',
@@ -388,7 +388,7 @@ const yamlScalar = (value: unknown): string => {
  * One item of a list: a scalar, or a mapping whose first key rides on the dash.
  *
  * The mapping form is here for the battery card's `entities`, whose rows carry a
- * `charging_entity` when the device's own state cannot say — so a config the visitor is
+ * `charging_entity` when the device's own state cannot say, so a config the visitor is
  * invited to paste has to be able to print one. Two spaces of indent and the dash, exactly
  * as every Home Assistant document writes it.
  */
@@ -414,7 +414,7 @@ export const configToYaml = (config: LovelaceCardConfig): string =>
 /**
  * The config a visitor can paste, which is `toConfig` and nothing else.
  *
- * `custom:` is load-bearing — it is how Lovelace resolves a card that is not one of its
+ * `custom:` is load-bearing: it is how Lovelace resolves a card that is not one of its
  * own, and a config without it fails to render with a message about an unknown card.
  */
 export const widgetYaml = (widget: Widget, args: Args): string =>

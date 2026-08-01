@@ -90,7 +90,7 @@ export const baseStyles = css`
     border-radius: var(--cw-radius-inner);
   }
 
-  /* Truncation helpers — widgets are small, text overflow is the norm. */
+  /* Truncation helpers: widgets are small, text overflow is the norm. */
   .cw-truncate {
     overflow: hidden;
     text-overflow: ellipsis;

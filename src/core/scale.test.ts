@@ -5,7 +5,7 @@ import { columnsToPx, layoutFromBox } from './size'
 
 /**
  * Everything that reaches `scaleFactor` has been through a YAML file or a slider, and the
- * card multiplies its whole stylesheet by the answer — so "what does this do with rubbish"
+ * card multiplies its whole stylesheet by the answer, so "what does this do with rubbish"
  * is the entire test.
  */
 describe('scaleFactor', () => {
@@ -56,7 +56,7 @@ describe('scaleFactor', () => {
  * scaling the type walks a card towards the other layout: shrink it far enough and the
  * square footprint has room for two columns; grow it far enough and the wide one no longer
  * does. Both would be the widget quietly becoming a different widget, and the range in
- * `scale.ts` is chosen to stay clear of it — which is worth a test rather than a comment,
+ * `scale.ts` is chosen to stay clear of it, which is worth a test rather than a comment,
  * because the two constants that have to agree live in different files.
  */
 describe('the bounds', () => {
@@ -73,7 +73,7 @@ describe('the bounds', () => {
     }
   })
 
-  it('is bounded by that and not by taste — just outside it, the square folds', () => {
+  it('is bounded by that and not by taste: just outside it, the square folds', () => {
     // The floor has ~7 points of margin on it. This is the check that it is margin
     // against something real: keep going down and the 6 × 4 square turns into two
     // narrow columns, which is the reason MIN_SCALE exists.

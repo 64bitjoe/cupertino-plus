@@ -1,12 +1,12 @@
 /**
  * The card's Home Assistant visual editor, driving a live card.
  *
- * Reached exactly the way Home Assistant reaches it — through the card class's static
- * `getConfigElement()` — rather than by creating the editor element directly, so the page
+ * Reached exactly the way Home Assistant reaches it (through the card class's static
+ * `getConfigElement()`) rather than by creating the editor element directly, so the page
  * exercises the same path the dashboard does and notices if it goes missing.
  *
  * What it does NOT exercise is the widget: `ha-form` here is the stand-in from
- * `ha-stubs.ts`. This panel is for the behaviour — which keys the editor writes, which it
+ * `ha-stubs.ts`. This panel is for the behaviour: which keys the editor writes, which it
  * removes, what the card does with them. See it drawn properly with `pnpm ha:up`.
  *
  * Loaded when the Advanced section is first opened rather than with the page, because
@@ -37,7 +37,7 @@ let loading = false
 /**
  * Bumped by every reset, and captured by the load in flight at the time.
  *
- * `getConfigElement()` may be a promise — that is the whole reason it is awaited — so a
+ * `getConfigElement()` may be a promise (that is the whole reason it is awaited), so a
  * visitor who opens Advanced and immediately switches widget leaves a load running for a
  * card that is no longer on screen. Without this it would land afterwards and install the
  * previous widget's editor into the new one's panel.
@@ -60,7 +60,7 @@ export function pushEditorHass(hass: HomeAssistant): void {
 /**
  * Start loading the editor, if it has not been asked for yet.
  *
- * `hass` is set before `setConfig`, the order Home Assistant uses — an editor that reads
+ * `hass` is set before `setConfig`, the order Home Assistant uses: an editor that reads
  * `hass` inside `setConfig` survives only that one.
  */
 export function ensureEditor(

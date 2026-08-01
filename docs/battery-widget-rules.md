@@ -6,16 +6,16 @@ worked table at the bottom.
 
 Two views, and the card chooses between them rather than being told:
 
-- **labeled** — a ring with the percentage under it, for devices that fit on one row
-- **compact** — the ring alone, for more devices than one row holds
+- **labeled**: a ring with the percentage under it, for devices that fit on one row
+- **compact**: the ring alone, for more devices than one row holds
 
 Read [`calendar-widget-rules.md`](calendar-widget-rules.md) first if you want the library's
 sizing story; the short version is that Home Assistant owns the footprint and the card
 measures the box it ended up in. What this card does with that measurement is different
 enough from the calendar to be worth stating early:
 
-> The calendar's content is a **stream** — a fortnight of days arriving to be cut wherever the
-> box runs out — so its box arithmetic is a budget, and the answer to "what fits" is "how much
+> The calendar's content is a **stream**: a fortnight of days arriving to be cut wherever the
+> box runs out, so its box arithmetic is a budget, and the answer to "what fits" is "how much
 > of the week". This card's content is **exactly the devices the config names**. Nothing is
 > ever cut for lack of something better to draw, so the box does not decide _what_, only _how
 > large_ and _in how many rows_.
@@ -27,7 +27,7 @@ enough from the calendar to be worth stating early:
 ```ts
 {
   id: string,             // the battery entity
-  name: string,           // never drawn — see §6
+  name: string,           // never drawn (see §6)
   icon: string,           // an `mdi:` name
   level: number | null,   // 0–100, or null when it cannot be read
   charging: boolean
@@ -35,12 +35,12 @@ enough from the calendar to be worth stating early:
 ```
 
 Every field is normalised out of `hass.states` by `model.ts`, which is the whole of the card's
-contact with Home Assistant — there is no subscription, no window and no wire mapper. A
+contact with Home Assistant; there is no subscription, no window and no wire mapper. A
 battery level is a number sitting in the state machine, pushed to every card on every change.
 
 **The level** is `Number(state.state)`, clamped to 0–100. `unavailable` and `unknown` come out
 as `NaN` and so as `null`; so does a config pointing at an entity that no longer exists. The
-clamp is for the sensor that reports 105 after a firmware update — an arc longer than the
+clamp is for the sensor that reports 105 after a firmware update; an arc longer than the
 circle wraps back over itself and reads as nearly empty.
 
 **A device that cannot be read is not dropped.** It gets a ring with a bare track, a dimmed
@@ -48,7 +48,7 @@ icon, and a dash where the percentage would be. A card that quietly showed three
 four were configured would answer the opposite of the question somebody puts a battery widget
 on a dashboard to ask.
 
-**The icon** is the config's, then the entity's `attributes.icon`, then `mdi:battery` — or
+**The icon** is the config's, then the entity's `attributes.icon`, then `mdi:battery`, or
 `mdi:battery-unknown` when there is no reading behind it. The card contains no logic about
 kinds of device: what the icon has to say is _which_ device, and the only honest source for
 that is whoever wrote the config. Home Assistant's own icon for a `device_class: battery`
@@ -57,7 +57,7 @@ second time in the middle of it.
 
 **Charging** is read in this order, and it stops at the first answer:
 
-1. `charging_entity`, if the config named one — `on` means charging. This is the
+1. `charging_entity`, if the config named one: `on` means charging. This is the
    `battery_charging` binary sensor an integration that knows publishes.
 2. `is_charging === true` on the battery sensor's own attributes.
 3. `battery_state` equal to `charging`, compared lower-cased: integrations write `Charging`,
@@ -68,10 +68,10 @@ absent bolt is a widget that has not been told; a bolt on a device sitting on a 
 widget that is wrong.
 
 **None of the four is YAML-only, and they are one control rather than four.** A device is a
-panel in a sortable list — titled and iconed with what the card is drawing for it, dragged by a
-handle, deleted by the bin in its header — and inside it are the battery sensor, the icon, the
+panel in a sortable list, titled and iconed with what the card is drawing for it, dragged by a
+handle, deleted by the bin in its header, and inside it are the battery sensor, the icon, the
 charging sensor and the name. An **Add a device** button under the list opens a picker that adds
-the next one — one press, not one to reveal the picker and another to open it — and that picker
+the next one (one press, not one to reveal the picker and another to open it), and that picker
 leaves out every sensor the list already holds: a device cannot be added twice, so offering one
 that would be refused is offering a dead end.
 
@@ -79,7 +79,7 @@ Each of the two fields that override something greys the inherited value in as i
 and that is the rule rather than a flourish: the placeholder is the answer to "what happens if I
 leave this empty", so it is read off the same expression the card keeps it with. Which is why
 the icon field offers `mdi:battery` and not the `mdi:battery-70` Home Assistant computes for the
-same sensor — see `inheritedIcon`.
+same sensor (see `inheritedIcon`).
 
 The one thing the editor cannot reach is a battery percentage published without the `battery`
 device class, which is what the pickers' filter costs and is stated where the filter is.
@@ -88,18 +88,18 @@ device class, which is what the pickers' filter costs and is stated where the fi
 
 - A track the full way round, and an arc over it from **twelve o'clock, clockwise**, whose
   length is `level / 100` of the circle.
-- **Always green**, at every level. Not amber at 20 and not red at 5 — see §7.
+- **Always green**, at every level. Not amber at 20 and not red at 5 (see §7).
 - Stroke **10% of the diameter**, with round caps. The track is the same stroke in
   `--cw-track`. Ten and not the 13 the reference's 8-of-62 comes to: that proportion is right
   on a 62pt ring and reads heavy at the 96 this card draws at the design footprint, because
-  the same share of a ring half again as large is half again as much ink — the arc stops
+  the same share of a ring half again as large is half again as much ink; the arc stops
   looking like a line and starts looking like a band.
 - `level === 0` and `level === null` are both a bare track. The two are told apart by the
-  caption — `0%` against `—` — and where there is no caption, by the dimmed icon.
+  caption, `0%` against an em dash, and where there is no caption, by the dimmed icon.
 - The shortest arc there is, for any level above zero, is one unit of the ring's hundred: with
   a round cap that paints exactly one dot of the stroke's width, which is the reading a 1%
   battery deserves. Deliberately **not** a floor of the stroke width, which is the obvious
-  answer and is wrong by twice over — a cap adds half a stroke beyond each end of the dash, so
+  answer and is wrong by twice over; a cap adds half a stroke beyond each end of the dash, so
   a dash of one stroke draws two long and a 1% battery would read as 7%.
 
 **The icon** sits in the middle of the ring at 45% of its diameter, in `--cw-label`, at 40%
@@ -108,7 +108,7 @@ opacity when there is no reading.
 **The charging badge** is a bolt at twelve o'clock, straddling the stroke's centreline, on a
 disc of the card's own surface colour. The disc is what makes it work: the badge sits exactly
 where the arc _starts_, so a green bolt laid straight on it is invisible at the one moment it
-matters most — a device left on the charger overnight, at 100%, whose arc runs all the way
+matters most: a device left on the charger overnight, at 100%, whose arc runs all the way
 round. Punching the surface through first costs a notch out of the arc and buys a badge that
 reads at every level. The arc underneath is not shortened for it, so its length still means
 what it means.
@@ -117,7 +117,7 @@ The glyph is Material's own `Bolt` rather than one of MDI's, which makes it the 
 the library not drawn from the set Home Assistant draws itself with. MDI's `mdiFlash` and
 `mdiLightningBolt` are both harder-edged, with a flat top and a straight leading edge;
 Material's tapers and kinks, which is what makes it read as a charging mark beside a round
-gauge rather than as a hazard sign. It is inlined as a path string — Apache-2.0, from
+gauge rather than as a hazard sign. It is inlined as a path string, Apache-2.0, from
 `@mui/icons-material`, which is a React package of some ten megabytes and not a dependency
 worth taking for one glyph.
 
@@ -132,7 +132,7 @@ labeled  = visible <= columns && every column is wide enough for `100%`
 ```
 
 **Four rings is what either of these footprints draws.** The square holds its 2 × 2 and the
-wide card holds one row of four — and the wide card pointedly does **not** stack a second row
+wide card holds one row of four, and the wide card pointedly does **not** stack a second row
 under it. A 4 + 2 grid fits perfectly well in the box and reads as a card that ran out of
 something, where one row of four reads as the widget it is.
 
@@ -151,7 +151,7 @@ which is a thing to fix in the editor rather than a fact to report on the card.
 Both halves of the `labeled` test are required, and they fail differently.
 
 **More rings than one row holds** is the reference's own rule: the percentages come off and the
-grid closes up. That is the trade the widget makes — a caption is worth a row of its own, and
+grid closes up. That is the trade the widget makes. A caption is worth a row of its own, and
 past one row there is no room to keep buying it. Note it reads `visible`, not `count`: the wide
 card draws four rings whether it was given four devices or nine, and four rings are one row, so
 it is **always** captioned. Counting the configured list instead would take the percentages off
@@ -165,9 +165,9 @@ own: a widget with two type sizes for one number is a worse answer than a widget
 the column is too narrow to caption. A _single_ device is priced against the whole width
 rather than against a column it does not share, so it keeps its caption in the same box.
 
-The height is the third bound and the only one that is measured. It can take a row away — a
+The height is the third bound and the only one that is measured. It can take a row away (a
 square squashed below two legible rows of rings draws one, with two of its four devices
-undrawn — but it can never add one. That is the corner where the widget cannot say everything
+undrawn), but it can never add one. That is the corner where the widget cannot say everything
 it was asked to, and the answer is the editor's own advice: drag the card taller.
 
 ## 4. The grid
@@ -181,7 +181,7 @@ it was asked to, and the answer is the editor's own advice: drag the card taller
   above, which reads as a pyramid rather than as a grid with a corner missing; in four columns
   there is no row above to line up with, so a short row centred is simply a short row centred.
   With `maxRows` as it is, the two-column case is the only one where an incomplete row sits
-  under a full one — but the rule belongs to the grid, and `large` will want it.
+  under a full one, but the rule belongs to the grid, and `large` will want it.
 
 ## 5. How big a ring is
 
@@ -190,14 +190,14 @@ ring = clamp(RING_MIN, min(RING_MAX, cell width, cell height − the caption), �
 ```
 
 **`RING_MAX` is 96 design units, and it is a proportion rather than a taste.** The widget
-being copied draws a 62pt ring in a 158pt square with 16pt of inset — 39% of the widget's
-width, two of them nearly filling the space between the insets. Home Assistant's small
+being copied draws a 62pt ring in a 158pt square with 16pt of inset, which comes to 39% of the
+widget's width, two of them nearly filling the space between the insets. Home Assistant's small
 footprint is a ~246px square rather than 158pt, and 39% of that is 96, so a card at the design
 footprint reproduces the reference's proportion. Past that the cap holds: a card dragged wider
 than the shape the rings were laid out for gets air rather than dinner-plate rings.
 
 **`RING_MIN` is 40**, which is where an icon at 45% stops being a silhouette you can name. It
-is a floor in two senses — no row is kept whose cell could not hold a ring this big, and a box
+is a floor in two senses: no row is kept whose cell could not hold a ring this big, and a box
 too small for even one row of them gets the ring anyway and is clipped by `ha-card`. Clipping
 is the right failure there: `min_columns` and `min_rows` keep the Layout tab well clear of it,
 and a card that answered a squashed box by drawing nothing would look broken rather than
@@ -208,7 +208,7 @@ The calendar answers larger type with fewer rows of it; there is no equivalent h
 the rows are the devices and §3 caps them anyway. So the same footprint holds the same devices
 at every scale and draws them smaller. Which direction runs out first depends on the shape: the
 wide card is column-limited, so four captioned rings across 500px come down from 96 to 77 at
-130%, while the square runs out of both at once — 70.8 units of column against 71.6 of row,
+130%, while the square runs out of both at once, 70.8 units of column against 71.6 of row,
 which is what a square footprint means. A card dragged **taller** gets bigger rings rather than
 more of them: the rows are the devices, so there is nothing to fill extra height with.
 
@@ -217,9 +217,9 @@ more of them: the rows are the devices, so there is nothing to fill extra height
 - `NN%`, `Math.round`ed, no decimal and no space before the `%`.
 - **`100%` is set in the same size as `9%`.** The type does not shrink to fit, which is why §3
   prices a captioned column against the width `100%` needs rather than against the reading
-  currently on screen — a cell measured against `72%` would clip only on the day the device
+  currently on screen; a cell measured against `72%` would clip only on the day the device
   was full.
-- `level === null` prints `—` in the secondary label colour.
+- `level === null` prints an em dash in the secondary label colour.
 - Tabular figures, so the numeral does not shift between 9% and 90%.
 
 **The device's name is never drawn.** It is the cell's `title` and its accessible name, and
@@ -230,7 +230,7 @@ option is a reasonable thing to want and is not in this version.
 ## 7. Why the ring is never red
 
 The level is read off the **length** of the arc, which is a quantity. A colour that changed
-underneath it would be a second, coarser reading of the same number — one that says "low" at
+underneath it would be a second, coarser reading of the same number, one that says "low" at
 19% and "fine" at 21% when the arc has already said 19 and 21. And a widget of six devices in
 three colours stops being a glance and becomes a thing to interpret.
 
@@ -253,14 +253,14 @@ for: **6 × 4** is a ~246px square and **12 × 4** is the ~500 × 248 2:1.
 | 6       | compact `2+2`, 4 of 6    | labeled, 4 across, 4 of 6  |
 | 9       | compact `2+2`, 4 of 9    | labeled, 4 across, 4 of 9  |
 
-The square's 1 and 2 are the left half of the wide card, percentages and all — that pairing is
+The square's 1 and 2 are the left half of the wide card, percentages and all; that pairing is
 the point of the two views, and the reason the caption rule is about a row rather than about a
 size.
 
 The bottom three rows are the same two cards. Past four devices nothing about the drawing
 changes, at either footprint, and there is a test that says so in exactly those terms: a wide
-card given six devices is compared field for field against one given four. §3 has the argument
-— four rings is the design of these two sizes, and a longer `entities` is a config waiting for
+card given six devices is compared field for field against one given four. §3 has the argument:
+four rings is the design of these two sizes, and a longer `entities` is a config waiting for
 `large` rather than a card that has to grow.
 
 The square is the one footprint whose row count the box can still change, and only downwards:
@@ -272,7 +272,7 @@ squashed box to lose the second row.
 Decided rather than known, each one edit away from being decided differently.
 
 - **`show_name`.** §6 says why it is not the default. As an option it would need a rule for
-  what happens when a name does not fit, and the honest one — truncate — is the thing §6 is
+  what happens when a name does not fit, and the honest one (truncate) is the thing §6 is
   avoiding.
 - **A `+N` indicator** for devices that were not drawn. §3 argues it is the wrong shape of
   answer here; the counter-argument is that silence is exactly what the calendar refuses. It
@@ -287,5 +287,5 @@ Decided rather than known, each one edit away from being decided differently.
   every valve and every door contact, and no order over them is the order anybody meant. So
   `No Devices` is the honest first frame rather than a shortcoming.
 - **A tap opens `more-info` for the device.** Per cell rather than per card, because the card
-  has no single subject — six devices behind one dialog would have to pick one, and picking
+  has no single subject; six devices behind one dialog would have to pick one, and picking
   the first is a card that opens the wrong thing five times out of six.

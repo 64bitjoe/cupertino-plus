@@ -3,8 +3,8 @@
  *
  * Hand-built days that exercise every branch of the layout: an empty today and a
  * finished one, a skipped empty tomorrow, locations that fit and locations that do not,
- * reminders mixed into the same stream as events, an all-day entry, and a tail that runs
- * out of column.
+ * reminders mixed into the same stream as events — due at a time and due on a date, which
+ * are two different rows — an all-day entry, and a tail that runs out of column.
  *
  * Times for *today* are anchored to the current clock rather than written out, so the
  * card still has something to show at four in the afternoon — and, since the spacing
@@ -243,10 +243,21 @@ const scenarios: Record<string, (now: Date) => Draft[]> = {
     ]
   },
 
-  /** Reminders and events in one stream, ordered by time rather than by kind. */
+  /**
+   * Reminders and events in one stream, ordered by time rather than by kind — and both
+   * shapes a to-do arrives in: one due at a time, which reads like an event, and one due on
+   * a date, which is a single line at the top of the day with no midnight invented for it.
+   */
   reminders: now => {
     const base = soon(now)
     return [
+      {
+        kind: 'reminder',
+        title: 'Book the car service',
+        start: midnight(now, 0),
+        allDay: true,
+        color: LIST,
+      },
       { kind: 'reminder', title: 'Pick up dry cleaning', start: base, color: LIST },
       {
         kind: 'event',

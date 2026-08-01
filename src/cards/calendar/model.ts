@@ -2,14 +2,15 @@
  * What the calendar widget draws, independent of where it came from.
  *
  * The layout engine (`flow.ts`, `layout.ts`) only ever sees `CalendarItem`, so the data
- * source stays a swappable seam. Two produce these today: `source.ts`, from the
- * `calendar/event/subscribe` websocket, and `demo-data.ts`, for the harness and the card
- * picker. The mapping and the protocol behind it are documented on `source.ts`, which is
- * the only file in the card that knows Home Assistant exists.
+ * source stays a swappable seam. Three produce these: `source.ts`, from the
+ * `calendar/event/subscribe` websocket; `todo-source.ts`, from `todo/item/subscribe`; and
+ * `demo-data.ts`, for the harness. The two protocols are documented on those files, which
+ * are the only ones in the card that know Home Assistant exists.
  *
- * Still to come: `todo` entities, which is where `kind: 'reminder'` will come from — a
- * to-do item has a `due` and no duration, which is exactly the shape below. Nothing
- * produces one yet, so the reminder rows are reachable only from the fixtures.
+ * `kind` is the whole of what the two sources disagree about, and it is a statement about
+ * the *thing* rather than about where it came from: an event is a span of a day, a
+ * reminder is something you tick off. A to-do item has a `due` and no duration, which is
+ * why the shape below fits both without a second interface.
  */
 
 export type CalendarItemKind = 'event' | 'reminder'
@@ -23,6 +24,10 @@ export interface CalendarItem {
   start: Date
   /** Absent for reminders, and for events with no duration. */
   end?: Date
+  /**
+   * This belongs to a day rather than to a moment: an all-day event, or a to-do due on a
+   * date with no time on it. Both print no time and sort to the top of their day.
+   */
   allDay?: boolean
   /** The calendar's (or to-do list's) colour, as a CSS colour value. */
   color: string

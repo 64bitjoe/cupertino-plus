@@ -216,14 +216,25 @@ export interface TextSelector {
 }
 
 /**
+ * A switch. Nothing to configure, and the empty object is what selects it.
+ *
+ * `ha-selector-boolean` renders `.checked=${this.value ?? this.placeholder === true}` and
+ * reports `target.checked`, so it always sends a real boolean — `false` included, which is
+ * what lets an off switch survive `applyFormData` rather than being read as a blank.
+ */
+export interface BooleanSelector {
+  boolean: Record<string, never>
+}
+
+/**
  * A selector, as `ha-selector` reads it.
  *
  * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful —
  * hence a union rather than a bag of optional keys. The shipped build knows 57 of
- * these; these are the five our editors ask for.
+ * these; these are the six our editors ask for.
  */
 export type Selector =
-  EntitySelector | SelectSelector | NumberSelector | IconSelector | TextSelector
+  EntitySelector | SelectSelector | NumberSelector | IconSelector | TextSelector | BooleanSelector
 
 /**
  * One row of an `ha-form`.

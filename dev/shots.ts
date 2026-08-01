@@ -19,9 +19,10 @@
  *    all-day entry on its own — and a day assembled to hit a branch reads as assembled
  *    however plausible its rows are. Those are the right fixtures for the harness and the
  *    wrong ones for a shop window.
- *  - **Only behaviour that actually works.** Reminders render, but nothing feeds them
- *    yet (they want `todo` entities), so a screenshot led by reminders would be
- *    advertising a feature. Fixtures whose reminders sit below the fold are fine.
+ *  - **Only behaviour that actually works.** The rule that kept reminders out of the
+ *    gallery while nothing fed them; they come off `todo` entities now, so a shot led by
+ *    them would be advertising a feature the card has. It still applies to anything else
+ *    the fixtures can draw and the card cannot yet fill.
  *  - **Only the two footprints**, 6×4 and 12×4. See `Shot.columns` below.
  */
 

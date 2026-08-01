@@ -112,6 +112,50 @@ export const dayStart = (day: number, timeZone?: string): Date => {
   return new Date(wanted - zoneOffset(guess, timeZone))
 }
 
+// ---- The wire ------------------------------------------------------------------
+
+/**
+ * A date with no time on it: `2026-07-26`, as opposed to `2026-07-26T09:30:00+02:00`.
+ *
+ * Both subscriptions the card reads speak this dialect — a calendar event's `start`/`end`
+ * and a to-do item's `due` are each either the bare date or a full ISO datetime — so the
+ * test lives here rather than in one of them. Home Assistant's own to-do card asks the
+ * same question by looking for a `T` in the string; the year/month/day captures are what
+ * `parseWireDate` needs anyway, so it is one regex rather than two tests.
+ */
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/** Whether a wire value carries a day and no time — an all-day event, an undated to-do. */
+export const isWireDateOnly = (value: unknown): boolean => DATE_ONLY.test(String(value))
+
+/**
+ * One wire date as an instant, or nothing if it cannot be read.
+ *
+ * The two shapes are resolved differently, and only the first of them needs this module:
+ * a bare date is a day in the DISPLAY zone, which is what `dayStart` is for, while a
+ * datetime is an instant already and goes to `new Date`.
+ *
+ * That second branch reads the browser's zone for a datetime with no offset on it, which
+ * is the one case where a display zone pinned to the server's would disagree — and there
+ * is no better answer available: a naive datetime is a wall clock with no zone attached,
+ * and the language's own grammar says local. Calendars are safe from it (Home Assistant
+ * requires its `CalendarEvent` datetimes to be aware); a to-do's `due` is not, since
+ * `todo/item/subscribe` serialises whatever `datetime` the integration stored. Reading it
+ * as the browser's local time is what the frontend's own to-do card does with it.
+ */
+export const parseWireDate = (value: unknown, timeZone: string | undefined): Date | undefined => {
+  if (typeof value !== 'string') return undefined
+
+  const dateOnly = DATE_ONLY.exec(value)
+  if (dateOnly) {
+    const day = Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    return dayStart(day / 86_400_000, timeZone)
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
 /**
  * Which locale to format with, and whether that means AM/PM.
  *

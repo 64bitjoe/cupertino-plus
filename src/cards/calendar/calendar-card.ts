@@ -11,7 +11,7 @@ import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { registerCard } from '../../core/register'
-import type { LovelaceCardEditor } from '../../core/types/ha'
+import type { HomeAssistant, LovelaceCardEditor } from '../../core/types/ha'
 import { CALENDAR_EDITOR_TAG } from './calendar-card-editor'
 import { timePreferences, type TimeFormatOption } from './datetime'
 import { demoItems } from './demo-data'
@@ -21,12 +21,26 @@ import type { FormatContext, ItemTime, TimeToken } from './format'
 import { geometryFor, packFlow, type LayoutColumn, type LayoutRow } from './layout'
 import type { CalendarItem } from './model'
 import { CalendarFeed, calendarsFor, subscriptionWindow } from './source'
+import { TodoFeed, remindersEnabled, todoListsFor } from './todo-source'
 
 export const CALENDAR_CARD_TAG = 'cupertino-widgets-calendar'
 
 export interface CalendarCardConfig extends CupertinoCardConfig {
   /** Calendar entities to show. Empty/absent means "every calendar", decided at render. */
   entities?: string[]
+  /**
+   * Whether to draw reminders — the to-do items that carry a due date — beside the events.
+   *
+   * Absent means yes, so the to-do lists behave like the calendars: say nothing and you
+   * get all of them. `false` is the one thing the entity picker below cannot express, since
+   * an emptied picker and an untouched one report the same `[]`. See `remindersEnabled`.
+   */
+  show_reminders?: boolean
+  /**
+   * To-do lists to read reminders from. Empty/absent means "every list", decided at render,
+   * exactly as `entities` does for the calendars.
+   */
+  todo_entities?: string[]
   /**
    * The clock this card prints times in, over the top of the Home Assistant profile.
    *
@@ -268,16 +282,23 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
          (its ROW, less the gap) — this is the tallest one-row node there is, so it must
          not grow.
 
-         The 2px on the left is the badge's inset, not a spacing step. A 24px chip with
-         a 12px inner radius ends in a semicircle of r=12; the badge is r=10 on the same
-         centre, so it clears the chip by 2px right around that arc rather than only at
-         the sides. It is the smallest inset that still reads as one shape nested in
-         another — flush, the two rims merge into a single edge and the badge stops
-         looking like a badge. Both radii and both insets move together or not at all. */
+         A reminder reaches this rule too, when its to-do is due on a date with no time on
+         it. It keeps the bullet and the 10px inset the two-line rows use — the badge below
+         is a calendar, which is not what a to-do is — and comes to the same 24px, so the
+         budget does not have to know the difference. */
       .row.allday {
         align-items: center;
-        padding: calc(1px * var(--cw-scale)) calc(10px * var(--cw-scale))
-          calc(1px * var(--cw-scale)) calc(2px * var(--cw-scale));
+        padding: calc(1px * var(--cw-scale)) calc(10px * var(--cw-scale));
+      }
+
+      /* The 2px on the left is the badge's inset, not a spacing step. A 24px chip with a
+         12px inner radius ends in a semicircle of r=12; the badge is r=10 on the same
+         centre, so it clears the chip by 2px right around that arc rather than only at the
+         sides. It is the smallest inset that still reads as one shape nested in another —
+         flush, the two rims merge into a single edge and the badge stops looking like a
+         badge. Both radii and both insets move together or not at all. */
+      .row.allday.event {
+        padding-left: calc(2px * var(--cw-scale));
       }
 
       /* 20px inside a 24px chip, so the badge clears the chip's edge by 2px on every
@@ -419,8 +440,15 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
    */
   @state() private _items: readonly CalendarItem[] = []
 
+  /** The same, from the to-do lists. Kept apart only because two feeds report separately. */
+  @state() private _reminders: readonly CalendarItem[] = []
+
   private readonly _feed = new CalendarFeed(items => {
     this._items = items
+  })
+
+  private readonly _todos = new TodoFeed(items => {
+    this._reminders = items
   })
 
   /**
@@ -454,6 +482,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     clearTimeout(this._tick)
     this._tick = undefined
     this._feed.stop()
+    this._todos.stop()
     super.disconnectedCallback()
   }
 
@@ -470,19 +499,21 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
   /**
    * Entity ids whose state changes have to reach this card.
    *
-   * Overridden for the zero-config case, where the card follows whatever calendars exist
-   * and a filter that let a bare `hass` swap through unnoticed would never find out
-   * about a new one. Derived from `hass` on every call rather than cached, because that
-   * is what puts a newly-appeared calendar in the list at the moment its state first
-   * differs from `undefined`.
+   * Overridden for the zero-config case, where the card follows whatever calendars and
+   * to-do lists exist and a filter that let a bare `hass` swap through unnoticed would
+   * never find out about a new one. Derived from `hass` on every call rather than cached,
+   * because that is what puts a newly-appeared entity in the list at the moment its state
+   * first differs from `undefined`.
    *
-   * A calendar that goes away is the one case this cannot catch — it drops out of the
+   * An entity that goes away is the one case this cannot catch — it drops out of the
    * list before anything compares it. `hass` swaps often enough for another reason that
    * this has never been visible, and a subscription to a deleted entity is closed by
    * Home Assistant regardless.
    */
   protected override watchedEntities(): string[] {
-    return calendarsFor(this._config?.entities, this.hass)
+    const calendars = calendarsFor(this._config?.entities, this.hass)
+    if (!remindersEnabled(this._config?.show_reminders)) return calendars
+    return [...calendars, ...todoListsFor(this._config?.todo_entities, this.hass)]
   }
 
   private async _reconcileFeed(): Promise<void> {
@@ -491,13 +522,39 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     const hass = this.hass
     if (this._fixtures !== undefined || !hass?.connection) {
       this._feed.stop()
+      this._todos.stop()
       return
     }
 
-    await this._feed.reconcile(
+    // Both, and neither waits for the other: they are separate subscriptions over one
+    // socket, and a slow calendar must not hold the reminders back.
+    await Promise.all([
+      this._feed.reconcile(
+        hass,
+        calendarsFor(this._config?.entities, hass),
+        subscriptionWindow(this._now, LOOKAHEAD_DAYS),
+        this._timeZone,
+      ),
+      this._reconcileTodos(hass),
+    ])
+  }
+
+  /**
+   * The to-do half, which has one question in front of it the calendars do not.
+   *
+   * Switched off means not subscribed at all rather than subscribed and filtered: the
+   * cheapest way to draw no reminders is to not ask Home Assistant for them, and `stop`
+   * is what takes the rows already on screen away with it.
+   */
+  private async _reconcileTodos(hass: HomeAssistant): Promise<void> {
+    if (!remindersEnabled(this._config?.show_reminders)) {
+      this._todos.stop()
+      return
+    }
+
+    await this._todos.reconcile(
       hass,
-      calendarsFor(this._config?.entities, hass),
-      subscriptionWindow(this._now, LOOKAHEAD_DAYS),
+      todoListsFor(this._config?.todo_entities, hass),
       this._timeZone,
     )
   }
@@ -555,7 +612,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     if (item.allDay) {
       return html`
         <div class="row ${item.kind} allday" style="--item-color: ${item.color}">
-          ${ALL_DAY_BADGE}
+          ${item.kind === 'event' ? ALL_DAY_BADGE : html`<div class="bullet"></div>`}
           <div class="title cw-truncate">${item.title}</div>
         </div>
       `
@@ -600,7 +657,10 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
 
     const mode = this.cwLayout
     const fixtures = this._fixtures
-    const items = fixtures === undefined ? this._items : demoItems(fixtures, now)
+    // One pile, and `buildFlow` sorts it: events and reminders share a stream rather than
+    // being drawn in sections of their own (§2). The fixtures already hold both.
+    const items =
+      fixtures === undefined ? [...this._items, ...this._reminders] : demoItems(fixtures, now)
 
     // Small is today and nothing else, however busy tomorrow looks.
     const flow = buildFlow(items, { now, ctx, todayOnly: mode === 'small' })

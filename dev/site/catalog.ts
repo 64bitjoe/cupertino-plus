@@ -125,9 +125,10 @@ export interface Widget {
  *
  * Every other option sets `demo_scenario`, which hands the card a ready-made
  * `CalendarItem[]` and exercises the layout rules. This one leaves the key off, which is
- * what a real dashboard looks like — so the card resolves `entities`, subscribes over
- * `mock-hass`'s websocket, and runs the wire mapper on the way in. The only option that
- * would have caught the card drawing fixtures in Home Assistant.
+ * what a real dashboard looks like — so the card resolves `entities` and `todo_entities`,
+ * opens both subscriptions over `mock-hass`'s websocket, and runs both wire mappers on the
+ * way in. The only option that would have caught the card drawing fixtures in Home
+ * Assistant, and the only one where an undated to-do can be seen not being drawn.
  */
 export const LIVE_DATA = 'live'
 

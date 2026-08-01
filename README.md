@@ -22,9 +22,9 @@ taken from the box you drag them into rather than from a size setting.
 The demo runs every size live, with sample data and the clock under your control, and hands
 you the config to paste when you like what you see — nothing to install to look.
 
-> **Status: early.** Two cards. The calendar draws your real calendars and lays itself out
-> exactly like the phone's, though the grey reminder rows are not wired up yet — those need
-> `todo` entities. The battery card draws any battery sensors you point it at.
+> **Status: early.** Two cards. The calendar draws your real calendars and to-do lists and
+> lays itself out exactly like the phone's. The battery card draws any battery sensors you
+> point it at.
 >
 > It needs a current Home Assistant, **2026.7 or newer** — the cards track the latest
 > frontend APIs rather than carrying compatibility shims.
@@ -33,9 +33,10 @@ you the config to paste when you like what you see — nothing to install to loo
 
 Today's date, then today's events, then as much of the days after today as the card has
 room for — one continuous flow, poured through however many columns the footprint gives it.
-Each event is tinted with the colour of the calendar it came from. Empty days are not listed
-as empty, they simply do not appear, and whatever is left of the day the card ran out of
-room in becomes `2 more events`.
+Each event is tinted with the colour of the calendar it came from, and anything due out of
+your to-do lists joins the same flow at its own time. Empty days are not listed as empty,
+they simply do not appear, and whatever is left of the day the card ran out of room in
+becomes `2 more events`.
 
 <table>
   <tr>
@@ -149,9 +150,10 @@ Batteries** — and both have a visual editor, so there is no YAML to write unle
 
 ### The calendar
 
-Three fields: **Calendars**, which calendars feed it; **Clock**, which format it prints times
-in; and **Scale**, how large to draw it. Leave all three alone and you get every calendar, your
-Home Assistant time format, and 100%.
+Five fields: **Calendars**, which calendars feed it; **Reminders**, whether your to-do items
+are drawn beside the events; **To-do lists**, which lists those come from; **Clock**, which
+format it prints times in; and **Scale**, how large to draw it. Leave all of them alone and
+you get every calendar, every to-do list, your Home Assistant time format, and 100%.
 
 The equivalent YAML, if you prefer it:
 
@@ -160,17 +162,29 @@ type: custom:cupertino-widgets-calendar
 entities: # optional; leave it out for every calendar
   - calendar.work
   - calendar.personal
+show_reminders: true # optional; false leaves your to-do lists out entirely
+todo_entities: # optional; leave it out for every to-do list
+  - todo.chores
 time_format: system # optional; system | 12 | 24
 scale: 100 # optional; 80–130, percent
 ```
 
-| Option        | Default        | Meaning                                                         |
-| ------------- | -------------- | --------------------------------------------------------------- |
-| `entities`    | every calendar | Which `calendar.*` entities to draw. Omit it rather than empty. |
-| `time_format` | `system`       | `system` follows your profile; `12` or `24` overrides it.       |
-| `scale`       | `100`          | Percent. Draws the whole widget larger or smaller. 80–130.      |
+| Option           | Default          | Meaning                                                          |
+| ---------------- | ---------------- | ---------------------------------------------------------------- |
+| `entities`       | every calendar   | Which `calendar.*` entities to draw. Omit it rather than empty.  |
+| `show_reminders` | `true`           | Whether reminders are drawn. `false` reads no to-do list at all. |
+| `todo_entities`  | every to-do list | Which `todo.*` entities to read. Omit it rather than empty.      |
+| `time_format`    | `system`         | `system` follows your profile; `12` or `24` overrides it.        |
+| `scale`          | `100`            | Percent. Draws the whole widget larger or smaller. 80–130.       |
 
 `12`, `24` and `scale` are read whether or not you quote them.
+
+**On reminders.** A reminder is a to-do item with a **due date** — the date is what gives it a
+day to be drawn on, so an item without one never appears, and neither does one you have ticked
+off. An item due at a time reads like an event, with the time under its title; one due on a
+date reads as a single line, with no invented midnight under it. Both are drawn in the same
+stream as the events rather than in a section of their own, which is where a to-do due at half
+past ten belongs: between the nine o'clock meeting and the noon one.
 
 **On `system`.** It follows the time format in your Home Assistant profile, and that
 setting's own auto-detection reads the browser's locale — which is the only channel a
@@ -179,9 +193,10 @@ and there is no web API that would know better. That is what `12` and `24` are f
 
 Colours come from the colour set on each calendar in Home Assistant's entity settings, and
 otherwise from this library's own palette, dealt in the same order Home Assistant's own
-calendar panel deals its own — so a calendar keeps the colour you have got used to. Each
-calendar is subscribed to rather than polled, so the card follows Home Assistant as events
-change.
+calendar panel deals its own — so a calendar keeps the colour you have got used to. A to-do
+list has no colour to take in Home Assistant, so its circle comes from that palette by the
+position of the list. Every calendar and every list is subscribed to rather than polled, so
+the card follows Home Assistant as events and items change.
 
 ### The batteries
 
@@ -279,12 +294,12 @@ belongs to every card rather than to this one.
 
 ## The widgets
 
-| Widget                          | Status                |
-| ------------------------------- | --------------------- |
-| Calendar                        | events, live          |
-| Battery levels                  | live                  |
-| Reminders, in the calendar card | needs `todo` entities |
-| To-do lists                     | planned               |
+| Widget                          | Status                      |
+| ------------------------------- | --------------------------- |
+| Calendar                        | events, live                |
+| Battery levels                  | live                        |
+| Reminders, in the calendar card | to-do items with a due date |
+| A to-do list of its own         | planned                     |
 
 ## Development
 

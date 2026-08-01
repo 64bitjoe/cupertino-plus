@@ -13,6 +13,11 @@ homeassistant:
 # calendar.calendar_1 / calendar.calendar_2, plus assorted sensors.
 # For richer calendar work add the "Local Calendar" integration in the UI --
 # it is writable, so events can be created from the card.
+#
+# It has no `todo` platform at all, so the calendar card's reminders have nothing to read
+# here until the "Local To-do" integration is added in the UI -- it is config-flow only and
+# cannot be set up from this file. Add a list, then give an item a due date: only the dated
+# ones reach the card, which is the rule that is worth seeing work.
 demo:
 
 # Devices for the battery card, because `demo:` has almost nothing it can use: two
@@ -126,5 +131,5 @@ lovelace:
     # empty directory and serving 404 for a bundle that is sitting right there on the
     # host. `ha:up` force-recreates, which re-resolves the mount. Same failure the README
     # warns about for `rm -rf dist`, reached by a different route.
-    - url: /local/cupertino-widgets/cupertino-widgets.js?v=14
+    - url: /local/cupertino-widgets/cupertino-widgets.js?v=15
       type: module

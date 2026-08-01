@@ -41,6 +41,25 @@ const STATES: Record<string, HassEntity> = {
     all_day: false,
     supported_features: 7,
   }),
+  /*
+   * Two to-do lists, which `demo` does not provide at all — it has no `todo` platform, so
+   * the dev Home Assistant needs the Local To-do integration adding by hand and the
+   * showcase needs these.
+   *
+   * A to-do entity's state is its count of unfinished items, and `supported_features: 127`
+   * is every `TodoListEntityFeature` — what `local_todo` reports. The card reads neither:
+   * the count is not what it draws, and the flags say what can be written to a list rather
+   * than what it holds. They are here because a state a real one would not have is a way to
+   * find out that something is quietly reading it.
+   */
+  'todo.chores': entity('todo.chores', '3', {
+    friendly_name: 'Chores',
+    supported_features: 127,
+  }),
+  'todo.shopping': entity('todo.shopping', '2', {
+    friendly_name: 'Shopping',
+    supported_features: 127,
+  }),
   // The battery card's devices, which are a list of their own — see `battery-devices.ts`,
   // where the config that points at them lives beside them.
   ...Object.fromEntries(BATTERY_STATES.map(one => [one.entity_id, one])),
@@ -69,6 +88,18 @@ const wireDate = (offsetDays: number): string => {
 
 /** A timed instant, `minutes` from now. */
 const wireTime = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString()
+
+/**
+ * The same instant as a local wall clock with no zone on it — `2026-07-26T10:30:00`.
+ *
+ * Only a `todo` list sends these: Home Assistant requires a calendar event's datetimes to
+ * be aware, while a to-do's `due` is serialised as whatever the integration stored.
+ */
+const naiveTime = (minutes: number): string => {
+  const at = new Date(Date.now() + minutes * 60_000)
+  const day = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`
+  return `${day}T${pad(at.getHours())}:${pad(at.getMinutes())}:00`
+}
 
 /**
  * Calendar events in Home Assistant's OWN wire shape, per calendar.
@@ -109,12 +140,93 @@ const WIRE_EVENTS: Record<string, () => Record<string, unknown>[]> = {
 }
 
 /**
+ * To-do items in Home Assistant's OWN wire shape, per list.
+ *
+ * Written the way `todo/item/subscribe` sends them, which is `asdict` with no dict
+ * factory: every field present, the unset ones `null`, `status` spelled out, and `due`
+ * either a bare `YYYY-MM-DD` or an ISO datetime. Between them the two lists cover every
+ * branch of the mapper — a timed item, a dated one with no time, a naive datetime with no
+ * offset on it (which is what an integration that stored a wall clock sends), a completed
+ * item and an undated one. The last two must never appear on the card: one is done, and the
+ * other has no day to be drawn on.
+ *
+ * Split across two lists for the same reason the events are: picking one in the editor has
+ * to visibly drop the other's rows.
+ */
+const WIRE_TODOS: Record<string, () => Record<string, unknown>[]> = {
+  'todo.chores': () => [
+    {
+      summary: 'Pick up dry cleaning',
+      uid: 'chore-1',
+      status: 'needs_action',
+      due: wireTime(150),
+      description: null,
+      completed: null,
+    },
+    {
+      summary: 'Water the plants',
+      uid: 'chore-2',
+      status: 'needs_action',
+      due: wireDate(0),
+      description: null,
+      completed: null,
+    },
+    {
+      summary: 'Renew library card',
+      uid: 'chore-3',
+      status: 'needs_action',
+      due: wireDate(2),
+      description: null,
+      completed: null,
+    },
+    // Neither of these is drawable: the first is done, the second belongs to no day.
+    {
+      summary: 'Take the bins out',
+      uid: 'chore-4',
+      status: 'completed',
+      due: wireDate(0),
+      description: null,
+      completed: wireTime(-60),
+    },
+    {
+      summary: 'Sort the cellar out',
+      uid: 'chore-5',
+      status: 'needs_action',
+      due: null,
+      description: null,
+      completed: null,
+    },
+  ],
+  'todo.shopping': () => [
+    {
+      summary: 'Order the birthday cake',
+      uid: 'shop-1',
+      status: 'needs_action',
+      // No offset, which `todo/item/subscribe` will happily send: a naive `datetime` goes
+      // out as the wall clock it was stored as, and the browser reads it as local time.
+      due: naiveTime(320),
+      description: null,
+      completed: null,
+    },
+    {
+      summary: 'Buy stamps',
+      uid: 'shop-2',
+      status: 'needs_action',
+      due: wireDate(1),
+      description: null,
+      completed: null,
+    },
+  ],
+}
+
+/**
  * The handful of Home Assistant strings our editors reuse, copied out of the `en` table
  * the frontend ships. `localize` answers `''` for anything else, which is what the real
  * one does with a key it does not have — the fallback path an editor has to survive.
  */
 const TRANSLATIONS: Record<string, string> = {
   'ui.panel.lovelace.editor.card.calendar.calendar_entities': 'Calendar entities',
+  'panel.todo': 'To-do lists',
 }
 
 export interface MockHassOptions {
@@ -142,12 +254,19 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
       async subscribeMessage(callback, message) {
         console.debug('[mock-hass] subscribeMessage', message)
 
+        // Asynchronously in both cases, because Home Assistant is: the subscribe resolves
+        // first and the snapshot arrives after it, so a card that expected data from the
+        // call itself would work here and nowhere else.
         if (message.type === 'calendar/event/subscribe') {
           const entityId = String(message.entity_id)
-          // Asynchronously, because Home Assistant is: the subscribe resolves first and
-          // the snapshot arrives after it, so a card that expected data from the call
-          // itself would work here and nowhere else.
           queueMicrotask(() => callback({ events: WIRE_EVENTS[entityId]?.() ?? [] } as never))
+        }
+
+        if (message.type === 'todo/item/subscribe') {
+          const entityId = String(message.entity_id)
+          // `items: []` for a list nobody wrote fixtures for, never `items: null` — the real
+          // handler maps over `todo_items or []`, so there is no null case to imitate.
+          queueMicrotask(() => callback({ items: WIRE_TODOS[entityId]?.() ?? [] } as never))
         }
 
         return async () => {

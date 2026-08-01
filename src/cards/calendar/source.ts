@@ -1,10 +1,12 @@
 /**
- * Where the widget's rows actually come from: Home Assistant's calendars.
+ * Where the widget's event rows come from: Home Assistant's calendars.
  *
  * Everything above this file speaks `CalendarItem` and knows nothing about Home
- * Assistant — see `model.ts`. This is the one place that does, so it carries the
- * protocol, verified by reading `homeassistant/components/calendar/__init__.py` and the
- * frontend bundle inside home-assistant 2026.7.4 rather than from documentation:
+ * Assistant — see `model.ts`. This file and `todo-source.ts` are the two that do, one per
+ * domain, because the two subscriptions have nothing in common but their shape. This one
+ * carries the calendar protocol, verified by reading
+ * `homeassistant/components/calendar/__init__.py` and the frontend bundle inside
+ * home-assistant 2026.7.4 rather than from documentation:
  *
  *  - the command is `calendar/event/subscribe`, and its schema is strict
  *    (`vol.PREVENT_EXTRA`): exactly `type`, `entity_id`, `start`, `end`, no more;
@@ -29,7 +31,7 @@
  */
 
 import type { HomeAssistant } from '../../core/types/ha'
-import { dayStart } from './datetime'
+import { isWireDateOnly, parseWireDate } from './datetime'
 import type { CalendarItem } from './model'
 
 /**
@@ -133,6 +135,11 @@ export const calendarsFor = (value: unknown, hass: HomeAssistant | undefined): s
  * colours the widget is drawn in, and they already have a dark variant in `tokens.ts`
  * that a saturated `#4269d0` would not. Red comes last because the widget spends it on
  * the weekday above the flow.
+ *
+ * `todo-source.ts` deals from the same deck by the position of a list in its own list, so
+ * a calendar and a to-do list can come out the same hue. That is deliberate: the deck is
+ * the widget's, not the calendars', and dealing the to-do lists from where the calendars
+ * left off would make a list's colour depend on how many calendars happen to exist.
  */
 const PALETTE = [
   'var(--cw-blue)',
@@ -246,22 +253,6 @@ export const subscriptionWindow = (now: Date, days: number): SubscriptionWindow 
 
 // ---- The mapping ---------------------------------------------------------------
 
-/** An all-day event's dates are bare `YYYY-MM-DD`; a timed one's carry a `T`. */
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
-
-const parseWireDate = (value: unknown, timeZone: string | undefined): Date | undefined => {
-  if (typeof value !== 'string') return undefined
-
-  const dateOnly = DATE_ONLY.exec(value)
-  if (dateOnly) {
-    const day = Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
-    return dayStart(day / 86_400_000, timeZone)
-  }
-
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed
-}
-
 /**
  * One wire event as a row, or nothing if it cannot be drawn.
  *
@@ -276,9 +267,8 @@ const parseWireDate = (value: unknown, timeZone: string | undefined): Date | und
  * ended this morning is retired by `isOver` at the stroke of midnight. Translating it to
  * an inclusive last day, or dropping it as the fixtures do, breaks both.
  *
- * **Everything is `kind: 'event'`.** Reminders are `todo` entities and are not wired up
- * yet, so nothing here can produce one. The rendering for them exists and the fixtures
- * exercise it.
+ * **Everything is `kind: 'event'`.** A reminder comes from a `todo` entity, which is
+ * `todo-source.ts`'s subscription and not this one.
  *
  * **The id has to survive a re-render**, because `flow.ts` uses it as the keyed-render
  * identity. `uid` is the natural answer but it is optional on the wire — absent from
@@ -302,7 +292,7 @@ export const toCalendarItem = (
   // rather than a datetime; the date-only string is the same fact on the wire. Either
   // one is enough, and taking both means an integration that sends only one still lands
   // on the single-line row it asked for.
-  const allDay = event.all_day === true || DATE_ONLY.test(String(event.start))
+  const allDay = event.all_day === true || isWireDateOnly(event.start)
   const location = typeof event.location === 'string' ? event.location : ''
   const uid = typeof event.uid === 'string' ? event.uid : ''
 

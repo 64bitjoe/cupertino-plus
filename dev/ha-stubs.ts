@@ -829,6 +829,8 @@ class HaFormStub extends HTMLElement {
       row.append(this._renderText(node.name, value, node.selector.icon.placeholder))
     } else if ('text' in node.selector) {
       row.append(this._renderText(node.name, value, node.selector.text.placeholder))
+    } else if ('boolean' in node.selector) {
+      row.append(this._renderBoolean(node.name, value))
     } else if (node.selector.entity.multiple) {
       row.append(this._renderEntities(node, node.selector.entity))
     } else {
@@ -932,6 +934,20 @@ class HaFormStub extends HTMLElement {
     input.value = typeof value === 'string' ? value : ''
     input.placeholder = placeholder ?? ''
     input.addEventListener('input', () => this._emit(name, input.value || undefined))
+    return input
+  }
+
+  /**
+   * A checkbox where Home Assistant draws a switch, and the one thing worth copying is what
+   * it reports: `target.checked`, so a **boolean** and never `undefined`. An editor that
+   * only ever saw a truthy value here would have no way to write an option off.
+   */
+  private _renderBoolean(name: string, value: unknown): HTMLElement {
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.id = name
+    input.checked = value === true
+    input.addEventListener('change', () => this._emit(name, input.checked))
     return input
   }
 

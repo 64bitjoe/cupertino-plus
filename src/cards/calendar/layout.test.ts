@@ -251,6 +251,32 @@ describe('medium — packing rules', () => {
     }
     expect(costs([reminder], [4, 7], 'medium')).toEqual([[2], []])
   })
+
+  /**
+   * A to-do due on a date with no time carries `allDay` for exactly this: there is no time
+   * to print under its title, so it is one line, and the budget must not be charged for
+   * two. The kind is what changes the row's anatomy — a bullet rather than the calendar
+   * badge — and not what it costs.
+   */
+  it('prices a dated reminder with no time at one row, like any all-day entry', () => {
+    // Built out rather than spread from `item`: a reminder has no `end` at all, which is
+    // what keeps `isOver` from retiring it, and there is no spreading `end` away.
+    const datedReminder = (title: string): FlowNode => ({
+      type: 'item',
+      key: title,
+      item: {
+        id: title,
+        kind: 'reminder',
+        title,
+        start: new Date('2026-07-24T00:00:00Z'),
+        allDay: true,
+        color: 'orange',
+      },
+    })
+
+    const flow = ['R1', 'R2', 'R3', 'R4'].map(datedReminder)
+    expect(costs(flow, [4, 7], 'medium')).toEqual([[1, 1, 1, 1], []])
+  })
 })
 
 describe('the tail indicator', () => {
@@ -659,8 +685,10 @@ describe('geometry', () => {
     const GAP = 6
     const COMPACT = 56
     /**
-     * The tallest of the three one-row nodes: an all-day chip, 22px of title inside 1px
-     * of padding. A `2 more events` is 22px, a heading 20px.
+     * The tallest of the one-row nodes: an all-day chip, 22px of title inside 1px of
+     * padding. A `2 more events` is 22px, a heading 20px, and a dated reminder with no time
+     * is the same chip with a bullet in it — 24px as well, since the bullet is 13px and the
+     * title line is what sets the height.
      */
     const ONE_ROW = 24
 

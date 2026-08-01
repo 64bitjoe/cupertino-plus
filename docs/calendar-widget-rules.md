@@ -20,8 +20,8 @@ Two sizes, matching the two Apple offers on a home screen:
   location?: string,
   start: Date,
   end?: Date,          // reminders have none
-  allDay?: boolean,
-  color: string        // the calendar's colour
+  allDay?: boolean,    // belongs to a day, not to a moment
+  color: string        // the calendar's or the to-do list's colour
 }
 ```
 
@@ -31,6 +31,14 @@ palette below is how the four come out of the one colour Home Assistant holds.
 
 **Reminder** — a neutral grey background, an empty circle in the list's colour, muted
 text. Reminders never show a location.
+
+**A reminder with a date and no time** — the same row with the time line gone, so one line
+and 24px, priced exactly like an all-day event (§4). It keeps its circle rather than taking
+the badge below: the badge is a calendar, and a to-do is not on one. `allDay` is the flag
+for both, because both mean the same thing — this belongs to a day rather than to a moment
+— and it is what puts them at the top of their day and prints no time under them. There is
+no time to print: `12:00AM` would be an invention, and an invention about the one thing the
+reader would act on.
 
 **All-day event** — the chip of an event, but the bar gives way to a filled circle with
 a calendar knocked out of it, in the bar's colour, and then the title on one line
@@ -60,6 +68,14 @@ Home Assistant holds one colour per calendar — the hex the `google` integratio
 token its colour picker writes, or the palette entry `source.ts` deals a calendar that has
 neither. The widget needs four out of that one: the bar, the title, the time, and the chip
 behind them. Twice over, because a dark theme is not a light one with the numbers nudged.
+
+A **to-do list** has no colour at all in Home Assistant — no registry option, nothing in
+the to-do panel — so for those the palette is not a fallback, it is the whole answer: a list
+takes the entry at its own position in the card's list of lists. That is dealt
+independently of the calendars, so a calendar and a to-do list can come out the same hue.
+The alternative, dealing the lists from where the calendars left off, would make a list's
+colour depend on how many calendars happen to exist, and the two rows do not look alike
+anyway: one has a bar and a tint, the other a circle and grey.
 
 The derivation is in OKLCH, and the hue is the channel that never moves. Only `L` and `C`
 do, per role, so the four read as one colour at four strengths rather than as four
@@ -166,12 +182,31 @@ colour and nothing else from the table:
 
 ## 2. Selection and order
 
+### Which rows exist at all
+
+Events come from the `calendar` entities the config names, and every calendar in the
+installation when it names none. Reminders work the same way over `todo` entities, with one
+question in front of them that the calendars do not have — **whether reminders are drawn**,
+which defaults to yes. An empty picker cannot say "none": Home Assistant reports an emptied
+entity list as `[]`, which is what "I chose nothing" and "I chose everything" both look
+like, so the switch is what says no. Off means not subscribed rather than subscribed and
+filtered.
+
+**A to-do item is a row only if it has a due date, and is not ticked off.** The date is what
+files it under a day, and a calendar widget has nowhere to put an item without one — which
+is most of a real list, so this is the rule that keeps a shopping list from arriving as a
+wall of undated rows. A due date with no time on it is a day (§1); a due time is a moment
+and prints like one.
+
+### Order
+
 1. Today and forwards only — a fortnight is more than enough.
 2. Anything that has finished is dropped; anything running now stays. Only a real end
    time can retire a row, so an overdue reminder stays up for the rest of its day.
 3. Inside a day: all-day first, then by start time. Reminders and events share one
    stream — `Pick up dry cleaning 10:30` comes before `Language class 12:00`, and it is
-   not shunted into a section of its own.
+   not shunted into a section of its own. A reminder due on a date with no time is one of
+   the all-day rows, so it sits with them at the top rather than at midnight.
 4. Sections are calendar days. **A day with nothing in it disappears entirely**,
    heading and all: if today is Friday and Saturday is empty, the next heading is
    `SUNDAY, 26 JUL`, not an empty Saturday.
@@ -229,13 +264,13 @@ yesterday ends at today's midnight and is still yesterday's.
 
 The unit is one line of text inside the card.
 
-| Element                                | Cost |
-| -------------------------------------- | ---- |
-| compact row (title + time)             | 2    |
-| expanded row (title + location + time) | 3    |
-| all-day row (title alone)              | 1    |
-| section heading                        | 1    |
-| `2 more events`                        | 1    |
+| Element                                      | Cost |
+| -------------------------------------------- | ---- |
+| compact row (title + time)                   | 2    |
+| expanded row (title + location + time)       | 3    |
+| all-day row (title alone), reminder or event | 1    |
+| section heading                              | 1    |
+| `2 more events`                              | 1    |
 
 | Column               | Budget |
 | -------------------- | ------ |

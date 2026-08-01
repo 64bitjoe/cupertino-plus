@@ -326,6 +326,83 @@ registry-hidden entities, honour the user's per-calendar colour from the entity 
 else assign from a palette by index. Also confirms `hass.entities` (entity registry) is
 available to custom cards.
 
+## To-do data (VERIFIED — and it is NOT the calendar's protocol twice)
+
+The calendar card reads reminders off `todo` entities. Same idea as the calendar
+subscription, three differences that matter, all four points checked in the image:
+
+```python
+# components/todo/__init__.py
+@websocket_api.websocket_command({
+    vol.Required("type"): "todo/item/subscribe",
+    vol.Required("entity_id"): cv.entity_domain(DOMAIN),   # ONE entity, again
+})
+```
+
+1. **No window.** The command takes nothing but the entity, so what arrives is the WHOLE
+   list, however far out its due dates reach. Nothing to key a re-subscribe on either —
+   the calendar's midnight rollover has no counterpart here.
+2. **The push is not the REST shape and not the calendar's shape.** The listener sends
+   `[dataclasses.asdict(item) for item in todo_items or []]` — `asdict` with **no dict
+   factory**, unlike `todo/item/list` below, which passes `_api_items_factory` and drops
+   the `None`s. So every field is present and the unset ones are `null`:
+
+   ```json
+   {
+     "items": [
+       {
+         "summary": "Buy stamps",
+         "uid": "abc",
+         "status": "needs_action",
+         "due": "2026-07-28",
+         "description": null,
+         "completed": null
+       }
+     ]
+   }
+   ```
+
+   `{ "items": null }` does **not** happen — the `or []` is inside the comprehension, which
+   is the one way this is kinder than `calendar/event/subscribe`.
+
+3. **`due` is a date OR a datetime, and the datetime may be naive.** It is whatever
+   `datetime.date | datetime.datetime` the integration stored, serialised by orjson through
+   `json_bytes`. Probed inside the image rather than assumed:
+
+   ```
+   date(2026,7,31)                          -> "2026-07-31"
+   datetime(2026,7,31,10,30)                -> "2026-07-31T10:30:00"        # no offset
+   datetime(2026,7,31,10,30,tzinfo=Warsaw)  -> "2026-07-31T10:30:00+02:00"
+   ```
+
+   Nothing on the way out makes it aware, so the naive form is real — unlike a calendar
+   event, whose datetimes core requires to be aware. The frontend's own to-do card tells
+   the two apart with `due?.includes("T")`, which is `isWireDateOnly` here.
+
+`status` is `TodoItemStatus`, a `StrEnum` orjson serialises to its value: `needs_action` or
+`completed`, and the field is `Optional` on the dataclass so an integration may omit it.
+An initial snapshot is pushed by the subscribe handler itself (`entity.async_update_listeners()`),
+but after `send_result` — so, as with the calendar, there is nothing to await for data.
+A missing entity is `send_error(..., "invalid_entity_id")`, i.e. a rejected command rather
+than an error frame on a live subscription.
+
+Also there, and not used: `todo/item/list` (a one-shot with `_api_items_factory`, so no
+nulls), `todo/item/move`, and the `todo.get_items` service with `SupportsResponse.ONLY`.
+
+**A to-do list has no colour.** There is no `options.todo` in the entity registry and no
+colour anywhere in the to-do panel — grepped both. `options.calendar.color` has no
+counterpart, so a palette is the whole answer rather than a fallback.
+
+**`TodoListEntityFeature` is about writing, not about content.**
+`SET_DUE_DATE_ON_ITEM = 16` / `SET_DUE_DATETIME_ON_ITEM = 32` say the list accepts a due
+date being _set_, so an integration serving read-only dated items advertises neither.
+Filtering discovery on them would hide exactly the lists a calendar wants.
+
+One store-level detail, because it looks like the calendar's exclusive-end trap:
+`local_todo` keeps a date-only due a day forward (rfc5545 due dates are exclusive) and
+shifts it back on the way out — `if (due := item.due) and not isinstance(due, datetime):
+due -= timedelta(days=1)`. The date on the wire is the day the item is due, inclusive.
+
 ## Visual editors (VERIFIED — and the received wisdom here is stale)
 
 A card gets a visual editor by answering `static getConfigElement()`. Without one,
@@ -518,7 +595,7 @@ names are the panel's own. This library passes explicit placeholders instead —
 
 ### Selectors
 
-`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Five we use:
+`ha-selector` dispatches on `Object.keys(selector)[0]`; 57 types ship. Six we use:
 
 ```js
 { entity: { filter: { domain: 'calendar' }, multiple: true } }
@@ -526,6 +603,7 @@ names are the panel's own. This library passes explicit placeholders instead —
 { number: { min: 80, max: 130, step: 5, mode: 'slider', unit_of_measurement: '%' } }
 { icon: { placeholder: 'mdi:watch' } }
 { text: { placeholder: 'Watch battery' } }
+{ boolean: {} }
 ```
 
 - `filter` is the current spelling. A top-level `{ entity: { domain } }` still works, but
@@ -578,6 +656,13 @@ names are the panel's own. This library passes explicit placeholders instead —
 - `text` renders `ha-input`, and reports **`undefined`** rather than `''` for a field that
   has been emptied — as long as the row is not `required`. That is what lets an override
   disappear from a config instead of sitting in it blank.
+- `boolean` takes no options and renders an `ha-switch` inside an `ha-formfield`, with the
+  helper as a second line under the label rather than beneath the control. It reports
+  `target.checked`, so always a real boolean — `false` included, which is what lets an
+  option be switched _off_ in a config rather than only blanked out of it. Its `.checked` is
+  `this.value ?? this.placeholder === true`, so a schema-level default is available there
+  too; our editors do it through `defaults()` instead, which puts the same value in front of
+  every row and in one place.
 
 ### The list-of-objects selector — considered, and not used
 

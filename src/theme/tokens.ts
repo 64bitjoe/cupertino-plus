@@ -68,6 +68,12 @@ export const tokens = css`
        two colours rather than as a length. Half the fill's weight, in each theme. */
     --cw-track: rgba(0, 0, 0, 0.1);
 
+    /* cards/complication/tint.ts's NEEDS_DARK_ON_TINT hard-codes which four of these ten
+       fail a 3:1 white-text contrast check — worked out against the exact hex values
+       below, in both themes, not against the tint names in the abstract. Change a value
+       here (this block or the :host([dark]) one further down) and that judgement is
+       stale until someone re-checks it; the passing six could start failing, or one of
+       the four could clear the bar and no longer need the near-black override. */
     --cw-accent: var(--primary-color, #007aff);
     --cw-red: #ff3b30;
     --cw-orange: #ff9500;

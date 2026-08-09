@@ -69,7 +69,13 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
       /* Every px below is a design unit multiplied by --cw-scale, and layout.ts holds the
          same numbers unscaled: it divides the measured box by the factor instead, so the
          two sides of the arithmetic never restate each other. The lengths each price a
-         twin in layout.ts are called out below, next to that twin's name there. */
+         twin in layout.ts are called out below, next to that twin's name there. The one
+         exception is --cw-comp-ring: packFor answers it in the same design units as
+         everything else, but the template sets it as a custom property CSS consumes
+         directly, so it is scaled once, there, rather than restated as calc(var(--cw-
+         comp-ring) * var(--cw-scale)) at every rule below that reads it -- the battery
+         card's --cw-ring-size crosses the same boundary the same way, with the same
+         comment, at battery-card.ts. */
       ha-card {
         height: 100%;
         box-sizing: border-box;
@@ -184,11 +190,35 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
       }
 
       .reading {
-        font: 600 calc(17px * var(--cw-scale)) / calc(22px * var(--cw-scale)) var(--cw-font);
+        font-family: var(--cw-font);
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
         letter-spacing: -0.01em;
         color: var(--cw-label);
         z-index: 1;
+      }
+
+      /* The ring's own reading, sized off the ring it actually landed in rather than off
+         --cw-scale alone. A fixed 17px * scale read fine at packFor's default RING_MAX
+         (96 design units) but not at RING_MIN (40): a 46% would touch the track on both
+         sides, and a longer value like 21.4°C would wrap onto a second line the .ring box
+         has no height budgeted for, spilling out of it and breaking the row beside it --
+         both visible in docs/images/complication-small.png before this rule existed.
+         white-space: nowrap is what .cell.inline .reading already carries for the same
+         reason (see its own comment below): with the default 'normal' the reading wraps
+         at its internal space rather than growing past its box, and a wrapped ring
+         reading has nowhere to grow into. The clamp: a floor that stays legible at
+         RING_MIN, a preferred size proportional to the ring's own diameter rather than a
+         flat multiple of scale, and a ceiling at the 17px this rule always drew, so a
+         ring at or above RING_MAX looks exactly as it did before this change. */
+      .ring .reading {
+        font-size: clamp(
+          calc(11px * var(--cw-scale)),
+          calc(var(--cw-comp-ring) * 0.2),
+          calc(17px * var(--cw-scale))
+        );
+        line-height: 1.15;
+        white-space: nowrap;
       }
 
       /* var(--cw-text-caption-2), not a --cw-comp-label of its own: its 11px/13px is the
@@ -489,18 +519,52 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
   }
 
   /**
-   * The defaults `core/size.ts` gives every card, with this card's own floors over the
-   * top.
+   * The defaults `core/size.ts` gives every card, raised to this card's own floors where
+   * the defaults would sit below them.
    *
-   * The floors are the overflow design; see `floorsFor`. Recomputed on every call rather
-   * than cached, because they depend on the config and a stale floor is a card that can
-   * be dragged smaller than it fits.
+   * `super.getGridOptions()` returns a flat `rows: 4` — it has no idea this card exists,
+   * let alone how many entities it holds — so spreading the floors on top of it (the
+   * original shape here) only ever raised `min_rows`/`min_columns`, never the `rows`/
+   * `columns` HA actually renders at before anyone touches the Layout tab. A three-entity
+   * `rectangular` card floors at `min_rows: 6` but was still handed a default `rows: 4`:
+   * below its own floor, and silently below it, because `ha-card` clips overflow
+   * (`theme/base-styles.ts`) rather than spilling it — the third entity was not drawn
+   * smaller or truncated, it was simply gone. Raising the default to the floor (never
+   * lowering it, in case a future default grows past what this card needs) is what
+   * closes that gap; the floors are the overflow design, see `floorsFor`, and a default
+   * that starts under its own floor defeats it before the user ever drags anything.
+   *
+   * Recomputed on every call rather than cached, because both halves depend on the
+   * config and a stale value is a card that can render, or be dragged, smaller than it
+   * fits.
    */
   public override getGridOptions(): LovelaceGridOptions {
     const style = this._config?.style ?? DEFAULT_STYLE
     const count = entityConfigs(this._config?.entities).length
+    const floors = floorsFor(style, count)
+    const base = super.getGridOptions()
 
-    return { ...super.getGridOptions(), ...floorsFor(style, count) }
+    return {
+      ...base,
+      ...floors,
+      // `columns`/`rows` are `number | 'full'` and `number | 'auto'` (`core/types/ha.ts`)
+      // because Home Assistant's own grid accepts those literals as "as wide/tall as the
+      // grid allows" — and `super.getGridOptions()` could in principle return one, even
+      // though `core/size.ts`'s `gridOptions()` happens to return plain numbers today.
+      // `Number('full')` is `NaN`, so a blind `Math.max` would silently turn a deliberate
+      // literal into a broken grid option instead of leaving it alone; a literal is also
+      // already at least as generous as any floor this card could ask for, so there is
+      // nothing to raise. Only the number case is coerced; either literal, or an absent
+      // default, passes straight to the floor itself.
+      columns:
+        typeof base.columns === 'number'
+          ? Math.max(base.columns, floors.min_columns)
+          : (base.columns ?? floors.min_columns),
+      rows:
+        typeof base.rows === 'number'
+          ? Math.max(base.rows, floors.min_rows)
+          : (base.rows ?? floors.min_rows),
+    }
   }
 
   /**
@@ -587,6 +651,13 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
    * which reads worse than no gauge at all. So the icon takes the ring's place instead:
    * the same style showing what the data supports, rather than a sixth style for entities
    * with no range.
+   *
+   * The `aria-label` here, and on the other two faces below, spells "unavailable" out
+   * rather than reading `item.value` straight: `model.ts` already turns an unreadable
+   * entity's value into an em dash for the dashed, dimmed cell decision 4 draws visually,
+   * but an em dash read aloud by a screen reader is silence, not a dash — "Lounge
+   * Humidity, —" tells nobody anything went wrong. `battery-card.ts`'s cells make the
+   * same call the same way, off the same `unknown`/`unavailable` flag.
    */
   private _renderCircular(item: Complication, labels: boolean): TemplateResult {
     const gauge = item.range !== null
@@ -597,7 +668,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         style=${`--cw-comp-tint:${tintVar(item.tint)}`}
         role="button"
         tabindex="0"
-        aria-label=${`${item.name}, ${item.value}`}
+        aria-label=${`${item.name}: ${item.unavailable ? 'unavailable' : item.value}`}
         @click=${() => this._openMoreInfo(item.id)}
         @keydown=${this._activate(item.id)}
       >
@@ -638,7 +709,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         style=${`--cw-comp-tint:${tintVar(item.tint)}; --cw-comp-on-tint:${onTintVar(item.tint)}`}
         role="button"
         tabindex="0"
-        aria-label=${`${item.name}, ${item.value}`}
+        aria-label=${`${item.name}: ${item.unavailable ? 'unavailable' : item.value}`}
         @click=${() => this._openMoreInfo(item.id)}
         @keydown=${this._activate(item.id)}
       >
@@ -668,7 +739,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         style=${`--cw-comp-tint:${tintVar(item.tint)}`}
         role="button"
         tabindex="0"
-        aria-label=${`${item.name}, ${item.value}`}
+        aria-label=${`${item.name}: ${item.unavailable ? 'unavailable' : item.value}`}
         @click=${() => this._openMoreInfo(item.id)}
         @keydown=${this._activate(item.id)}
       >
@@ -733,11 +804,17 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
       this.scaleFactor,
     )
 
+    // pack.ring arrives in design units, like every other number packFor returns; scaled
+    // here, once, into the one custom property this stylesheet reads pre-multiplied. See
+    // the styles' own top-of-file comment for why that is the one length that crosses the
+    // scale boundary raw instead of restating "* var(--cw-scale)" at each rule below.
+    const ring = `calc(${pack.ring}px * var(--cw-scale))`
+
     return html`
       <ha-card class=${style}>
         <div
           class="grid ${style}"
-          style=${`--cw-comp-columns:${pack.columns}; --cw-comp-ring:${pack.ring}px`}
+          style=${`--cw-comp-columns:${pack.columns}; --cw-comp-ring:${ring}`}
         >
           ${items.map(item => this._renderCell(style, item, pack.labels))}
         </div>

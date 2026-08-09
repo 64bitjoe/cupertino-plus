@@ -160,12 +160,24 @@ config on every call, so they can never go stale behind an entity list that just
 
 That is the whole of the overflow design, and the cost is worth stating in the same breath as
 the benefit: **the Layout tab clamps its own sliders to whatever `floorsFor` returns**, so a
-card holding six rings simply cannot be dragged down to a box that holds four. There is no
-`+2 more` indicator, no scroller, and no truncated state anywhere in this card, and that is not
-an omission, it is what makes overflow unreachable. The trade is a card that sometimes insists
-on being bigger than the user first reached for — which is the honest cost, how much room the
-content actually needs rather than a taste the card is imposing (`layout.test.ts`, "asks for
-more height as the entities pile up").
+card holding six rings cannot be _dragged_ down to a box that holds four. There is no
+`+2 more` indicator, no scroller, and no truncated state anywhere in this card — for every
+footprint the Layout tab will offer, that is not an omission, it is what makes overflow
+unreachable. The trade is a card that sometimes insists on being bigger than the user first
+reached for — which is the honest cost, how much room the content actually needs rather than a
+taste the card is imposing (`layout.test.ts`, "asks for more height as the entities pile up").
+
+**The unreachable claim has one known gap, and it is a stale-config window rather than a hole
+in the arithmetic.** `config.grid_options` is spread after whatever `getGridOptions()` returns
+(`docs/ha-api-notes.md`), so Home Assistant only re-clamps a saved size against a _new_ floor
+when the user next touches the Layout tab. Drag a two-entity `rectangular` card down to its
+floor, then add a third entity in YAML: the floor `floorsFor` now computes is taller, but the
+`rows` already saved on the card survives the edit until someone reopens the Layout tab and
+moves the slider, and the card clips in the meantime. Closing that gap would mean the layout
+itself yielding when its box is smaller than its content needs — the opposite of the guarantee
+this section spends its whole argument making, and a design change, not a bug fix. It is left
+open rather than papered over; see §9 below for it named as a possible future direction rather
+than a silent gap.
 
 ## 6. Why the card does not scroll, ever
 
@@ -240,3 +252,14 @@ Decided rather than known, each one edit away from being decided differently.
 - **A per-row style override.** Every entity in one card currently shares one `style`; mixing,
   say, one `rectangular-bleed` headline complication with a row of plain `circular` ones
   underneath would need a shape for that in the config, which today it does not have.
+- **A saved size can go stale under a rising floor.** §5's "overflow is unreachable" claim
+  holds only up to the Layout tab's own clamp, which fires when the tab is opened, not when
+  the config changes underneath a size the user already saved — see §5's own note. The
+  option not taken here is a layout that _yields_: if `packFor` were allowed to shrink a
+  block below `RECT_BLOCK`, or drop a caption, or otherwise fit itself into a box smaller
+  than `floorsFor` says it needs, a stale saved size would degrade gracefully instead of
+  clipping. That is a real fix, and deliberately not this branch's: it would mean the count
+  no longer unconditionally deciding the grid (the module comment on `packFor`'s own
+  priority order), which three already-reviewed tasks were built against holding. Worth
+  reopening only as its own considered change, not as a patch bolted onto the end of this
+  one.

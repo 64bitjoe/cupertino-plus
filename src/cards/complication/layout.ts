@@ -14,12 +14,23 @@
  *
  * That is the whole of the overflow design, and it is worth saying plainly because it is
  * easy to miss reading the code alone: the Layout tab clamps its own sliders to whatever
- * `floorsFor` returns, so a card holding six rings simply cannot be dragged down to a box
- * that holds four. There is no `+2 more` indicator, no scroller, and no truncated state
- * anywhere in this card, and that is not an omission — it is what makes overflow
- * unreachable. A future change that adds one of those would be solving a problem this
- * design already closed off; the fix for a cramped card is `floorsFor` returning a bigger
- * number, not a face that hides what does not fit.
+ * `floorsFor` returns, so a card holding six rings cannot be *dragged* down to a box that
+ * holds four. There is no `+2 more` indicator, no scroller, and no truncated state anywhere
+ * in this card, and that is not an omission — for every footprint the Layout tab will let
+ * a user choose, it is what makes overflow unreachable. A future change that adds one of
+ * those would be solving a problem this design already closed off; the fix for a cramped
+ * card is `floorsFor` returning a bigger number, not a face that hides what does not fit.
+ *
+ * The qualifier matters, and it is a known, disclosed gap rather than a silent one:
+ * `config.grid_options` is spread *after* whatever `getGridOptions()` returns
+ * (`docs/ha-api-notes.md`), so a `rows` a user already had saved survives a later edit that
+ * raises `floorsFor`'s own floor — drag a two-entity `rectangular` card down to its floor,
+ * then add a third entity, and the saved `rows` is now below the new floor even though the
+ * Layout tab itself would refuse to offer that box today. That is a stale-config window,
+ * not a hole in the floors' arithmetic, and closing it would mean the layout yielding to an
+ * oversubscribed box — the opposite of the guarantee this module makes everywhere else, and
+ * a design change past the scope of a floor. See `docs/complication-widget-rules.md` §5 for
+ * where that trade is recorded for a reader who has not opened this file.
  *
  * The priority inside `packFor` is the battery card's, for the battery card's reason: the
  * count decides the grid, the grid decides the cell, the face fits the cell. Nothing here

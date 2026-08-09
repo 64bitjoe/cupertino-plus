@@ -78,6 +78,8 @@
 
 **This task is not additive.** `battery/layout.ts:102,120` declare `COLUMNS` and `MAX_ROWS` as `Record<WidgetLayout, number>`, so widening the union breaks typecheck until the battery card answers for `large`. That is the point — it is the file that has to answer. Finish both halves in this task.
 
+Two further files fail to typecheck for the same reason and are **not** listed above, because this plan missed them: `src/cards/calendar/calendar-card.ts` and `dev/shots.ts`. The calendar has no third arrangement in this plan (spec §2 says so outright), so it folds `large` into its `medium` rendering — but make that fold **visible and commented**, so the next reader knows the calendar deliberately has no large form rather than finding a silent coercion. `dev/shots.ts` simply needs the new `height` argument.
+
 - [ ] **Step 1: Write the failing test for the layout threshold**
 
 Create `src/core/size.test.ts`:
@@ -109,10 +111,17 @@ describe('layoutFromBox', () => {
   })
 
   it('compares in design units, so scale moves both thresholds', () => {
-    // At 130% a box that was comfortably large is only medium: the type grew, the box
-    // did not, so there is less room in the units that matter.
-    expect(layoutFromBox(LARGE.width, LARGE.height, 1.3)).toBe('medium')
-    expect(layoutFromBox(MEDIUM.width, MEDIUM.height, 1.3)).toBe('small')
+    // The type grew, the box did not, so there is less room in the units that matter —
+    // and each threshold gives way at its own scale rather than both at once.
+    //
+    // The large box is 512 tall, so it stays large until the scale passes 512/380 = 1.35;
+    // at 1.4 there are only 366 design units of height and it drops to medium. The medium
+    // box is 500 wide, so it stays medium until the scale passes 500/340 = 1.47; at 1.5
+    // there are only 333 design units of width and it drops to small.
+    expect(layoutFromBox(LARGE.width, LARGE.height, 1.3)).toBe('large')
+    expect(layoutFromBox(LARGE.width, LARGE.height, 1.4)).toBe('medium')
+    expect(layoutFromBox(MEDIUM.width, MEDIUM.height, 1.3)).toBe('medium')
+    expect(layoutFromBox(MEDIUM.width, MEDIUM.height, 1.5)).toBe('small')
   })
 
   it('agrees with the constants it is documented against', () => {

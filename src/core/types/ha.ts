@@ -29,6 +29,11 @@ export interface HassEntityRegistryDisplayEntry {
   hidden?: boolean
   entity_category?: string
   translation_key?: string
+  /**
+   * Decimal places the user pinned for this entity in the entity registry, if any.
+   * Absent means "however the integration reports it", which is what the raw state says.
+   */
+  display_precision?: number
 }
 
 /**

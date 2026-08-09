@@ -807,6 +807,40 @@ is the right shape. `ui.panel.lovelace.editor.card.calendar.calendar_entities`
 lazily-loaded `lovelace` translation fragment, which is loaded whenever an editor is
 open, so a card editor can borrow it.
 
+### Entity state strings (NOT VERIFIED — assumed from the frontend's structure)
+
+`cards/complication/model.ts`'s `formatValue` turns a non-numeric state (`heat`,
+`playing`, `locked`, …) into words by asking `hass.localize` for:
+
+```
+component.<domain>.entity_component.<device_class>.state.<state>
+component.<domain>.entity_component._.state.<state>
+```
+
+device-class first, then the domain's generic bucket (`_`), falling back to the raw
+state capitalised when `localize` answers `''` for both. This is the shape core's
+`entity_component` translation strings are known to nest under everywhere else in this
+file (see "Sizing / grid" and the `ha-form` sections, which do reach real frontend
+source), extended to the `state.<state>` leaf by analogy rather than by grepping a
+built bundle for it.
+
+This project's whole convention is recording what has been read out of a real core
+image versus what has been inferred, and this entry is honestly the second kind. The
+brief for this task names the check:
+
+```bash
+docker run --rm --entrypoint bash ghcr.io/home-assistant/home-assistant:stable -c \
+  'grep -roh -E "entity_component\.[_a-z]+\.state" /usr/local/lib/python3.*/site-packages/hass_frontend/frontend_latest/*.js | sort -u | head'
+```
+
+Not run: this environment has no `docker` binary (`which docker` fails, no daemon to
+reach either). `formatValue`'s fallback to the raw, capitalised state is exactly the
+safety net for this key shape being wrong — a card never shows an empty value even if
+`localize` never matches — so the risk this leaves open is cosmetic (an unlocalised
+label reading `Heat` instead of a translated one) rather than a broken card. Re-run the
+grep above once docker is available and correct the key shape here and in `model.ts` if
+it differs.
+
 ## Icons and more-info (VERIFIED)
 
 ### `ha-icon` needs no loading either, same as `ha-form`

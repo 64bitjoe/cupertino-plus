@@ -16,3 +16,6 @@ CLAUDE.md
 # container generates (state, db, logs, secrets).
 dev/ha-config/*
 !dev/ha-config/configuration.yaml
+
+# Brainstorming companion scratch
+.superpowers/

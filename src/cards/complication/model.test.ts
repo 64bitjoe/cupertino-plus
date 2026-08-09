@@ -123,6 +123,24 @@ describe('readComplications', () => {
     expect(rowed.name).toBe('Mine')
   })
 
+  /**
+   * A row that narrows only one end of the range must not lose the other end: the
+   * module's precedence is per-key (per-entity beats card beats derivation for `min`
+   * and for `max` separately), not "a row that sets anything replaces the whole pair".
+   */
+  it('fills in the other half of the range from the card default, not from nothing', () => {
+    const hass = hassWith(
+      state('sensor.t', '20', { friendly_name: 'T', device_class: 'temperature' }),
+    )
+
+    const [halved] = readComplications(hass, [{ entity: 'sensor.t', min: 0 }], {
+      min: 16,
+      max: 24,
+    })
+
+    expect(halved.range).toEqual({ min: 0, max: 24 })
+  })
+
   it('always answers with an icon, so no cell renders an empty one', () => {
     const hass = hassWith(
       state('sensor.a', '1', { icon: 'mdi:duck' }),
@@ -162,5 +180,24 @@ describe('readComplications', () => {
     expect(climate.supporting).toBe('Heating to 22°')
     expect(media.supporting).toBe('Weightless')
     expect(plain.supporting).toBeNull()
+  })
+
+  /**
+   * `temperature` is the thermostat's setpoint, and it sits on the entity in every mode
+   * including `off` — it is not proof of what the thermostat is doing. A verb chosen by
+   * a single equality test against `'cool'` would call an off thermostat "Heating"; the
+   * fix is a mode-keyed table, and this pins both the previously-wrong `off` case and a
+   * `cool` case alongside the brief's own `heat` case above.
+   */
+  it('does not claim a climate entity is heating when it is off, and picks the right verb', () => {
+    const hass = hassWith(
+      state('climate.off', 'off', { friendly_name: 'Off', temperature: 22 }),
+      state('climate.cool', 'cool', { friendly_name: 'Cool', temperature: 18 }),
+    )
+
+    const [off, cool] = readComplications(hass, ['climate.off', 'climate.cool'], {})
+
+    expect(off.supporting).toBeNull()
+    expect(cool.supporting).toBe('Cooling to 18°')
   })
 })

@@ -252,6 +252,27 @@ const formatValue = (hass: HomeAssistant, entity: HassEntity): string => {
 }
 
 /**
+ * The verb a thermostat's `temperature` attribute deserves, keyed by `hvac_mode` (which
+ * is what a climate entity's bare `state` is), or no entry at all where none is honest.
+ *
+ * `temperature` (the setpoint) sits on the entity in every mode, `off` included — it is
+ * what the thermostat is *set to*, not proof of what it is *doing*. A single equality
+ * test against `'cool'` therefore mislabels every other mode "Heating", `off` among
+ * them: a thermostat sitting off at 22° would read "Heating to 22°", which is the exact
+ * failure `supportingFor`'s own comment below warns against, only worse than opaque —
+ * it is false. `heat_cool` and `auto` span two setpoints under one number here, so
+ * "Set to" rather than a verb that picks a direction the entity has not picked; every
+ * mode with no entry (`off`, `dry`, `fan_only`, and anything `UNAVAILABLE` catches
+ * before this is ever reached) falls through to no line at all.
+ */
+const CLIMATE_VERB: Record<string, string> = {
+  heat: 'Heating',
+  cool: 'Cooling',
+  heat_cool: 'Set',
+  auto: 'Set',
+}
+
+/**
  * One line of context, and only where one is obviously right.
  *
  * Deliberately not a general-purpose attribute reader: this is the one place the card
@@ -268,8 +289,8 @@ const supportingFor = (entity: HassEntity): string | null => {
   if (domain === 'climate') {
     const target = entity.attributes.temperature
     if (typeof target === 'number') {
-      const verb = entity.state === 'cool' ? 'Cooling' : 'Heating'
-      return `${verb} to ${target}°`
+      const verb = CLIMATE_VERB[entity.state]
+      return verb ? `${verb} to ${target}°` : null
     }
     return null
   }
@@ -298,25 +319,31 @@ const pairOf = (min: number | undefined, max: number | undefined): Partial<Range
 })
 
 /**
- * A row's `min`/`max` override for `rangeFor`, worked out from the precedence this whole
- * module follows: the row's own values win outright if it set either; failing that, the
- * card's own defaults; failing that, `undefined`, which tells `rangeFor` there is no
- * override at all and to derive a range off the entity itself.
+ * A row's `min`/`max` override for `rangeFor`, worked out from the precedence the module
+ * comment above promises: per-entity beats card beats derivation, **per key** — a row
+ * that sets only `min` still gets the card's `max`, rather than losing the gauge outright.
  *
- * Not "does the row have a `min`", checked separately from "does it have a `max`": a
- * `min` with no `max` is exactly the "one end invented" shape `rangeFor` already refuses,
- * so the two are read as one pair, taken entirely from whichever of row-then-defaults set
- * either half, and left to `rangeFor` to accept or reject together.
+ * Each half is resolved on its own (`row.min ?? defaults.min`, independently for `max`),
+ * not as a pair taken wholesale from whichever of row-then-defaults set anything: the
+ * earlier version of this function read "sets either" as "supplies both", so a row
+ * narrowing just its floor (`{min: 0}` under a card `{min: 16, max: 24}`) discarded the
+ * card's `max` along with it and produced `undefined` for that half — which `rangeFor`
+ * then read as "no override", except `min` disagreed with that, so it fell to `rangeFor`'s
+ * own half-specified refusal and the gauge vanished, silently, on a row that had every
+ * intention of drawing one. Resolving per key is what actually delivers what the module
+ * doc comment already promised.
+ *
+ * The result can still come out half-specified — a row `{min: 0}` with no card default
+ * for `max` either, say — and that is fine: `rangeFor`'s own refusal of a `min` with no
+ * `max` is the safety rule this function defers to rather than duplicates.
  */
 const rangeOverride = (
   row: ComplicationEntityConfig,
   defaults: ComplicationDefaults,
 ): Partial<Range> | undefined => {
-  if (row.min !== undefined || row.max !== undefined) return pairOf(row.min, row.max)
-  if (defaults.min !== undefined || defaults.max !== undefined) {
-    return pairOf(defaults.min, defaults.max)
-  }
-  return undefined
+  const min = row.min ?? defaults.min
+  const max = row.max ?? defaults.max
+  return min === undefined && max === undefined ? undefined : pairOf(min, max)
 }
 
 /**

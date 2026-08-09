@@ -1,18 +1,10 @@
 /**
- * The arc, as arithmetic, shared between the battery and complication cards.
+ * The arc, as arithmetic.
  *
- * Living in `core` rather than the battery card itself because both the battery and
- * complication cards draw rings, and the maths they both need is independent of which card
- * draws it. The ring's coordinate space belongs here — everything is in the ring's own units,
- * never in pixels, so neither card's layout has to know anything about it. The SVG carries a
- * `viewBox` of `RING_BOX` square and is drawn at whatever diameter the layout worked out, so
- * the stroke and the arc scale with the ring for free. The one dimension the ring shares with a
- * card is the diameter itself, and it travels as a CSS length from card to card.
- *
- * The ring has no opinion about colour: the battery card colours it green; the complication
- * card will colour it as the user chooses. That decision lives with the card, not here.
- * Everything here is the maths: how long an arc to draw for a given level, and the constants
- * that define the ring's box and stroke.
+ * Shared between the battery and complication cards. This module has no opinion about colour:
+ * the battery card draws it green, the complication card as configured. Everything here is
+ * the mathematics — in the ring's own coordinate space, never in pixels — so both cards use
+ * it without knowing each other's pixels.
  *
  * Everything here is in the ring's own coordinate space rather than in pixels, and that is
  * what keeps `layout.ts` and this file from having to agree about anything: the SVG carries
@@ -20,10 +12,10 @@
  * so the stroke and the arc scale with the ring for free and `--cw-scale` never enters into
  * it. The one number the two files share is the diameter, and it travels as a CSS length.
  *
- * **The battery card draws it in green.** Not amber at 20 and not red at 5, and this is the
- * design being copied rather than an omission: the level is read off the length of the arc,
- * which is a quantity, and a colour that changed underneath it would be a second, coarser
- * reading of the same number: one that says "low" at 19% and "fine" at 21% when the arc has
+ * **The ring is always green.** Not amber at 20 and not red at 5, and this is the design
+ * being copied rather than an omission: the level is read off the length of the arc, which
+ * is a quantity, and a colour that changed underneath it would be a second, coarser reading
+ * of the same number: one that says "low" at 19% and "fine" at 21% when the arc has
  * already said 19 and 21. A widget of six devices in three colours also stops being a
  * glance and becomes a thing to interpret. The traffic light belongs on the notification
  * that fires at 20%, where it is about what to do rather than about what is.

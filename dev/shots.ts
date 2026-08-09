@@ -32,10 +32,17 @@ import './shots.css'
 
 import type { LitElement } from 'lit'
 
-import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG } from '../src/index'
+import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG, COMPLICATION_CARD_TAG } from '../src/index'
 import { columnsToPx, layoutFromBox, rowsToPx } from '../src/core/size'
 import type { LovelaceCard, LovelaceCardConfig } from '../src/core/types/ha'
 import { deviceSet } from './battery-devices'
+import {
+  LOUNGE_HUMIDITY,
+  LOUNGE_TEMPERATURE,
+  PHONE_BATTERY,
+  PRESSURE,
+  WATER_TANK,
+} from './complication-entities'
 import { defineHaStubs } from './ha-stubs'
 import { createMockHass } from './mock-hass'
 
@@ -93,6 +100,16 @@ const calendarShot = (scenario: string): Partial<LovelaceCardConfig> => ({
 const batteryShot = (set: string): Partial<LovelaceCardConfig> => ({
   entities: [...deviceSet(set)],
 })
+
+/**
+ * Not routed through `entitySet`, unlike the showcase's own catalog entry: a shot picks
+ * exactly the entities its one frame needs to make its point, which is not always one of
+ * the named sets `dev/site/catalog.ts` offers a visitor to choose between.
+ */
+const complicationShot = (
+  entities: readonly string[],
+  style: string,
+): Partial<LovelaceCardConfig> => ({ entities: [...entities], style })
 
 const SHOTS: readonly Shot[] = [
   {
@@ -163,6 +180,51 @@ const SHOTS: readonly Shot[] = [
     caption: 'medium, dark: four devices, one of them not reporting',
     tag: BATTERY_CARD_TAG,
     config: batteryShot('awkward'),
+    columns: 12,
+    rows: 4,
+    theme: 'dark',
+  },
+  {
+    name: 'complication-medium',
+    caption: 'medium: a ring where there is a range to gauge, a plain reading where there is none',
+    tag: COMPLICATION_CARD_TAG,
+    config: complicationShot(
+      [LOUNGE_TEMPERATURE, LOUNGE_HUMIDITY, WATER_TANK, PHONE_BATTERY],
+      'circular',
+    ),
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'complication-small',
+    caption: 'small: the same four entities, captions gone because the column cannot caption them',
+    tag: COMPLICATION_CARD_TAG,
+    config: complicationShot(
+      [LOUNGE_TEMPERATURE, LOUNGE_HUMIDITY, WATER_TANK, PHONE_BATTERY],
+      'circular',
+    ),
+    columns: 6,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'complication-inline',
+    caption: 'small: the inline face, hairline-separated strips instead of a grid of rings',
+    tag: COMPLICATION_CARD_TAG,
+    config: complicationShot(
+      [LOUNGE_TEMPERATURE, LOUNGE_HUMIDITY, WATER_TANK, PHONE_BATTERY],
+      'inline',
+    ),
+    columns: 6,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'complication-bleed-dark',
+    caption: 'medium, dark: full-bleed, the tint fixed to the entity rather than the reading',
+    tag: COMPLICATION_CARD_TAG,
+    config: complicationShot([PRESSURE], 'rectangular-bleed'),
     columns: 12,
     rows: 4,
     theme: 'dark',

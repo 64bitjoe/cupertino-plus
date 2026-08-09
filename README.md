@@ -7,9 +7,11 @@ taken from the box you drag them into rather than from a size setting.
 **[Live demo](https://sabbaken.github.io/cupertino-widgets/)** ·
 **[Install](#install)** ·
 **[The calendar](#the-calendar)** ·
+**[The complications](#the-complications)** ·
 **[The batteries](#the-batteries)** ·
 **[Card rules](docs/calendar-widget-rules.md)** ·
-**[Ring rules](docs/battery-widget-rules.md)**
+**[Ring rules](docs/battery-widget-rules.md)** ·
+**[Complication rules](docs/complication-widget-rules.md)**
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/sabbaken)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/sabbaken)
@@ -22,9 +24,10 @@ taken from the box you drag them into rather than from a size setting.
 The demo runs every size live, with sample data and the clock under your control, and hands
 you the config to paste when you like what you see: nothing to install to look.
 
-> **Status: early.** Two cards. The calendar draws your real calendars and to-do lists and
+> **Status: early.** Three cards. The calendar draws your real calendars and to-do lists and
 > lays itself out exactly like the phone's. The battery card draws any battery sensors you
-> point it at.
+> point it at. The complication card draws any entity at all, as a ring, a block or a line,
+> and works out most of what it needs from the entity itself.
 >
 > It needs a current Home Assistant, **2026.7 or newer**: the cards track the latest
 > frontend APIs rather than carrying compatibility shims.
@@ -78,6 +81,63 @@ Those are fixtures rather than anybody's real week. What the card decides to sho
 what order, is written down in
 [`docs/calendar-widget-rules.md`](docs/calendar-widget-rules.md), down to why `5 – 6PM`
 prints only one `PM`.
+
+## The complications
+
+One card, pointed at one entity or several, with a `style` choosing the look: a ring, a plain
+block, a block with a coloured header strip, a block whose colour fills the whole card, or a
+single line meant to sit among others like it. Everything else it works out for itself — the
+name, the icon, the unit, and whether there is a range to draw an arc against, all come off the
+entity, not off a form somebody had to fill in.
+
+The colour is not a reading. It is fixed the moment an entity is chosen — a temperature reads
+orange at 40° and orange at 90° — because a colour that stepped with the number would just be a
+second, blurrier opinion about the number the reading already gives, and that is doubly true
+next to a ring whose arc has already said what the level is. And the ring itself only appears
+where there is an honest range to draw it against: a room's temperature has no ceiling, so that
+complication draws its icon and its reading with no gauge at all, rather than one drawn against
+a scale nobody asserted.
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/complication-medium.png" width="420"
+           alt="A medium complication card: an unringed temperature reading, then humidity, water tank and phone battery each in their own coloured ring">
+      <br />
+      <sub><b>Medium.</b> A ring where there is a range to gauge, a plain reading where
+      there is none — the same style, not a different one.</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/complication-small.png" width="222"
+           alt="A small square complication card: the same four entities, with no captions under the rings because the column is too narrow to hold one">
+      <br />
+      <sub><b>Small.</b> The same four entities. The captions are gone because the column
+      is too narrow to hold a name without clipping it, not because the card ran out of
+      room for the rings themselves.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="docs/images/complication-inline.png" width="222"
+           alt="A small square complication card in the inline style: four hairline-separated rows, each an icon, a name and a reading">
+      <br />
+      <sub><b>Inline.</b> One line per entity, hairline-separated, for a complication meant
+      to sit among others rather than to fill a cell of its own.</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="docs/images/complication-bleed-dark.png" width="420"
+           alt="A medium complication card on a dark theme, full-bleed: a teal card reading Pressure, 1,013 hPa in dark ink over the whole tinted surface">
+      <br />
+      <sub><b>Full-bleed, dark theme.</b> The tint is the whole card here, so the text
+      needs its own dark ink on four of the ten tints — teal among them — where white
+      fails the same contrast check a ring or an icon never has to pass.</sub>
+    </td>
+  </tr>
+</table>
+
+[`docs/complication-widget-rules.md`](docs/complication-widget-rules.md) has the whole
+argument: why the colour is identity rather than a reading, when the ring is allowed to
+disappear, why a thermostat gets no gauge by default, and why the card never scrolls.
 
 ## The batteries
 
@@ -145,8 +205,9 @@ Then add a card. The next section shows how.
 
 ## Adding a card
 
-Both cards are in the dashboard's card picker (**Cupertino Calendar** and **Cupertino
-Batteries**), and both have a visual editor, so there is no YAML to write unless you want to.
+All three cards are in the dashboard's card picker (**Cupertino Calendar**, **Cupertino
+Complication** and **Cupertino Batteries**), and all three have a visual editor, so there is no
+YAML to write unless you want to.
 
 ### The calendar
 
@@ -197,6 +258,58 @@ calendar panel deals its own, so a calendar keeps the colour you have got used t
 list has no colour to take in Home Assistant, so its circle comes from that palette by the
 position of the list. Every calendar and every list is subscribed to rather than polled, so
 the card follows Home Assistant as events and items change.
+
+### The complications
+
+Six fields: **Entities**, which one or several to draw; **Style**, which of the five faces to
+use; **Minimum** and **Maximum**, an optional range to gauge; **Colour**, an optional override;
+and **Scale**. Leave everything but Entities alone and the card still works — name, icon, unit,
+colour and whether there is a range to gauge all come off the entity itself.
+
+```yaml
+type: custom:cupertino-widgets-complication
+entities:
+  - sensor.living_room_temperature
+  - sensor.living_room_humidity
+style: circular # optional; circular | rectangular | rectangular-header | rectangular-bleed | inline
+scale: 100 # optional; 80–130, percent
+```
+
+A row can carry more than an id, for the entities the card cannot read a range or a colour
+off on its own:
+
+```yaml
+entities:
+  - entity: sensor.workshop_temperature
+    min: 10 # both halves are required together, or neither counts
+    max: 30
+    color: red # overrules the colour the entity's device class or domain would pick
+```
+
+| Option      | Default    | Meaning                                                                                 |
+| ----------- | ---------- | --------------------------------------------------------------------------------------- |
+| `entities`  | none       | Which entities to draw, in the order the faces follow them. Ids or rows.                |
+| `style`     | `circular` | `circular` \| `rectangular` \| `rectangular-header` \| `rectangular-bleed` \| `inline`. |
+| `min`/`max` | derived    | A range to gauge, card-wide or per row. Both are required together.                     |
+| `color`     | derived    | Overrules the colour the entity's `device_class` or domain would pick.                  |
+| `scale`     | `100`      | Percent. Draws the whole widget larger or smaller. 80–130.                              |
+
+**No gauge is not a mistake.** A room's temperature has no ceiling to draw an arc against, so
+that complication draws its icon and its reading with nothing round them, rather than a ring
+scaled against a number nobody gave it. `min`/`max` is how you give it one, for the entities —
+a thermostat's current temperature is the usual case — where the honest answer is "there is a
+range, but only you know what it is".
+
+**The colour never moves.** It is fixed the moment the entity is chosen — from what
+`device_class` or the domain says the entity measures — and stays that colour at every reading,
+for the reason [`docs/complication-widget-rules.md`](docs/complication-widget-rules.md) argues
+at length: a colour that stepped with the number would be a second, blurrier version of the
+reading the card is already showing.
+
+**`rectangular-bleed` is worth using sparingly.** It replaces the card's own surface with the
+tint, edge to edge, which is arresting once and busy six times over on the same dashboard. Save
+it for the one reading that deserves the whole card, and reach for `rectangular-header` for the
+rest of a panel that wants the same colour without spending the whole view on it.
 
 ### The batteries
 
@@ -297,6 +410,7 @@ belongs to every card rather than to this one.
 | ------------------------------- | --------------------------- |
 | Calendar                        | events, live                |
 | Battery levels                  | live                        |
+| Complications                   | any entity, live            |
 | Reminders, in the calendar card | to-do items with a due date |
 | A to-do list of its own         | planned                     |
 

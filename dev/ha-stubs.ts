@@ -13,10 +13,16 @@ import {
   mdiBatteryUnknown,
   mdiCellphone,
   mdiDoorbellVideo,
+  mdiEye,
+  mdiGauge,
   mdiHeadphones,
   mdiHelpCircleOutline,
   mdiLaptop,
+  mdiRayVertex,
   mdiTablet,
+  mdiThermometer,
+  mdiWashingMachine,
+  mdiWaterPercent,
   mdiWatch,
 } from '@mdi/js'
 
@@ -174,9 +180,10 @@ const HA_FORM_CSS = `
  * into the showcase that GitHub Pages then serves to every visitor, for the sake of icons only
  * this file's own mock devices ever ask for.
  *
- * So: add an entry when `battery-devices.ts` grows one. A name with no entry draws the
- * question mark rather than nothing, on the same grounds as the `ha-form` stub's unsupported
- * row: a silently blank icon reads as a broken card, and the cards are what this page is for.
+ * So: add an entry when `battery-devices.ts` or `complication-entities.ts` grows one. A name
+ * with no entry draws the question mark rather than nothing, on the same grounds as the
+ * `ha-form` stub's unsupported row: a silently blank icon reads as a broken card, and the
+ * cards are what this page is for.
  */
 const ICONS: Record<string, string> = {
   'mdi:battery': mdiBattery,
@@ -187,6 +194,17 @@ const ICONS: Record<string, string> = {
   'mdi:laptop': mdiLaptop,
   'mdi:tablet': mdiTablet,
   'mdi:watch': mdiWatch,
+  // The complication card's mock entities, resolved off `device_class`/domain by
+  // `model.ts`'s `iconFor`: a thermometer, a humidity gauge, a pressure gauge, a washing
+  // machine, `number`'s generic glyph, and `mdi:eye` — the fallback `iconFor` itself
+  // returns for a domain neither of its tables recognises, which the water tank and the
+  // long-name sensor both fall through to.
+  'mdi:thermometer': mdiThermometer,
+  'mdi:water-percent': mdiWaterPercent,
+  'mdi:gauge': mdiGauge,
+  'mdi:washing-machine': mdiWashingMachine,
+  'mdi:ray-vertex': mdiRayVertex,
+  'mdi:eye': mdiEye,
 }
 
 /**

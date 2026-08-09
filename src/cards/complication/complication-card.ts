@@ -111,9 +111,18 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         --cw-comp-gap: calc(14px * var(--cw-scale));
       }
 
+      /* justify-items: stretch, not place-items: center's shrink-to-content: a grid item
+         sized to its own max-content can run wider than its 1fr track with nothing to
+         clip it against, since grid does not reflow a track to make room for an
+         overflowing neighbour — the visible symptom was a long caption overlapping the
+         cell beside it rather than eliding. Stretching the cell to its column and
+         centring within it via the flex column below (.cell's own align-items) gives the
+         caption's overflow:hidden something the width of the actual column to truncate
+         against. */
       .grid.circular {
         grid-template-columns: repeat(var(--cw-comp-columns), 1fr);
-        place-items: center;
+        align-items: center;
+        justify-items: stretch;
       }
 
       /* One column, no track gap: the inline style separates its strips with a hairline
@@ -228,10 +237,17 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         white-space: nowrap;
       }
 
+      /* white-space: nowrap for the same reason .name gets it: with the default 'normal',
+         a narrow column does not overflow the reading, it wraps it at the space before
+         the unit ('21.4' over '°C'), which grows the row past the 44px INLINE_ROW
+         layout.ts charged for it. A reading is short enough that nowrap alone is enough
+         room in practice; .name's ellipsis is what actually gives ground when a row is
+         tight. */
       .cell.inline .reading {
         margin-left: auto;
         color: var(--cw-label-secondary);
         font-weight: 400;
+        white-space: nowrap;
       }
 
       /* Nothing to say, said quietly — the battery card's rule for a dead sensor. */

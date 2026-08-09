@@ -13,11 +13,18 @@
  * applied last precisely because it must never end up in that YAML.
  */
 
-import { mdiBatteryHigh, mdiCalendarMonth, mdiFormatListChecks } from '@mdi/js'
+import { mdiBatteryHigh, mdiCalendarMonth, mdiFormatListChecks, mdiGaugeLow } from '@mdi/js'
 
 import { DEMO_SCENARIOS, DEFAULT_DEMO_SCENARIO } from '../../src/cards/calendar/demo-data'
-import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG } from '../../src/index'
+import {
+  COMPLICATION_STYLES,
+  DEFAULT_STYLE,
+  STYLE_LABELS,
+  type ComplicationStyle,
+} from '../../src/cards/complication/style'
+import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG, COMPLICATION_CARD_TAG } from '../../src/index'
 import { DEFAULT_DEVICE_SET, DEVICE_SETS, deviceSet } from '../battery-devices'
+import { DEFAULT_ENTITY_SET, ENTITY_SETS, entitySet } from '../complication-entities'
 import {
   DEFAULT_SCALE,
   MAX_SCALE,
@@ -254,7 +261,74 @@ const battery: Widget = {
   },
 }
 
-export const WIDGETS: readonly Widget[] = [calendar, battery]
+/**
+ * Readable names for the entity sets, and each one names the branch it lands on rather than
+ * the entities in it, which is what a visitor is choosing between.
+ */
+const ENTITY_LABELS: Record<string, string> = {
+  gauge: 'One entity: a derived range',
+  'no-range': 'One entity: no range to gauge',
+  four: 'Four: mixed ranges and tints',
+  six: 'Six: more than either footprint’s one row',
+  word: 'One entity: a word, not a number',
+  'long-name': 'One entity: a name too long to caption',
+  unavailable: 'One entity: not reporting',
+}
+
+const complication: Widget = {
+  id: 'complication',
+  name: 'Complication',
+  tagline: 'Any entity, drawn as a ring, a block, or a single line.',
+  icon: mdiGaugeLow,
+  tag: COMPLICATION_CARD_TAG,
+
+  props: [
+    {
+      kind: 'select',
+      name: 'style',
+      label: 'Style',
+      description: 'Which of the five faces to draw.',
+      group: 'card',
+      options: COMPLICATION_STYLES.map(value => ({ value, label: STYLE_LABELS[value] })),
+      initial: DEFAULT_STYLE,
+    },
+    {
+      kind: 'select',
+      name: 'entities',
+      label: 'Entities',
+      description: 'Mock entities, chosen for the branch each set lands on.',
+      group: 'card',
+      options: Object.keys(ENTITY_SETS).map(value => ({
+        value,
+        label: ENTITY_LABELS[value] ?? titleCase(value),
+      })),
+      initial: DEFAULT_ENTITY_SET,
+    },
+  ],
+
+  /**
+   * In the **Card** group and printed in the Config pane, the same reasoning as the battery
+   * card's own `toConfig`: this card has no fixtures either, so the YAML above the control is
+   * the config that produced what is on screen. The entity ids are the mock installation's,
+   * which is the one thing a visitor has to substitute for their own.
+   *
+   * `style` is written whether or not it sits at `DEFAULT_STYLE`, the same rule
+   * `cardOptions` states for `scale` and for the same reason: a key that appears and
+   * disappears as the Style select moves shifts the height of the YAML above it, which
+   * moves the control itself out from under the cursor.
+   */
+  toConfig(args) {
+    const rows = entitySet(readString(args, 'entities', DEFAULT_ENTITY_SET))
+    const style = readString(args, 'style', DEFAULT_STYLE) as ComplicationStyle
+    return { entities: [...rows], style }
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+export const WIDGETS: readonly Widget[] = [calendar, battery, complication]
 
 export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => w.id === id)
 

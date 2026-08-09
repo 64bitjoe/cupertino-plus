@@ -1,5 +1,6 @@
 import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
 import { BATTERY_STATES } from './battery-devices'
+import { COMPLICATION_STATES } from './complication-entities'
 
 /**
  * A `hass` object good enough to develop cards against.
@@ -63,6 +64,8 @@ const STATES: Record<string, HassEntity> = {
   // The battery card's devices, which are a list of their own; see `battery-devices.ts`,
   // where the config that points at them lives beside them.
   ...Object.fromEntries(BATTERY_STATES.map(one => [one.entity_id, one])),
+  // The complication card's entities; see `complication-entities.ts`, wired in the same way.
+  ...Object.fromEntries(COMPLICATION_STATES.map(one => [one.entity_id, one])),
 }
 
 /**

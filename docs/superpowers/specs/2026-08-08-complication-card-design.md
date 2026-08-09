@@ -322,9 +322,15 @@ shipping without it keeps the editor at five fields.
   `prefers-color-scheme`.
 - `rectangular-bleed` needs its own contrast treatment: white content on the tint in both
   themes, with the gradient darkened in dark mode so it does not glow.
-- Each complication gets an accessible name of "_name_, _value_" and a role that reflects
-  that it is activatable. Arcs are decorative and hidden from the accessibility tree — the
-  value is present as text.
+- Each complication gets an accessible name and a role that reflects that it is
+  activatable. **Correction, post-implementation:** this originally specified the name as
+  "_name_, _value_" literally, which the final review caught as a real accessibility bug
+  rather than a cosmetic one: `model.ts` turns an unreadable entity's value into an em
+  dash for the dashed, dimmed visual treatment §1 promises, and "_Lounge Humidity_, —"
+  read aloud is silence where the value should be, not a value marked unavailable. The
+  name is "_name_: _value_", or "_name_: unavailable" when `item.unavailable` is true —
+  the same idiom `battery-card.ts` already used for its own cells. Arcs are decorative and
+  hidden from the accessibility tree — the value is present as text.
 
 ## 9. Testing
 

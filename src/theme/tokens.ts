@@ -74,6 +74,11 @@ export const tokens = css`
     --cw-yellow: #ffcc00;
     --cw-green: #34c759;
     --cw-blue: #007aff;
+    /* Apple's systemTeal. Added for the complication card's tint palette, which is now
+       the closed set its color option chooses from: cards must not invent a colour
+       outside it, or a theme override of one tint would leave a stray hue unaccounted
+       for. */
+    --cw-teal: #30b0c7;
     --cw-indigo: #5856d6;
     --cw-purple: #af52de;
     --cw-pink: #ff2d55;
@@ -124,6 +129,8 @@ export const tokens = css`
     --cw-yellow: #ffd60a;
     --cw-green: #30d158;
     --cw-blue: #0a84ff;
+    /* Apple's systemTeal, dark variant. */
+    --cw-teal: #40c8e0;
     --cw-indigo: #5e5ce6;
     --cw-purple: #bf5af2;
     --cw-pink: #ff375f;

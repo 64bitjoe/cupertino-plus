@@ -13,7 +13,7 @@ import {
   type ComplicationDefaults,
   type ComplicationEntityConfig,
 } from './model'
-import { DEFAULT_STYLE, type ComplicationStyle } from './style'
+import { DEFAULT_STYLE, isRectangular, type ComplicationStyle } from './style'
 import { tintVar, type TintName } from './tint'
 
 export const COMPLICATION_CARD_TAG = 'cupertino-widgets-complication'
@@ -43,6 +43,28 @@ export interface ComplicationCardConfig extends CupertinoCardConfig {
 const NO_ENTITIES = 'No Entities'
 
 /**
+ * White text over the tint, except where the tint is too light for white to sit on.
+ *
+ * `rectangular-header`'s strip and `rectangular-bleed`'s whole card both paint their
+ * content straight onto `item.tint`, which the ring and inline faces never do — there
+ * the tint is a thin arc or an icon, not the surface under a paragraph. Checked against
+ * WCAG's contrast formula rather than by eye, against both the light and dark value of
+ * every tint in `tokens.ts`: white on `--cw-yellow` comes out at 1.4:1 in both themes,
+ * which fails even the 3:1 floor a large glyph is held to, and `--cw-orange`,
+ * `--cw-green` and `--cw-teal` are not far behind at 2.0–2.6:1. The other six tints —
+ * `red` clears 3:1 by a hair, `blue`/`indigo`/`purple`/`pink` clear it comfortably, and
+ * `accent` is the theme's own colour and unknowable here — keep white.
+ *
+ * The four that don't get `#1d1d1f`, a fixed near-black, rather than `var(--cw-label)`:
+ * `--cw-label` is white in dark mode, which is exactly the failure this function exists
+ * to route around, and unlike the label these four tint values barely move between
+ * themes (`--cw-yellow` is #ffcc00 light, #ffd60a dark) — a hue that stays light in both
+ * themes needs a fix that stays dark in both themes, not one that tracks the theme.
+ */
+const NEEDS_DARK_ON_TINT = new Set<TintName>(['yellow', 'orange', 'green', 'teal'])
+const onTintVar = (tint: TintName): string => (NEEDS_DARK_ON_TINT.has(tint) ? '#1d1d1f' : '#fff')
+
+/**
  * The complication card: any entity, drawn as a watch complication.
  *
  * `model.ts` turns a Home Assistant state into the one shape every face reads
@@ -52,11 +74,11 @@ const NO_ENTITIES = 'No Entities'
  * division of labour as the battery card, with one extra layer because a complication
  * has five faces where a battery ring has one.
  *
- * This file draws two of the five: `circular`, the watch-face complication proper, and
- * `inline`, the single-line strip. The three rectangular chromes are Task 7's; until
- * that lands, configuring one of them falls through to `circular` rather than to nothing,
- * because a card that drew nothing for a style it does not yet know is a broken card and
- * a card that drew the nearest face it does know is a working one.
+ * This file draws all five faces: `circular`, the watch-face complication proper;
+ * `inline`, the single-line strip; and the three rectangular chromes — `rectangular`,
+ * `rectangular-header` and `rectangular-bleed` — which share one markup shape
+ * (`_renderRectangular`) and differ only in stylesheet, because they say the same
+ * things in the same order and only wear a different amount of colour saying it.
  */
 class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
   static override styles: CSSResultGroup = [
@@ -96,6 +118,14 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
       .grid.inline {
         grid-template-columns: 1fr;
         gap: 0;
+      }
+
+      /* The rectangular family stacks one block per row, full width — packFor gives them
+         all columns: 1, and floorsFor prices their floor the same way. */
+      .grid.rectangular,
+      .grid.rectangular-header,
+      .grid.rectangular-bleed {
+        grid-template-columns: 1fr;
       }
 
       .cell {
@@ -213,6 +243,164 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         font: var(--cw-text-callout);
         color: var(--cw-label-secondary);
         margin: auto;
+      }
+
+      /* The rectangular family's shared shape: an icon-and-name head over a body carrying
+         the reading, an optional supporting line, and an optional bar. rectangular wears
+         this bare — tint only on the caption and the bar — and rectangular-header and
+         rectangular-bleed below layer their own chrome on top of it. */
+      .cell.block {
+        flex-direction: column;
+        align-items: stretch;
+        gap: calc(4px * var(--cw-scale));
+        /* Must match layout.ts's RECT_BLOCK. */
+        min-height: calc(104px * var(--cw-scale));
+        border-radius: var(--cw-radius-inner);
+        overflow: hidden;
+      }
+
+      .cell.block .head {
+        display: flex;
+        align-items: center;
+        gap: calc(6px * var(--cw-scale));
+        min-width: 0;
+      }
+
+      .cell.block .name {
+        font: var(--cw-text-caption-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--cw-comp-tint);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cell.block .body {
+        display: flex;
+        flex-direction: column;
+        gap: calc(3px * var(--cw-scale));
+        flex: 1;
+      }
+
+      .cell.block .reading {
+        font: var(--cw-text-title-1);
+        letter-spacing: -0.02em;
+        color: var(--cw-label);
+      }
+
+      .cell.block .support {
+        font: var(--cw-text-subheadline);
+        color: var(--cw-label-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cell.block .bar {
+        margin-top: auto;
+        height: calc(5px * var(--cw-scale));
+        border-radius: var(--cw-radius-pill);
+        background: var(--cw-track);
+        overflow: hidden;
+      }
+
+      .cell.block .bar i {
+        display: block;
+        height: 100%;
+        background: var(--cw-comp-tint);
+      }
+
+      .cell.block .glyph {
+        color: var(--cw-comp-tint);
+        --mdc-icon-size: calc(14px * var(--cw-scale));
+      }
+
+      /* The Notes treatment: the strip carries the identity, the body gets the story. */
+      .cell.rectangular-header {
+        gap: 0;
+        background: var(--cw-fill);
+      }
+
+      .cell.rectangular-header .head {
+        background: var(--cw-comp-tint);
+        padding: calc(8px * var(--cw-scale)) calc(12px * var(--cw-scale));
+      }
+
+      /* var(--cw-comp-on-tint), not a bare white: see onTintVar's comment in the .ts file
+         for why four of the ten tints need something other than white here. */
+      .cell.rectangular-header .head .name,
+      .cell.rectangular-header .head .glyph {
+        color: var(--cw-comp-on-tint);
+        font-size: calc(14px * var(--cw-scale));
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 600;
+      }
+
+      .cell.rectangular-header .head .glyph {
+        --mdc-icon-size: calc(16px * var(--cw-scale));
+      }
+
+      .cell.rectangular-header .body {
+        padding: calc(10px * var(--cw-scale)) calc(12px * var(--cw-scale));
+      }
+
+      .cell.rectangular-header .reading {
+        font: var(--cw-text-title-3);
+      }
+
+      /* The Weather treatment: the tint IS the card. Content is drawn in
+         var(--cw-comp-on-tint) in both themes, because the surface under it is the tint
+         rather than the theme's, so the theme's own label colour would be unreadable half
+         the time no matter which colour it read as. The overlay is what keeps the gradient
+         from glowing in dark mode, and it is a card-local overlay rather than a change to
+         --cw-surface: full-bleed is the one face in the library that replaces the user's
+         theme surface with the tint on purpose, and that is a once-per-cell decision this
+         style makes for itself, not something the rest of the card should inherit. */
+      .cell.rectangular-bleed {
+        background-image: linear-gradient(150deg, var(--cw-comp-tint), var(--cw-comp-tint));
+        background-color: var(--cw-comp-tint);
+        padding: calc(14px * var(--cw-scale));
+        position: relative;
+      }
+
+      .cell.rectangular-bleed::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(150deg, rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.22));
+        pointer-events: none;
+      }
+
+      :host([dark]) .cell.rectangular-bleed::after {
+        background: linear-gradient(150deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.05));
+      }
+
+      .cell.rectangular-bleed .name,
+      .cell.rectangular-bleed .reading,
+      .cell.rectangular-bleed .glyph {
+        color: var(--cw-comp-on-tint);
+        position: relative;
+        z-index: 1;
+      }
+
+      .cell.rectangular-bleed .name {
+        text-transform: none;
+        letter-spacing: 0;
+        font: 600 calc(14px * var(--cw-scale)) / calc(18px * var(--cw-scale)) var(--cw-font);
+      }
+
+      .cell.rectangular-bleed .reading {
+        font: 500 calc(38px * var(--cw-scale)) / calc(40px * var(--cw-scale)) var(--cw-font);
+      }
+
+      /* 92% of on-tint rather than a second colour: the same softened weight the header
+         chrome gives a secondary line, whichever of the two on-tint colours this tint got. */
+      .cell.rectangular-bleed .support {
+        color: color-mix(in srgb, var(--cw-comp-on-tint) 92%, transparent);
+        position: relative;
+        z-index: 1;
       }
     `,
   ]
@@ -363,6 +551,48 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
     `
   }
 
+  /**
+   * The three rectangular faces, which differ only in how much colour they wear: a tint
+   * on the caption and the bar, a tinted header strip, or the tint as the whole card. One
+   * markup shape, three stylesheets, because they say the same things in the same order —
+   * name and icon, reading, supporting line, bar — and only the chrome around them moves.
+   *
+   * The bar is suppressed on `rectangular-header`: the strip already carries the identity
+   * (icon and name), which is what a fraction bar exists to summon attention toward on the
+   * other two faces, so drawing one under the body as well would be repeating a cue the
+   * header just gave. `item.fraction` still gates it on the other two, same as everywhere
+   * else in this card — no fraction, no bar, whatever the style.
+   */
+  private _renderRectangular(style: ComplicationStyle, item: Complication): TemplateResult {
+    const header = style === 'rectangular-header'
+
+    return html`
+      <div
+        class="cell block ${style} ${item.unavailable ? 'unknown' : ''}"
+        style=${`--cw-comp-tint:${tintVar(item.tint)}; --cw-comp-on-tint:${onTintVar(item.tint)}`}
+        role="button"
+        tabindex="0"
+        aria-label=${`${item.name}, ${item.value}`}
+        @click=${() => this._openMoreInfo(item.id)}
+        @keydown=${this._activate(item.id)}
+      >
+        <div class="head">
+          <ha-icon class="glyph" .icon=${item.icon}></ha-icon>
+          <span class="name">${item.name}</span>
+        </div>
+        <div class="body">
+          <span class="reading">${item.value}</span>
+          ${item.supporting ? html`<span class="support">${item.supporting}</span>` : nothing}
+          ${
+            item.fraction !== null && !header
+              ? html`<div class="bar"><i style=${`width:${item.fraction * 100}%`}></i></div>`
+              : nothing
+          }
+        </div>
+      </div>
+    `
+  }
+
   /** The inline face: one line, an icon, a name and a reading, meant to sit among other
    * inline complications rather than to occupy a cell of its own. */
   private _renderInline(item: Complication): TemplateResult {
@@ -386,11 +616,10 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
   /**
    * One entity, in whichever of the five faces `style` names.
    *
-   * Only `inline` has a face of its own here; everything else falls through to
-   * `circular`. That is deliberate, not a gap: the three rectangular chromes are Task 7's,
-   * and `isRectangular` is imported there, alongside the branch that reads it, rather than
-   * here — see the module comment on why circular is the right fallback for a style this
-   * file does not yet know how to draw.
+   * `inline` and the rectangular family each have a face of their own; `circular` is
+   * both a face and the fallback, so a style this switch does not recognise (there is
+   * none today, but a future style added to `COMPLICATION_STYLES` without a branch here
+   * yet) still draws something rather than nothing.
    */
   private _renderCell(
     style: ComplicationStyle,
@@ -398,6 +627,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
     labels: boolean,
   ): TemplateResult {
     if (style === 'inline') return this._renderInline(item)
+    if (isRectangular(style)) return this._renderRectangular(style, item)
     return this._renderCircular(item, labels)
   }
 

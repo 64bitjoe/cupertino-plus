@@ -9,10 +9,12 @@ import { printBanner } from './core/register'
 import './cards/battery/battery-card'
 import './cards/calendar/calendar-card'
 import './cards/complication/complication-card'
+import './cards/weather/weather-card'
 
 printBanner()
 
 export { BATTERY_CARD_TAG } from './cards/battery/battery-card'
 export { CALENDAR_CARD_TAG } from './cards/calendar/calendar-card'
 export { COMPLICATION_CARD_TAG } from './cards/complication/complication-card'
+export { WEATHER_CARD_TAG } from './cards/weather/weather-card'
 export type { WidgetLayout } from './core/size'

@@ -799,6 +799,39 @@ Home Assistant's own calendar card editor is a useful reference but not a model:
 predates the entity selector and still hand-renders an `<ha-entities-picker>` beside its
 `ha-form`, with the label in a bare `<h3>`.
 
+### Does the Layout tab re-query `getGridOptions()` after a config change? (NOT VERIFIED)
+
+The complication card's floor grows with the entity count — `floorsFor` in
+`cards/complication/layout.ts` — which only holds up if `hui-card-layout-editor` asks the
+card for fresh `min_rows`/`min_columns` after every `setConfig`, not only once when the
+Layout tab is first opened. `getConfigGridOptions()` reads `config.grid_options` fresh on
+every call (see "Sizing / grid" above), so the _user's own_ drag survives a later config
+edit either way; the open question is narrower than that, and it is only about the floor:
+whether the sliders' `min`/`max` themselves are re-clamped live, in the same edit session,
+after adding or removing an entity — say, dragging a two-entity card down to its two-row
+floor, then adding a third entity and expecting the slider to refuse to go that low
+without the card being re-added to the dashboard first.
+
+Not run: this environment has no `docker` binary (`which docker` fails, no daemon to
+reach either — see the toolchain notes below), and `pnpm verify` needs a live HA
+container it cannot bring up here, so this was never exercised against a real frontend
+for this task. What _is_ known, from the "Sizing / grid" section above and unaffected by
+this question, is that the floor is correct wherever the element is freshly created: a
+saved dashboard reloaded, or a card newly dropped onto one, asks `getGridOptions()` once
+during `hui-card`'s own setup and gets the current config's floor, so the case that
+matters for a shipped dashboard is not at risk. What is unverified is only the _live_
+case — whether the floor visibly grows in front of the user while the editor dialog is
+still open, without them closing and reopening it. If it turns out the sliders do not
+update until the card is re-added, that is a paper cut in the editing experience rather
+than a bug in what gets saved, and the fix (if wanted) would be on Home Assistant's side,
+not something this card can force from the outside via any documented API.
+
+Re-check by opening a real HA 2026.7+ dev instance, adding a complication card with one
+entity in the sections view, dragging its Layout tab height slider down to the floor,
+then switching to the YAML tab (or back to the visual editor's Content tab) and adding a
+second entity, then returning to Layout and checking whether the slider's floor moved
+without closing the edit-card dialog.
+
 ### Strings
 
 `hass.localize(key)` returns `''` for a key it does not have, so `localize(k) || fallback`

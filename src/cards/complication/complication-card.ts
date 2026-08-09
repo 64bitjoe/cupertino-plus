@@ -3,7 +3,11 @@ import { css, html, nothing, svg, type CSSResultGroup, type TemplateResult } fro
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { registerCard } from '../../core/register'
 import { RING_BOX, RING_CIRCUMFERENCE, RING_RADIUS, RING_STROKE } from '../../core/ring'
-import type { LovelaceGridOptions } from '../../core/types/ha'
+import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
+// Imported for the side effect as well as the constant: the editor tag has to be
+// defined by the time getConfigElement is asked for it, and this is the only thing
+// that reaches it.
+import { COMPLICATION_EDITOR_TAG } from './complication-card-editor'
 import { packFor, floorsFor } from './layout'
 import {
   readComplications,
@@ -438,6 +442,14 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
   /** The `custom:` prefix is load-bearing (see the calendar card's note on it). */
   public static getStubConfig(): ComplicationCardConfig {
     return { type: `custom:${COMPLICATION_CARD_TAG}` }
+  }
+
+  /**
+   * A card with no editor loses its **Visibility** and **Layout** tabs too — the tab strip
+   * is rendered only inside the GUI branch. See the contract on `CupertinoCardEditor`.
+   */
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement(COMPLICATION_EDITOR_TAG) as LovelaceCardEditor
   }
 
   /**

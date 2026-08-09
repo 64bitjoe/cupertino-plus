@@ -536,7 +536,9 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
    * when both are absent (no daily forecast reached this card at all: an entity that does
    * not support it, or one that has not pushed yet) does the line give up on numbers
    * altogether and print the condition instead, so the card never renders an empty line
-   * where the spec asks for one.
+   * where the spec asks for one. Weather alerts remain unimplemented: Home Assistant has
+   * no standard weather-alert entity, so pulling one would require choosing a particular
+   * integration's alert schema; this is a known gap rather than an oversight.
    */
   private _detailLine(now: WeatherNow): string {
     if (now.high === null && now.low === null) return now.condition

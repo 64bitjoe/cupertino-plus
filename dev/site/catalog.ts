@@ -273,6 +273,7 @@ const ENTITY_LABELS: Record<string, string> = {
   word: 'One entity: a word, not a number',
   'long-name': 'One entity: a name too long to caption',
   unavailable: 'One entity: not reporting',
+  yellow: 'One entity: the worst-case tint contrast',
 }
 
 const complication: Widget = {

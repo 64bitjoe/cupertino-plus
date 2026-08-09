@@ -126,9 +126,12 @@ disappears politely into somebody's custom theme.
 ### `rectangular-header`
 
 The Notes treatment. A tinted strip carries the icon and the name; the body gets the state
-at size, a supporting line, and a quieter third line. Best of the five at entities whose
-answer is a word rather than a number, where a gauge has nothing to measure — appliances,
-locks, media players.
+at size and a supporting line. **Correction, post-implementation:** this originally promised
+"a quieter third line" in the body as well — that line was never built, and nothing in
+`model.ts`'s `Complication` shape has a second string to put there; `supporting` is the one
+line every rectangular face draws. Struck rather than left to imply a feature that does not
+exist. Best of the five at entities whose answer is a word rather than a number, where a
+gauge has nothing to measure — appliances, locks, media players.
 
 ### `rectangular-bleed`
 
@@ -262,14 +265,29 @@ and pricing everything after that against the CSS as written.
 
 **Packing.** The count decides the grid, the grid decides the cell, the face fits the cell.
 Columns come from `cwLayout` and the measured width; rows from the count, bounded by what the
-height can hold at a face still worth looking at. Names and supporting lines are dropped when
-their cell is too narrow, in that order — never shrunk into a second type size. The battery
-card's `labeled` / `compact` split is the same decision and its reasoning applies verbatim.
+height can hold at a face still worth looking at. **Correction, post-implementation:** this
+originally said names and supporting lines are "dropped when their cell is too narrow, in
+that order" — that is not what `packFor` does. `pack.labels` gates only the `circular` face's
+caption (a `boolean` the cell either draws under the ring or does not); the three rectangular
+faces always draw both the name and the supporting line and rely on `text-overflow: ellipsis`
+to give ground instead, which reads correctly in practice because a block face never gets
+narrower than `STACK_MIN_WIDTH`. Nothing is dropped there, and nothing is shrunk into a
+second type size. The battery card's `labeled` / `compact` split is the same decision
+`circular` makes, and its reasoning applies verbatim there.
 
 **The floors.** `getGridOptions()` returns `min_rows` and `min_columns` computed from the
 entity count and the style, so the Layout tab clamps its own sliders to a footprint that
 actually fits. This is what makes decision 6 work: overflow is not handled because it cannot
-be reached. Defaults stay as `core/size.ts` provides them; only the floors are card-specific.
+be reached. **Correction, post-implementation:** the line that used to stand here — "defaults
+stay as `core/size.ts` provides them; only the floors are card-specific" — was wrong, and
+following it literally produced the bug the final review caught. `core/size.ts`'s defaults
+(`rows: 4`, uniformly) do not know this card's floor, so a config whose floor exceeds 4 (two
+`rectangular` entities, five `inline` rows) was handed a default footprint _below_ its own
+floor, and because `ha-card` clips overflow rather than spilling it, the entities that did
+not fit were not visibly cramped, they were silently absent. The floors are not the whole of
+what `getGridOptions()` owes: the _default_ footprint has to be raised to the floor too,
+never lowered below whatever `core/size.ts` already provides, so the card never renders on
+its first frame at a size its own floor says is too small.
 
 Per-style floors (design units, at scale 100), to be confirmed against the harness during
 implementation:
@@ -282,10 +300,17 @@ implementation:
 
 ## 7. Tap
 
-Tapping a complication opens the more-info dialog for that entity, via the existing
-`core/navigate.ts` helper. This matches both the watch (a complication opens its app) and
-every other card in Home Assistant. In a multi-entity card the tap target is the individual
-complication, not the card.
+Tapping a complication opens the more-info dialog for that entity. **Correction,
+post-implementation:** this section originally said "via the existing `core/navigate.ts`
+helper" — no such helper exists. `core/navigate.ts` exports `cwNavigate`, which sends the
+browser to a _page_ by firing `location-changed` on the router's own window, and its own
+comment records why that is the wrong shape for this: a more-info dialog is a request
+addressed to whichever ancestor is listening, not a route, so it has to bubble out of the
+shadow root as an `hass-more-info` event instead. The implementation correctly followed the
+codebase rather than this line; the battery card opens its more-info dialog the identical
+way, and the complication card's `_openMoreInfo` matches it. This matches both the watch (a
+complication opens its app) and every other card in Home Assistant. In a multi-entity card
+the tap target is the individual complication, not the card.
 
 No `tap_action` config in v1. It is the obvious follow-up and costs nothing to add later;
 shipping without it keeps the editor at five fields.

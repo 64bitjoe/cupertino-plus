@@ -27,7 +27,7 @@
 
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 import { fractionOf, rangeFor, type Range } from './range'
-import { tintFor, type TintName } from './tint'
+import { TINTS, tintFor, type TintName } from './tint'
 
 /**
  * One row of the card's `entities`, as the config may write it.
@@ -248,7 +248,14 @@ const formatValue = (hass: HomeAssistant, entity: HassEntity): string => {
     if (translated) return translated
   }
 
-  return entity.state.charAt(0).toUpperCase() + entity.state.slice(1)
+  // The raw state, readably: HA's state strings are snake_case (`not_home`, `cleaning`,
+  // …), and this is the fallback for whenever the localize key above misses — plausibly
+  // the path most users actually see it on, since the key shape is recorded as unverified
+  // (see the comment above). Capitalising alone leaves the underscores in, so `not_home`
+  // — exactly what a `person`/`device_tracker` away from home reads, one of the more
+  // common states to land here — rendered as `Not_home` rather than `Not home`.
+  const readable = entity.state.replace(/_/g, ' ')
+  return readable.charAt(0).toUpperCase() + readable.slice(1)
 }
 
 /**
@@ -307,6 +314,26 @@ const supportingFor = (entity: HassEntity): string | null => {
 
   return null
 }
+
+/**
+ * A `row.color`/`defaults.color` value, kept only if it is one of `TINTS`.
+ *
+ * `entityConfigs` is deliberately forgiving of a hand-written config's shape everywhere
+ * else — a bad row is skipped rather than crashing the card, a scalar is read as a
+ * one-item list — but `color` is typed as `TintName` on `ComplicationEntityConfig` and
+ * `ComplicationDefaults` only at compile time; nothing checks it at the boundary where a
+ * config actually enters (`entityConfigs` above validates `entity` alone). A YAML
+ * `color: burgundy` reaches `tintVar` unchanged and comes out `var(--cw-burgundy)`, a
+ * custom property nothing defines — invalid at computed-value time, so the browser falls
+ * back to the property's initial value instead of erroring, and the arc or glyph that was
+ * meant to be burgundy is drawn in no colour at all with nothing in the render to say why.
+ * That is exactly the silent failure this card's forgiveness is supposed to avoid
+ * everywhere else, so this is the one place forgiveness has to mean "fall back", not
+ * "pass through unchecked" — the same precedence chain `readComplications` already runs,
+ * just with an invalid value treated as though it were never set.
+ */
+const validTint = (color: TintName | undefined): TintName | undefined =>
+  color !== undefined && (TINTS as readonly string[]).includes(color) ? color : undefined
 
 /**
  * A `{min, max}` pair with only the halves that are actually set, never a key holding an
@@ -371,7 +398,7 @@ export const readComplications = (
         range: null,
         fraction: null,
         supporting: null,
-        tint: row.color ?? defaults.color ?? 'accent',
+        tint: validTint(row.color) ?? validTint(defaults.color) ?? 'accent',
         unavailable: true,
       }
     }
@@ -389,7 +416,7 @@ export const readComplications = (
       range,
       fraction: range && numeric !== null ? fractionOf(numeric, range) : null,
       supporting: unavailable ? null : supportingFor(entity),
-      tint: row.color ?? defaults.color ?? tintFor(entity),
+      tint: validTint(row.color) ?? validTint(defaults.color) ?? tintFor(entity),
       unavailable,
     }
   })

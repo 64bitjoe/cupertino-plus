@@ -200,4 +200,53 @@ describe('readComplications', () => {
     expect(off.supporting).toBeNull()
     expect(cool.supporting).toBe('Cooling to 18°')
   })
+
+  /**
+   * A state that is not a number and has no localize hit (the fallback branch of
+   * `formatValue`) is only capitalised, not de-snake-cased, unless this is fixed:
+   * `not_home` — a `person`/`device_tracker` state a lot of dashboards actually show —
+   * would render as the literal `Not_home` rather than `Not home`.
+   */
+  it('turns a snake_case fallback state into words, not a literal underscore', () => {
+    const hass = hassWith(state('person.joe', 'not_home', { friendly_name: 'Joe' }))
+
+    const [away] = readComplications(hass, ['person.joe'], {})
+
+    expect(away.value).toBe('Not home')
+  })
+
+  /**
+   * `color` is typed as `TintName` but a config is never typechecked on the way in — see
+   * `entityConfigs`'s own tolerance for a malformed row. Unlike a missing `entity`, an
+   * invalid `color` fails silently downstream (`tintVar` turns it into a `var()` reference
+   * nothing defines), so this has to be caught here rather than trusted.
+   */
+  it('falls back to the derived tint when color is not one of TINTS', () => {
+    const hass = hassWith(
+      state('sensor.t', '20', { friendly_name: 'T', device_class: 'temperature' }),
+    )
+
+    const [row] = readComplications(hass, [{ entity: 'sensor.t', color: 'burgundy' as never }], {})
+    expect(row.tint).toBe('orange')
+
+    const [card] = readComplications(hass, ['sensor.t'], { color: 'burgundy' as never })
+    expect(card.tint).toBe('orange')
+
+    // A row's own bad value must not block the card default from being consulted: falling
+    // back to "unset" per key, the same precedence `rangeOverride` already uses for
+    // min/max.
+    const [rowBad] = readComplications(hass, [{ entity: 'sensor.t', color: 'burgundy' as never }], {
+      color: 'blue',
+    })
+    expect(rowBad.tint).toBe('blue')
+
+    // The same guard on the "entity missing from hass.states" branch, which has no
+    // `tintFor` derivation to fall back to and so falls to 'accent' instead.
+    const [missing] = readComplications(
+      hassWith(),
+      [{ entity: 'sensor.never', color: 'burgundy' as never }],
+      {},
+    )
+    expect(missing.tint).toBe('accent')
+  })
 })

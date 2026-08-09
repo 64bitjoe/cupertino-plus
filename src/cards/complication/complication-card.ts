@@ -316,6 +316,20 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         --mdc-icon-size: calc(14px * var(--cw-scale));
       }
 
+      /* .cell.unknown .reading above and .cell.block .reading are both three-class
+         selectors, so which one wins is decided by source order rather than by meaning —
+         and a rule declared later in this file would silently un-dim an unavailable
+         reading again. .block.unknown is four classes, so it beats both outright,
+         whatever else here gets reordered. This is what keeps model.ts's rule true on
+         the two block faces that colour their reading from --cw-label (plain
+         rectangular and rectangular-header): an entity that has gone unavailable is
+         never dropped, it is drawn dashed and dimmed, same as circular and inline draw
+         it. rectangular-bleed colours its reading from --cw-comp-on-tint instead, so it
+         gets its own version of this rule further down, once on-tint is in scope. */
+      .cell.block.unknown .reading {
+        color: var(--cw-label-secondary);
+      }
+
       /* The Notes treatment: the strip carries the identity, the body gets the story. */
       .cell.rectangular-header {
         gap: 0;
@@ -401,6 +415,22 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         color: color-mix(in srgb, var(--cw-comp-on-tint) 92%, transparent);
         position: relative;
         z-index: 1;
+      }
+
+      /* rectangular-bleed's own version of .cell.block.unknown .reading above: that
+         rule dims to --cw-label-secondary, which is picked for the surface behind
+         circular/inline/the other two block faces, not for whatever --cw-comp-tint this
+         card just became — grey theme text over a saturated tint reads as a colour
+         clash, not as quiet. Dimmed the same way the rest of the library steps a
+         primary down to a secondary instead: 60% opacity is the exact alpha
+         --cw-label-secondary already carries against --cw-label in tokens.ts, in both
+         themes, so this reading dims by the same ratio as every other face's — just
+         applied to on-tint ink, the only ink that is ever legible on this face's
+         background. Declared after .cell.rectangular-bleed .support so it also beats
+         .cell.block.unknown .reading (both four classes, tie broken by source order)
+         on a cell that carries both .block and .rectangular-bleed. */
+      .cell.rectangular-bleed.unknown .reading {
+        color: color-mix(in srgb, var(--cw-comp-on-tint) 60%, transparent);
       }
     `,
   ]

@@ -1,4 +1,4 @@
-import { mdiWeatherNight, mdiWeatherNightPartlyCloudy } from '@mdi/js'
+import { mdiWeatherNight, mdiWeatherNightPartlyCloudy, mdiWeatherSunny } from '@mdi/js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
@@ -178,6 +178,34 @@ describe('readWeather', () => {
     const view = readWeather(hass, 'weather.home', [], [])
 
     expect(view?.now.icon).toBe(mdiWeatherNight)
+  })
+
+  it('agrees with the hourly strip\'s "Now" column, even where sun.sun disagrees with the clock', () => {
+    // The regression this guards: an earlier version of `readWeather` computed the
+    // "Now" column's icon with the clock heuristic (`isNightAt`) instead of the shared
+    // `sun.sun`-preferring boolean `now.icon` uses, so the two could show a sun and a
+    // moon, side by side, for what is meant to be the exact same instant. The test
+    // above never caught it because it always passed an empty `hourly` array — this one
+    // does not.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-09T12:00:00Z'))
+    const hass = hassWith(
+      weather('weather.home', 'sunny', { temperature_unit: '°F' }),
+      sun('below_horizon'),
+    )
+    const hourly = [
+      hourlyItem({ datetime: '2026-08-09T12:00:00+00:00', condition: 'sunny', temperature: 80 }),
+      hourlyItem({ datetime: '2026-08-09T13:00:00+00:00', condition: 'sunny', temperature: 79 }),
+    ]
+
+    const view = readWeather(hass, 'weather.home', [], hourly)
+
+    expect(view?.now.icon).toBe(mdiWeatherNight)
+    expect(view?.hours[0]?.label).toBe('Now')
+    expect(view?.hours[0]?.icon).toBe(mdiWeatherNight)
+    // A genuine future hour is unaffected: 1PM UTC has no `sun.sun` opinion attached to
+    // it, so it still reads its own clock hour, which the fallback window calls daytime.
+    expect(view?.hours[1]?.icon).toBe(mdiWeatherSunny)
   })
 
   it('falls back to the hour of day for the current-conditions icon when sun.sun is absent', () => {

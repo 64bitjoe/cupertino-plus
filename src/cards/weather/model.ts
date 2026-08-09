@@ -211,11 +211,11 @@ const weekdayShort = (
 /**
  * Whether `date` reads as night, purely from the clock — this is the card's own
  * inference, not anything the weather data says (see `condition.ts`'s comment on
- * `NIGHT_ICONS` for why one is needed at all). It is deliberately the only signal used
- * for a forecast hour: `sun.sun`'s `state` is a snapshot of right now and says nothing
- * about whether 2PM tomorrow will be light or dark, so every hourly column — including
- * the current one — reads its own day/night split off its own timestamp rather than off
- * a sun position that cannot answer for it.
+ * `NIGHT_ICONS` for why one is needed at all). This is the only signal available for a
+ * *future* forecast hour: `sun.sun`'s `state` is a snapshot of right now and says
+ * nothing about whether 2PM tomorrow will be light or dark. It is deliberately NOT used
+ * for the current hour's column — see `isNightNow`, which is what that column is drawn
+ * with instead, and why.
  */
 const isNightAt = (date: Date, timeZone: string | undefined): boolean => {
   const hour = hourOf(date, timeZone)
@@ -223,16 +223,26 @@ const isNightAt = (date: Date, timeZone: string | undefined): boolean => {
 }
 
 /**
- * Whether it is night *right now*, for the current-conditions row only.
+ * Whether it is night *right now* — for the current-conditions row AND for the hourly
+ * strip's first ("Now") column, which `readWeather` below computes this once and hands
+ * to both, specifically so the two can never draw a different glyph for what is, on the
+ * dashboard, the exact same instant. An earlier version of this file used `isNightAt`
+ * for every hourly column including the first, on the reasoning that a forecast hour
+ * should read its own timestamp; that missed that the *first* column is not really a
+ * forecast — it is "now" a second time, spelled differently — and produced a card that
+ * could show a sun in "Now" and a moon three inches to its left, or the reverse,
+ * whenever `sun.sun`'s actual position disagreed with the fixed 6am–8pm window (which
+ * an 8:30pm midsummer evening does, at most latitudes, for a good few weeks a year).
  *
  * `sun.sun` is preferred when it exists in `hass.states`, because it is Home
  * Assistant's own answer to exactly this question and is right at every latitude and
- * season the clock-based fallback above is only approximately right at. It is not used
- * for `isNightAt` because it cannot be: `state` is `above_horizon`/`below_horizon` for
- * this instant alone, with no forecast of its own. Absent `sun.sun` (not every
- * installation runs the integration), this falls back to the same clock heuristic every
- * hourly column already uses, so "now" and "the current hour's column" never disagree
- * for the one reason that would be confusing — using two different rules.
+ * season the clock-based fallback is only approximately right at. It is not usable for
+ * `isNightAt`'s *other* callers (every hourly column past the first) because it cannot
+ * be: `state` is `above_horizon`/`below_horizon` for this instant alone, with no
+ * forecast of its own — which is exactly why those columns keep the clock heuristic.
+ * Absent `sun.sun` (not every installation runs the integration), this falls back to
+ * that same heuristic, so the guarantee above still holds: "Now" and the current
+ * conditions are always computed from one shared boolean, never two.
  */
 const isNightNow = (hass: HomeAssistant, timeZone: string | undefined): boolean => {
   const sun = hass.states['sun.sun']
@@ -273,13 +283,17 @@ export const readWeather = (
 
   const currentTemperature = numberAttr(entity.attributes.temperature)
   const today = daily[0]
+  // Computed once, shared by `now.icon` and the hourly strip's first column below —
+  // see `isNightNow`'s own comment for why splitting this into two calls is exactly
+  // the bug this file used to have.
+  const nightNow = isNightNow(hass, timeZone)
 
   const now: WeatherNow = {
     location: entity.attributes.friendly_name ?? entity.entity_id,
     temperature:
       currentTemperature !== null ? formatTemperature(hass, currentTemperature, unit) : VALUE_DASH,
     condition: conditionLabel(entity.state),
-    icon: conditionIcon(entity.state, isNightNow(hass, timeZone)),
+    icon: conditionIcon(entity.state, nightNow),
     high: today ? formatTemperature(hass, today.temperature, unit) : null,
     low: today?.templow !== undefined ? formatTemperature(hass, today.templow, unit) : null,
   }
@@ -296,9 +310,14 @@ export const readWeather = (
   const hours: WeatherHour[] = upcoming.map((item, index) => {
     const at = new Date(item.datetime)
     const label = index === 0 ? 'Now' : hourLabel(at, ctx)
+    // The first surviving column IS "now" — see `isNightNow`'s comment — so it takes
+    // the same shared boolean `now.icon` used above rather than reading its own
+    // timestamp through the clock heuristic; every column after it is a genuine future
+    // hour, which `isNightAt` is the only honest answer for.
+    const night = index === 0 ? nightNow : isNightAt(at, timeZone)
     return {
       label,
-      icon: conditionIcon(item.condition, isNightAt(at, timeZone)),
+      icon: conditionIcon(item.condition, night),
       temperature: formatTemperature(hass, item.temperature, unit),
     }
   })

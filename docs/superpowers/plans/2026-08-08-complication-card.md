@@ -1105,7 +1105,7 @@ describe('floorsFor', () => {
     expect(floorsFor('circular', 1)).toEqual({ min_columns: 4, min_rows: 3 })
     expect(floorsFor('circular', 4)).toEqual({ min_columns: 6, min_rows: 3 })
     expect(floorsFor('circular', 8)).toEqual({ min_columns: 6, min_rows: 3 })
-    expect(floorsFor('circular', 12)).toEqual({ min_columns: 6, min_rows: 4 })
+    expect(floorsFor('circular', 12)).toEqual({ min_columns: 6, min_rows: 3 })
   })
 
   it('gives the stacking styles a floor per entity', () => {
@@ -1209,10 +1209,21 @@ const columnsFor = (px: number): number => {
   return GRID_COLUMNS
 }
 
-/** The fewest whole grid rows whose height covers `px`, floored at 1. */
+/**
+ * The fewest whole grid rows whose height covers `px`, floored at 1.
+ *
+ * Unbounded above, and that is the whole of the difference between this and `columnsFor`.
+ * A section really does have twelve columns and no more, so a cap there is a fact about
+ * Home Assistant; there is no equivalent fact about rows, and `model.ts` never drops an
+ * entity, so the list this is pricing has no length limit either. A capped search that
+ * returned its ceiling without checking it would hand back a floor shorter than the
+ * content — seven rectangular blocks need 14 grid rows and a cap of 12 would claim 12,
+ * which is the clipped card the floors exist to make unreachable.
+ */
 const rowsFor = (px: number): number => {
-  for (let r = 1; r < 12; r++) if (rowsToPx(r) >= px) return r
-  return 12
+  let rows = 1
+  while (rowsToPx(rows) < px) rows++
+  return rows
 }
 
 // ---- Packing ----------------------------------------------------------------

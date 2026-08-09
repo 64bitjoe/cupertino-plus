@@ -6,7 +6,7 @@ import type { LovelaceCardEditor } from '../../core/types/ha'
 import { BATTERY_EDITOR_TAG } from './battery-card-editor'
 import { gridFor, type BatteryView } from './layout'
 import { readDevices, watchedIds, type BatteryDevice, type BatteryDeviceConfig } from './model'
-import { RING_BOX, RING_CIRCUMFERENCE, RING_RADIUS, RING_STROKE, arcFor } from './ring'
+import { RING_BOX, RING_CIRCUMFERENCE, RING_RADIUS, RING_STROKE, arcFor } from '../../core/ring'
 
 export const BATTERY_CARD_TAG = 'cupertino-widgets-battery'
 

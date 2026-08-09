@@ -2,6 +2,8 @@ import { CupertinoCardEditor } from '../../core/card-editor'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { ComplicationCardConfig } from './complication-card'
+import { mergeEntities } from './entities-form'
+import { watchedIds } from './model'
 import { COMPLICATION_STYLES, DEFAULT_STYLE, STYLE_LABELS } from './style'
 import { TINTS } from './tint'
 
@@ -69,6 +71,14 @@ const HELPERS: Record<string, string> = {
  * `ComplicationEntityConfig` and `range.ts`/`tint.ts` — and read as "Automatic" the
  * moment they are left blank, which is what `helper` says rather than what a bare label
  * would only imply.
+ *
+ * A per-row override is also this editor's one shape that cannot pass straight through
+ * `ha-form`: the `entities` picker can only show and report a bare `string[]`, where a row
+ * may be `{ entity, name, icon, min, max, color }`. `toForm`/`fromForm` below are the pair
+ * `CupertinoCardEditor` sets aside for exactly this, and `entities-form.ts` carries the
+ * pure merge, so a config someone hand-wrote with per-row overrides survives a trip through
+ * this editor — an add, a remove, a reorder — rather than losing them the moment the
+ * picker's own report overwrites the config wholesale.
  */
 class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCardConfig> {
   protected override fields(): readonly HaFormSchema[] {
@@ -89,6 +99,43 @@ class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCa
 
   protected override helper(schema: HaFormSchema): string | undefined {
     return HELPERS[schema.name] ?? super.helper(schema)
+  }
+
+  /**
+   * `entities`, flattened to the bare ids `ha-entities-picker` can render.
+   *
+   * A row here may be an object carrying a `name`/`icon`/`min`/`max`/`color` override —
+   * see `ComplicationEntityConfig` — but the multiple entity selector can only ever show
+   * and report a `string[]`. `fromForm` below is what puts the overrides back; this half
+   * only has to throw them away for the render, not lose them.
+   */
+  protected override toForm(config: ComplicationCardConfig): Record<string, unknown> {
+    return { ...config, entities: watchedIds(config.entities) }
+  }
+
+  /**
+   * The reported ids, folded back into `entities` with each surviving row's overrides
+   * restored rather than flattened.
+   *
+   * `super.fromForm` (`applyFormData`) is still what handles `style`/`min`/`max`/`color`/
+   * `scale` and what drops `entities` entirely when the picker is emptied; `mergeEntities`
+   * only rebuilds the one field `toForm` flattened, matching the ids the form reported
+   * against `config`'s own prior rows by entity id — see its own comment for exactly what
+   * "matched" means, including the duplicate-id case.
+   */
+  protected override fromForm(
+    config: ComplicationCardConfig,
+    data: Record<string, unknown>,
+    fields: readonly string[],
+  ): ComplicationCardConfig {
+    const next = super.fromForm(config, data, fields)
+    const merged = mergeEntities(config.entities, watchedIds(next.entities))
+
+    const withEntities: ComplicationCardConfig = { ...next }
+    if (merged.length === 0) delete withEntities.entities
+    else withEntities.entities = merged
+
+    return withEntities
   }
 }
 

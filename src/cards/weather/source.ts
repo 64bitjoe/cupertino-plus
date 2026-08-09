@@ -41,17 +41,24 @@ const BITS: Record<ForecastKind, number> = {
 }
 
 /**
- * One forecast entry, as `weather/subscribe_forecast` pushes it. `templow` is optional
- * because it is a DAILY field, not an integration quirk: a daily entry has a high
+ * One forecast entry, as `weather/subscribe_forecast` pushes it. `templow` is the only
+ * field the daily/hourly asymmetry makes optional: a daily entry has a high
  * (`temperature`) and a low (`templow`) for the day, while an hourly entry is one instant
- * and therefore only has `temperature`. Treating the two as the same shape and reading
+ * and therefore only has `temperature` — every entry, daily or hourly, carries
+ * `temperature`, so it is required here. Treating the two shapes as the same and reading
  * `templow` off an hourly item would silently read `undefined` forever rather than fail
  * loudly, which is exactly the kind of bug this comment exists to head off.
+ *
+ * Everything below `templow` is optional for a different reason: not a shape difference
+ * between daily and hourly, but that not every weather integration reports every field
+ * (a wind-only source may have no `uv_index`, a basic one no `dew_point`). Conflating the
+ * two reasons would suggest a rule ("optional means daily-only") that only actually holds
+ * for `templow`.
  */
 export interface ForecastItem {
   datetime: string
   condition: string
-  temperature?: number
+  temperature: number
   /** The day's low. Present on daily entries only — see the interface comment above. */
   templow?: number
   precipitation_probability?: number
@@ -66,9 +73,14 @@ export interface ForecastItem {
   pressure?: number
 }
 
-/** What the subscription pushes: the forecast type it answers for, and the entries. */
+/**
+ * What the subscription pushes. `weather/subscribe_forecast`'s own reply carries a
+ * `type` alongside `forecast`, but this file has nothing to check it against: the kind
+ * is already known to the caller (it is what asked for the subscription), so there is no
+ * mismatch a runtime check here could catch that the caller could not already tell by
+ * comparing its own argument. Left off the type rather than modelled and ignored.
+ */
 interface ForecastPush {
-  type?: string
   forecast?: ForecastItem[] | null
 }
 

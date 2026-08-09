@@ -46,6 +46,7 @@
  */
 
 import { rowsToPx } from '../../core/size'
+import type { LovelaceGridOptions } from '../../core/types/ha'
 import { isRectangular, type ComplicationStyle } from './style'
 
 export interface Box {
@@ -288,3 +289,39 @@ export const floorsFor = (style: ComplicationStyle, count: number): Floors => {
     min_rows: Math.max(3, rowsFor(neededHeight)),
   }
 }
+
+/**
+ * The card's own floors, folded into the defaults Home Assistant was going to be handed.
+ *
+ * This exists as a function rather than as three lines inside `getGridOptions()` because
+ * of what it is guarding. `core/size.ts`'s `gridOptions()` answers a flat `rows: 4` — it
+ * has no idea this card exists, let alone how many entities it holds — and spreading the
+ * floors on top of that raises only `min_rows`/`min_columns`, never the `rows`/`columns`
+ * Home Assistant actually renders at before anybody touches the Layout tab. A three-entity
+ * `rectangular` card floors at `min_rows: 6` and was still handed `rows: 4`: below its own
+ * floor, and silently below it, because `ha-card` clips overflow rather than spilling it.
+ * The third entity was not drawn cramped or truncated. It was simply not drawn.
+ *
+ * The card element cannot be unit-tested here — `vitest.config.ts` runs in node with no
+ * DOM — so a test that reimplemented this merge would pass just as happily against the
+ * broken version. Pulling it out is what lets the test import the thing the card actually
+ * calls, which is the difference between a test that documents a fix and one that pins it.
+ *
+ * `columns` and `rows` accept the literals `'full'` and `'auto'` (`core/types/ha.ts`), and
+ * `Number('full')` is `NaN`, so a blind `Math.max` would turn a deliberate literal into a
+ * broken grid option. A literal is also already at least as generous as any floor this card
+ * could ask for, so there is nothing to raise: only the numeric case is compared, and a
+ * literal or an absent default passes through to the floor untouched.
+ */
+export const withFloors = (base: LovelaceGridOptions, floors: Floors): LovelaceGridOptions => ({
+  ...base,
+  ...floors,
+  columns:
+    typeof base.columns === 'number'
+      ? Math.max(base.columns, floors.min_columns)
+      : (base.columns ?? floors.min_columns),
+  rows:
+    typeof base.rows === 'number'
+      ? Math.max(base.rows, floors.min_rows)
+      : (base.rows ?? floors.min_rows),
+})

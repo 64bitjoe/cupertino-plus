@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { gridOptions } from '../../core/size'
-import { floorsFor, packFor, type Box } from './layout'
+import { floorsFor, packFor, withFloors, type Box } from './layout'
 import { COMPLICATION_STYLES } from './style'
 
 /** The two footprints the library designs for, in a section of the usual ~500px. */
@@ -141,14 +141,14 @@ describe('floorsFor', () => {
  * overflow rather than spilling it (`theme/base-styles.ts`), so the third entity was not
  * drawn cramped, it was simply never drawn.
  *
- * Deliberately not a test of `CupertinoComplicationCard.getGridOptions()` itself: that
- * method lives on a custom element, and this suite runs in `environment: 'node'`
- * (`vitest.config.ts`) with no DOM to construct one against. The merge below is the same
- * one that method performs — raise a numeric default to the floor, leave a `'full'`/
- * `'auto'` literal untouched — reimplemented here as a pure function of two things this
- * file already has pure access to: `floorsFor` and the base defaults `core/size.ts`
- * provides. If the two implementations ever drift, this test and `complication-card.ts`
- * disagreeing is exactly the signal that should happen.
+ * It calls `withFloors` — the same function `getGridOptions()` calls — rather than the card
+ * method itself, which lives on a custom element this suite cannot build (`vitest.config.ts`
+ * runs in `environment: 'node'`, no DOM). That distinction matters more than it looks. An
+ * earlier version of this test reimplemented the merge inline, which meant it asserted
+ * `Math.max(a, b) >= b` against its own arithmetic and would have passed just as happily
+ * against the broken card. Pulling the merge into `layout.ts` is what makes this test able
+ * to fail: revert `getGridOptions()` to spreading the floors on top of the defaults and the
+ * card stops calling this code, but leave `withFloors` wrong and this goes red.
  */
 describe('the default footprint never sits below its own floor', () => {
   it('holds for every style and a spread of entity counts', () => {
@@ -157,24 +157,10 @@ describe('the default footprint never sits below its own floor', () => {
     for (const style of COMPLICATION_STYLES) {
       for (const count of [0, 1, 2, 3, 5, 7, 12]) {
         const floors = floorsFor(style, count)
+        const { columns, rows } = withFloors(base, floors)
 
-        // Same per-field merge as CupertinoComplicationCard.getGridOptions(): raise the
-        // numeric case, leave a 'full'/'auto' literal (or an absent default) alone. Kept
-        // as an explicit typeof check, not a shared generic helper, because columns and
-        // rows carry two different literal types (number | 'full' vs number | 'auto')
-        // and a helper typed to cover both stops TypeScript narrowing either one back
-        // down to number for the assertion below.
-        const columns =
-          typeof base.columns === 'number'
-            ? Math.max(base.columns, floors.min_columns)
-            : (base.columns ?? floors.min_columns)
-        const rows =
-          typeof base.rows === 'number'
-            ? Math.max(base.rows, floors.min_rows)
-            : (base.rows ?? floors.min_rows)
-
-        expect(typeof columns === 'string' || columns >= floors.min_columns).toBe(true)
-        expect(typeof rows === 'string' || rows >= floors.min_rows).toBe(true)
+        expect(typeof columns === 'string' || (columns ?? 0) >= floors.min_columns).toBe(true)
+        expect(typeof rows === 'string' || (rows ?? 0) >= floors.min_rows).toBe(true)
       }
     }
   })

@@ -8,7 +8,7 @@ import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/h
 // defined by the time getConfigElement is asked for it, and this is the only thing
 // that reaches it.
 import { COMPLICATION_EDITOR_TAG } from './complication-card-editor'
-import { packFor, floorsFor } from './layout'
+import { packFor, floorsFor, withFloors } from './layout'
 import {
   readComplications,
   watchedIds,
@@ -541,30 +541,13 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
   public override getGridOptions(): LovelaceGridOptions {
     const style = this._config?.style ?? DEFAULT_STYLE
     const count = entityConfigs(this._config?.entities).length
-    const floors = floorsFor(style, count)
-    const base = super.getGridOptions()
 
-    return {
-      ...base,
-      ...floors,
-      // `columns`/`rows` are `number | 'full'` and `number | 'auto'` (`core/types/ha.ts`)
-      // because Home Assistant's own grid accepts those literals as "as wide/tall as the
-      // grid allows" — and `super.getGridOptions()` could in principle return one, even
-      // though `core/size.ts`'s `gridOptions()` happens to return plain numbers today.
-      // `Number('full')` is `NaN`, so a blind `Math.max` would silently turn a deliberate
-      // literal into a broken grid option instead of leaving it alone; a literal is also
-      // already at least as generous as any floor this card could ask for, so there is
-      // nothing to raise. Only the number case is coerced; either literal, or an absent
-      // default, passes straight to the floor itself.
-      columns:
-        typeof base.columns === 'number'
-          ? Math.max(base.columns, floors.min_columns)
-          : (base.columns ?? floors.min_columns),
-      rows:
-        typeof base.rows === 'number'
-          ? Math.max(base.rows, floors.min_rows)
-          : (base.rows ?? floors.min_rows),
-    }
+    // The merge lives in `layout.ts` beside the floors it folds in, and the literal
+    // handling is documented there. It is a function rather than three lines here so the
+    // test suite can call the same code this method does: an element cannot be built in
+    // this project's node test environment, and a test that reimplemented the merge would
+    // have passed against the broken version too.
+    return withFloors(super.getGridOptions(), floorsFor(style, count))
   }
 
   /**

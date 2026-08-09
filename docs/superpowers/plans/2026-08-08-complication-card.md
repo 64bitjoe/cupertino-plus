@@ -902,11 +902,22 @@ const supportingFor = (entity: HassEntity): string | null => {
 
   if (domain === 'climate') {
     const target = entity.attributes.temperature
-    if (typeof target === 'number') {
-      const verb = entity.state === 'cool' ? 'Cooling' : 'Heating'
-      return `${verb} to ${target}°`
+    if (typeof target !== 'number') return null
+
+    // The verb comes off the mode, and several modes have no honest verb at all.
+    // A thermostat keeps its setpoint attribute whatever it is doing, so a line that
+    // assumed "heating unless cooling" would read `Heating to 22°` at an entity that is
+    // switched off — which is the failure this whole function argues against, in its
+    // strongest form: not merely a line that means nothing, but one that is false.
+    const VERBS: Record<string, string> = {
+      heat: 'Heating to',
+      cool: 'Cooling to',
+      heat_cool: 'Set to',
+      auto: 'Set to',
     }
-    return null
+
+    const verb = VERBS[entity.state]
+    return verb ? `${verb} ${target}°` : null
   }
 
   if (domain === 'media_player') {
@@ -948,12 +959,16 @@ export const readComplications = (
     const unavailable = UNAVAILABLE.has(entity.state)
     const numeric = unavailable ? null : numberOf(entity.state)
 
-    const override =
-      row.min !== undefined || row.max !== undefined
-        ? { min: row.min, max: row.max }
-        : defaults.min !== undefined || defaults.max !== undefined
-          ? { min: defaults.min, max: defaults.max }
-          : undefined
+    // Each end falls back on its own. Resolving the pair together — taking the row's
+    // whole override the moment it names either end — means a row that widens only the
+    // bottom discards the card's ceiling, and `rangeFor` then refuses the half-specified
+    // result and draws no gauge at all. Per-key is also what this module's own doc comment
+    // promises: a key set on a row beats *the same key* set at the top of the card.
+    // `rangeFor` still refuses a range only one end of which exists anywhere, so nothing is
+    // invented; that rule lives there and is untouched by this one.
+    const min = row.min ?? defaults.min
+    const max = row.max ?? defaults.max
+    const override = min === undefined && max === undefined ? undefined : { min, max }
 
     const range = unavailable ? null : rangeFor(entity, override)
 

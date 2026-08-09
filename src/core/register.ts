@@ -8,7 +8,7 @@ declare global {
   }
 }
 
-const REPO_URL = 'https://github.com/sabbaken/cupertino-widgets'
+const REPO_URL = 'https://github.com/64bitjoe/cupertino-widgets'
 
 /**
  * Define one custom element, tolerating a bundle that has already been loaded once.

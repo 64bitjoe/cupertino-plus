@@ -7,10 +7,10 @@
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sabbaken/cupertino-widgets.git"
+    "url": "git+https://github.com/64bitjoe/cupertino-widgets.git"
   },
-  "homepage": "https://github.com/sabbaken/cupertino-widgets",
-  "bugs": "https://github.com/sabbaken/cupertino-widgets/issues",
+  "homepage": "https://github.com/64bitjoe/cupertino-widgets",
+  "bugs": "https://github.com/64bitjoe/cupertino-widgets/issues",
   "packageManager": "pnpm@10.11.0",
   "engines": {
     "node": ">=22"

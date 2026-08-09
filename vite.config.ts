@@ -7,8 +7,19 @@ const { version } = JSON.parse(readFileSync('./package.json', 'utf8')) as { vers
  * Kept in the shipped file on purpose. The bundle is served to every dashboard
  * visitor's browser, which is distribution, and the AGPL wants the notice and a route
  * to the source to travel with it. `/*!` marks it a legal comment so minifiers keep it.
+ *
+ * Two names, and both have to be here. Kirill Verenih's copyright is on the work this
+ * fork received — the calendar card, the battery card, and the whole frame they stand in —
+ * and section 5 of the licence says a modified version keeps the notices it was given
+ * rather than replacing them. The second line is what this fork added, which is the
+ * complication card. Deleting the first would be the one change in this repository that
+ * is not merely rude but a licence violation.
+ *
+ * The source URL points at the fork rather than upstream, and that is the correction the
+ * licence actually asks for: the offer has to lead to the source of *this* binary, and
+ * upstream does not carry these modifications.
  */
-const LICENCE_BANNER = `/*! cupertino-widgets v${version} | Copyright (C) 2026 Kirill Verenih | AGPL-3.0-only | Source: https://github.com/sabbaken/cupertino-widgets */`
+const LICENCE_BANNER = `/*! cupertino-widgets v${version} | Copyright (C) 2026 Kirill Verenih | Modifications Copyright (C) 2026 Joe Speakman | AGPL-3.0-only | Source: https://github.com/64bitjoe/cupertino-widgets */`
 
 /**
  * Where the showcase site is served from, as a URL path.

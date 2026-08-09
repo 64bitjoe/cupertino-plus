@@ -12,7 +12,7 @@ pnpm test         # the layout rules, as unit tests
 ## The showcase
 
 `pnpm dev` serves the same page that is published at
-[sabbaken.github.io/cupertino-widgets](https://sabbaken.github.io/cupertino-widgets/), with
+[64bitjoe.github.io/cupertino-widgets](https://64bitjoe.github.io/cupertino-widgets/), with
 full HMR: every card against a mock `hass` object, in a box the sections grid would have
 given it. This is the fast loop.
 

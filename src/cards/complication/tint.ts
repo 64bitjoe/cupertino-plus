@@ -115,3 +115,27 @@ export const tintFor = (entity: HassEntity): TintName => {
  * the complication sits on the dashboard rather than only at the moment it was drawn.
  */
 export const tintVar = (tint: TintName): string => `var(--cw-${tint})`
+
+/**
+ * White text over the tint, except where the tint is too light for white to sit on.
+ *
+ * Two faces paint content straight onto `tintVar(tint)` rather than drawing it as a thin
+ * arc or an icon: `rectangular-header`'s strip and `rectangular-bleed`'s whole card. Both
+ * need an ink that stays legible on every one of the ten tints, in both themes, and white
+ * is not that ink for all ten. Checked against WCAG's contrast formula rather than by eye,
+ * against both the light and dark value of every tint in `tokens.ts`: white on
+ * `--cw-yellow` comes out at 1.4-1.5:1 (light/dark), which fails even the 3:1 floor a
+ * large glyph is held to, and `--cw-orange`, `--cw-green` and `--cw-teal` are not far
+ * behind at 2.0-2.6:1. The other six tints -- `red` clears 3:1 by a hair at 3.41-3.55:1,
+ * `blue`/`indigo`/`purple`/`pink` clear it comfortably, and `accent` is the theme's own
+ * colour and unknowable here -- keep white.
+ *
+ * The four that don't get `#1d1d1f`, a fixed near-black, rather than `var(--cw-label)`:
+ * `--cw-label` is white in dark mode, which is exactly the failure this function exists
+ * to route around, and unlike the label these four tint values barely move between themes
+ * (`--cw-yellow` is #ffcc00 light, #ffd60a dark) -- a hue that stays light in both themes
+ * needs a fix that stays dark in both themes, not one that tracks the theme.
+ */
+const NEEDS_DARK_ON_TINT = new Set<TintName>(['yellow', 'orange', 'green', 'teal'])
+export const onTintVar = (tint: TintName): string =>
+  NEEDS_DARK_ON_TINT.has(tint) ? '#1d1d1f' : '#fff'

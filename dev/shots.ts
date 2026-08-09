@@ -37,6 +37,7 @@ import { columnsToPx, layoutFromBox, rowsToPx } from '../src/core/size'
 import type { LovelaceCard, LovelaceCardConfig } from '../src/core/types/ha'
 import { deviceSet } from './battery-devices'
 import {
+  EV_CHARGER,
   LOUNGE_HUMIDITY,
   LOUNGE_TEMPERATURE,
   PHONE_BATTERY,
@@ -222,9 +223,10 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'complication-bleed-dark',
-    caption: 'medium, dark: full-bleed, the tint fixed to the entity rather than the reading',
+    caption:
+      'medium, dark: full-bleed, the tint reaching the edges of the card, stacked blocks kept apart by the grid gap between them',
     tag: COMPLICATION_CARD_TAG,
-    config: complicationShot([PRESSURE], 'rectangular-bleed'),
+    config: complicationShot([PRESSURE, EV_CHARGER], 'rectangular-bleed'),
     columns: 12,
     rows: 4,
     theme: 'dark',

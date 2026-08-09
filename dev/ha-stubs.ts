@@ -14,6 +14,7 @@ import {
   mdiCellphone,
   mdiDoorbellVideo,
   mdiEye,
+  mdiFlash,
   mdiGauge,
   mdiHeadphones,
   mdiHelpCircleOutline,
@@ -198,13 +199,15 @@ const ICONS: Record<string, string> = {
   // `model.ts`'s `iconFor`: a thermometer, a humidity gauge, a pressure gauge, a washing
   // machine, `number`'s generic glyph, and `mdi:eye` — the fallback `iconFor` itself
   // returns for a domain neither of its tables recognises, which the water tank and the
-  // long-name sensor both fall through to.
+  // long-name sensor both fall through to. `mdi:flash` is `device_class: power`'s own
+  // entry in the same table, for the yellow-tint fixture.
   'mdi:thermometer': mdiThermometer,
   'mdi:water-percent': mdiWaterPercent,
   'mdi:gauge': mdiGauge,
   'mdi:washing-machine': mdiWashingMachine,
   'mdi:ray-vertex': mdiRayVertex,
   'mdi:eye': mdiEye,
+  'mdi:flash': mdiFlash,
 }
 
 /**

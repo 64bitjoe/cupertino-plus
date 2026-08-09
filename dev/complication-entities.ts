@@ -43,6 +43,7 @@ export const TARGET = 'number.demo_target'
 export const WASHING_MACHINE = 'sensor.demo_washing_machine'
 export const LONG_NAME = 'sensor.demo_extremely_long_entity_name'
 export const OFFLINE = 'sensor.demo_offline'
+export const EV_CHARGER = 'sensor.demo_ev_charger_power'
 
 /**
  * The mock installation's entities, one per branch `range.ts`, `tint.ts` and `model.ts` can
@@ -97,6 +98,17 @@ export const COMPLICATION_STATES: readonly HassEntity[] = [
   entity(OFFLINE, 'unavailable', {
     friendly_name: 'Offline sensor',
   }),
+  // yellow — tint.ts's BY_DEVICE_CLASS maps power/current/voltage/illuminance and the
+  // light domain to yellow. None of the branch-chosen states above land there, and
+  // yellow is the one tint whose white-on-tint contrast fails hardest (1.4-1.5:1, see
+  // onTintVar in tint.ts), so it is worth a fixture of its own to reach it in the
+  // showcase and the shipped screenshots rather than leaving it computationally-checked
+  // only.
+  entity(EV_CHARGER, '7200', {
+    friendly_name: 'EV charger power',
+    device_class: 'power',
+    unit_of_measurement: 'W',
+  }),
 ]
 
 /**
@@ -109,7 +121,10 @@ export const COMPLICATION_STATES: readonly HassEntity[] = [
  * to show a card sizing itself up to fit rather than one hiding a device. `word` and
  * `long-name` are this card's two text failure modes: a reading that is not a number, and a
  * name too long to caption. `unavailable` is the card's unhappy path, same as the battery
- * card's `doorbell`.
+ * card's `doorbell`. `yellow` exists for one reason only: it is the single entity in this
+ * file that tints yellow, the worst of the four contrast cases `onTintVar` (`tint.ts`)
+ * routes around — nothing else here carries a `power`/`current`/`voltage`/`illuminance`
+ * device class or sits in the `light` domain.
  */
 export const ENTITY_SETS = {
   gauge: [PHONE_BATTERY],
@@ -126,6 +141,7 @@ export const ENTITY_SETS = {
   word: [WASHING_MACHINE],
   'long-name': [LONG_NAME],
   unavailable: [OFFLINE],
+  yellow: [EV_CHARGER],
 } as const
 
 export type EntitySetName = keyof typeof ENTITY_SETS

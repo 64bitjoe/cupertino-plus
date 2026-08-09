@@ -18,7 +18,7 @@ import {
   type ComplicationEntityConfig,
 } from './model'
 import { DEFAULT_STYLE, isRectangular, type ComplicationStyle } from './style'
-import { tintVar, type TintName } from './tint'
+import { onTintVar, tintVar, type TintName } from './tint'
 
 export const COMPLICATION_CARD_TAG = 'cupertino-widgets-complication'
 
@@ -45,28 +45,6 @@ export interface ComplicationCardConfig extends CupertinoCardConfig {
 
 /** Not localised: HA has no string for it, and the library's own words are its own. */
 const NO_ENTITIES = 'No Entities'
-
-/**
- * White text over the tint, except where the tint is too light for white to sit on.
- *
- * `rectangular-header`'s strip and `rectangular-bleed`'s whole card both paint their
- * content straight onto `item.tint`, which the ring and inline faces never do — there
- * the tint is a thin arc or an icon, not the surface under a paragraph. Checked against
- * WCAG's contrast formula rather than by eye, against both the light and dark value of
- * every tint in `tokens.ts`: white on `--cw-yellow` comes out at 1.4:1 in both themes,
- * which fails even the 3:1 floor a large glyph is held to, and `--cw-orange`,
- * `--cw-green` and `--cw-teal` are not far behind at 2.0–2.6:1. The other six tints —
- * `red` clears 3:1 by a hair, `blue`/`indigo`/`purple`/`pink` clear it comfortably, and
- * `accent` is the theme's own colour and unknowable here — keep white.
- *
- * The four that don't get `#1d1d1f`, a fixed near-black, rather than `var(--cw-label)`:
- * `--cw-label` is white in dark mode, which is exactly the failure this function exists
- * to route around, and unlike the label these four tint values barely move between
- * themes (`--cw-yellow` is #ffcc00 light, #ffd60a dark) — a hue that stays light in both
- * themes needs a fix that stays dark in both themes, not one that tracks the theme.
- */
-const NEEDS_DARK_ON_TINT = new Set<TintName>(['yellow', 'orange', 'green', 'teal'])
-const onTintVar = (tint: TintName): string => (NEEDS_DARK_ON_TINT.has(tint) ? '#1d1d1f' : '#fff')
 
 /**
  * The complication card: any entity, drawn as a watch complication.
@@ -97,6 +75,22 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
         box-sizing: border-box;
         padding: var(--cw-inset);
         display: flex;
+      }
+
+      /* rectangular-bleed only: the tint has to reach the card's own rounded corners, the
+         way the Weather complication it copies does, so this is the one style that draws
+         outside the padding every other style sits inside. The class comes off style
+         itself, same as .grid's own class -- see .cell.rectangular-bleed below for why its
+         border-radius has to change to match once the padding that used to hold it away
+         from the corner is gone.
+
+         layout.ts's floorsFor still charges 2*INSET for every rectangular style, bleed
+         included -- it has no reason to special-case this one. That makes the floor it
+         returns for a bleed card larger than what the CSS actually needs by 2*INSET, the
+         same direction ASSUMED_SECTION_WIDTH already errs in: a generous floor, not a
+         wrong one, so the Layout tab still never offers a box the card does not fit. */
+      ha-card.rectangular-bleed {
+        padding: 0;
       }
 
       .grid {
@@ -391,11 +385,25 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
          from glowing in dark mode, and it is a card-local overlay rather than a change to
          --cw-surface: full-bleed is the one face in the library that replaces the user's
          theme surface with the tint on purpose, and that is a once-per-cell decision this
-         style makes for itself, not something the rest of the card should inherit. */
+         style makes for itself, not something the rest of the card should inherit.
+
+         border-radius: var(--cw-radius), not the inner radius .cell.block set above (this
+         rule wins the tie: same two-class specificity, later in the sheet). --cw-radius-
+         inner is right for a panel that sits inside the card's own padding, which is what
+         every other rectangular face still is; with ha-card's padding removed above, this
+         one block IS the card's face, so its corners have to agree with the outer radius
+         ha-card itself draws with, or the two curves show as a mismatched notch at every
+         corner. Stacked blocks each keep all four corners rounded and stay separated by
+         the grid's own gap between cells (unchanged, still var(--cw-comp-gap)) rather than
+         a card-coloured margin of their own: every block spans full width, so its left and
+         right edges always meet ha-card's, while only the first block's top edge and the
+         last block's bottom edge meet ha-card's top and bottom -- an interior block floats
+         between two gaps, rounded on all four corners like the single-entity case. */
       .cell.rectangular-bleed {
         background-image: linear-gradient(150deg, var(--cw-comp-tint), var(--cw-comp-tint));
         background-color: var(--cw-comp-tint);
         padding: calc(14px * var(--cw-scale));
+        border-radius: var(--cw-radius);
         position: relative;
       }
 
@@ -726,7 +734,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
     )
 
     return html`
-      <ha-card>
+      <ha-card class=${style}>
         <div
           class="grid ${style}"
           style=${`--cw-comp-columns:${pack.columns}; --cw-comp-ring:${pack.ring}px`}

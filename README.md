@@ -40,7 +40,7 @@ Then install **Cupertino Plus** and reload your browser.
 
 ## The cards
 
-Three of them. Each one is in the card picker; none of them needs YAML.
+Four of them. Each one is in the card picker; none of them needs YAML.
 
 ### The calendar
 
@@ -94,19 +94,45 @@ how many rings across, whether there is room for the percentages, and how big to
 
 The rules are in [`docs/battery-widget-rules.md`](docs/battery-widget-rules.md).
 
+### The weather
+
+One entity, and everything else follows from it. Current conditions first, then the next six
+hours starting from right now rather than from whatever hour the forecast happens to begin at,
+and — give the card enough room — the week beyond them, each day drawn as a low, a range bar
+and a high. The bars all share one scale, the width of the whole week rather than of the one
+day under it, so a warm day sits visibly to the right of a cold one instead of every bar
+running the full width of its own row and telling you nothing next to its neighbours.
+
+<p align="center">
+  <img src="docs/images/weather-large.png" width="420"
+       alt="A large weather card: Home reading 78°F and sunny, six hourly columns starting at Now, then seven daily rows each with a low, a coloured range bar and a high, Today's bar carrying a small dot at the live reading">
+</p>
+
+The high and low printed under the current temperature come from the forecast, never from the
+entity's own attributes — there is no such attribute to read — so even the smallest card, which
+draws neither the hourly strip nor the daily list, still holds a subscription open for it. Night
+is mostly a guess the card makes for itself: Home Assistant marks only one condition,
+`clear-night`, as explicitly after dark, so every other glyph's day-or-night choice comes from
+`sun.sun`'s actual position for the current hour and a plain clock for every hour after it,
+because a sun's position is a snapshot and a forecast is not.
+
+The rules, including why the bars are never scaled against themselves, are in
+[`docs/weather-widget-rules.md`](docs/weather-widget-rules.md).
+
 ## Configuring
 
 Every card has a visual editor — add it from the picker and fill in the form. Nobody needs to
 write YAML, and there is no size field in any of them: **Home Assistant's Layout tab owns the
 footprint**, and the card re-lays itself out for whatever box you drag it into.
 
-The three types, if you do want to paste config:
+The four types, if you do want to paste config:
 
 | Card         | Type                                 | Asks for                          |
 | ------------ | ------------------------------------ | --------------------------------- |
 | Calendar     | `custom:cupertino-plus-calendar`     | nothing — it finds your calendars |
 | Complication | `custom:cupertino-plus-complication` | entities, and a style             |
 | Battery      | `custom:cupertino-plus-battery`      | which battery sensors             |
+| Weather      | `custom:cupertino-plus-weather`      | one weather entity                |
 
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.

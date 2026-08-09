@@ -23,7 +23,16 @@
  *    gallery while nothing fed them; they come off `todo` entities now, so a shot led by
  *    them would be advertising a feature the card has. It still applies to anything else
  *    the fixtures can draw and the card cannot yet fill.
- *  - **Only the two footprints**, 6×4 and 12×4. See `Shot.columns` below.
+ *  - **Only the two footprints**, 6×4 and 12×4 — with one deliberate exception. Every
+ *    card up to the weather one only ever draws `small` or `medium`, both of which fit
+ *    inside 4 rows, so those were the only two shapes worth a picture. The weather card's
+ *    `large` layout (`core/size.ts`'s `LARGE_HEIGHT_THRESHOLD`) needs a box taller than 4
+ *    rows can ever measure — no combination of 6×4/12×4 can reach it — so `Shot.rows`
+ *    also allows `8`, purely for that one layout. It is still not a free-for-all: 7 rows
+ *    is already tall enough to cross the threshold, but `packFor` only fits 6 daily rows
+ *    in it; `8` is the shortest count that fits every day of a seven-day fixture, which is
+ *    the shape worth showing — the whole point of this shot is a full week's worth of
+ *    bars next to each other.
  */
 
 import '../src/index'
@@ -32,7 +41,12 @@ import './shots.css'
 
 import type { LitElement } from 'lit'
 
-import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG, COMPLICATION_CARD_TAG } from '../src/index'
+import {
+  BATTERY_CARD_TAG,
+  CALENDAR_CARD_TAG,
+  COMPLICATION_CARD_TAG,
+  WEATHER_CARD_TAG,
+} from '../src/index'
 import { columnsToPx, layoutFromBox, rowsToPx } from '../src/core/size'
 import type { LovelaceCard, LovelaceCardConfig } from '../src/core/types/ha'
 import { deviceSet } from './battery-devices'
@@ -46,6 +60,7 @@ import {
 } from './complication-entities'
 import { defineHaStubs } from './ha-stubs'
 import { createMockHass } from './mock-hass'
+import { WEATHER_CABIN, WEATHER_HOME } from './weather-fixtures'
 
 defineHaStubs()
 
@@ -90,7 +105,8 @@ interface Shot {
    * and let the Layout tab be discovered as the thing that also permits the rest.
    */
   columns: 6 | 12
-  rows: 4
+  /** See the module comment: `8` exists only for the weather card's `large` layout. */
+  rows: 4 | 8
   theme: 'light' | 'dark'
 }
 
@@ -111,6 +127,8 @@ const complicationShot = (
   entities: readonly string[],
   style: string,
 ): Partial<LovelaceCardConfig> => ({ entities: [...entities], style })
+
+const weatherShot = (entityId: string): Partial<LovelaceCardConfig> => ({ entity: entityId })
 
 const SHOTS: readonly Shot[] = [
   {
@@ -229,6 +247,42 @@ const SHOTS: readonly Shot[] = [
     config: complicationShot([PRESSURE, EV_CHARGER], 'rectangular-bleed'),
     columns: 12,
     rows: 4,
+    theme: 'dark',
+  },
+  {
+    name: 'weather-small',
+    caption: 'small: current conditions, and the day’s high and low underneath',
+    tag: WEATHER_CARD_TAG,
+    config: weatherShot(WEATHER_HOME),
+    columns: 6,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'weather-medium',
+    caption: 'medium: the hourly strip added underneath, starting at Now',
+    tag: WEATHER_CARD_TAG,
+    config: weatherShot(WEATHER_HOME),
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'weather-large',
+    caption: 'large: the week below, every bar sharing one scale',
+    tag: WEATHER_CARD_TAG,
+    config: weatherShot(WEATHER_HOME),
+    columns: 12,
+    rows: 8,
+    theme: 'light',
+  },
+  {
+    name: 'weather-dark',
+    caption: 'large, dark: a flat week, still drawing a bar and a dot on every row',
+    tag: WEATHER_CARD_TAG,
+    config: weatherShot(WEATHER_CABIN),
+    columns: 12,
+    rows: 8,
     theme: 'dark',
   },
 ]

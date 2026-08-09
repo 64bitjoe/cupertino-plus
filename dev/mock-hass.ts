@@ -1,6 +1,11 @@
 import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
 import { BATTERY_STATES } from './battery-devices'
 import { COMPLICATION_STATES } from './complication-entities'
+import {
+  WEATHER_DAILY_FORECASTS,
+  WEATHER_HOURLY_FORECASTS,
+  WEATHER_STATES,
+} from './weather-fixtures'
 
 /**
  * A `hass` object good enough to develop cards against.
@@ -66,6 +71,10 @@ const STATES: Record<string, HassEntity> = {
   ...Object.fromEntries(BATTERY_STATES.map(one => [one.entity_id, one])),
   // The complication card's entities; see `complication-entities.ts`, wired in the same way.
   ...Object.fromEntries(COMPLICATION_STATES.map(one => [one.entity_id, one])),
+  // The weather card's entities; see `weather-fixtures.ts`. Its forecasts are not states
+  // at all — they arrive over `weather/subscribe_forecast`, answered below alongside the
+  // calendar and to-do subscriptions.
+  ...Object.fromEntries(WEATHER_STATES.map(one => [one.entity_id, one])),
 }
 
 /**
@@ -281,6 +290,18 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
           // `items: []` for a list nobody wrote fixtures for, never `items: null`; the real
           // handler maps over `todo_items or []`, so there is no null case to imitate.
           queueMicrotask(() => callback({ items: WIRE_TODOS[entityId]?.() ?? [] } as never))
+        }
+
+        // The weather card's own subscription — see `cards/weather/source.ts`. Answered
+        // the same way the calendar's is: asynchronously, and with `forecast: []` for any
+        // entity/kind combination nobody wrote a fixture for, never `forecast: null` (the
+        // card's own `ForecastPush` type treats the two as equivalent, but `[]` is what a
+        // real installation with nothing to report sends).
+        if (message.type === 'weather/subscribe_forecast') {
+          const entityId = String(message.entity_id)
+          const forecasts =
+            message.forecast_type === 'hourly' ? WEATHER_HOURLY_FORECASTS : WEATHER_DAILY_FORECASTS
+          queueMicrotask(() => callback({ forecast: forecasts[entityId]?.() ?? [] } as never))
         }
 
         return async () => {

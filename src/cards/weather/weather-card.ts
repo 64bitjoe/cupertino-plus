@@ -53,6 +53,16 @@ const RANGE_DASH = '—'
  * own: holding the two live subscriptions open for exactly as long as this element is on
  * the dashboard pointed at exactly this entity, and not a moment longer — see
  * `_resubscribe`.
+ *
+ * Every glyph here is drawn with `<ha-svg-icon .path=…>`, not `<ha-icon .icon=…>` the
+ * way the battery and complication cards draw theirs. That is not a stylistic choice:
+ * `condition.ts`'s icons are `@mdi/js` path constants the card computes for itself from a
+ * `condition` string, never a name off `attributes.icon` for Home Assistant's own
+ * registry to resolve — exactly the "inlined path" case `docs/ha-api-notes.md`'s `ha-icon`
+ * section names as the reason to reach for `ha-svg-icon` instead. `.icon` expects a name
+ * (`"mdi:weather-sunny"`) and resolves it asynchronously out of an icon cache; handing it
+ * a raw path string the way an earlier draft of this file did resolves nothing; `.path`
+ * is what actually takes one.
  */
 class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
   static override styles: CSSResultGroup = [
@@ -540,7 +550,7 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
           hour => html`
             <div class="hour">
               <span class="hour-label">${hour.label}</span>
-              <ha-icon class="hour-glyph" .icon=${hour.icon}></ha-icon>
+              <ha-svg-icon class="hour-glyph" .path=${hour.icon}></ha-svg-icon>
               <span class="hour-temp">${hour.temperature}</span>
             </div>
           `,
@@ -605,7 +615,7 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
               : null
           return html`
             <span class="day-label">${day.label}</span>
-            <ha-icon class="day-glyph" .icon=${day.icon}></ha-icon>
+            <ha-svg-icon class="day-glyph" .path=${day.icon}></ha-svg-icon>
             <span class="day-low">${day.lowLabel}</span>
             <div class="day-bar">
               <div
@@ -667,7 +677,7 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
           @keydown=${this._activate(entityId)}
         >
           <div class="now ${view.unavailable ? 'unknown' : ''}">
-            <ha-icon class="glyph" .icon=${view.now.icon}></ha-icon>
+            <ha-svg-icon class="glyph" .path=${view.now.icon}></ha-svg-icon>
             <div class="location cw-truncate">${view.now.location}</div>
             <div class="temperature">${view.now.temperature}</div>
             <div class="detail cw-truncate">${this._detailLine(view.now)}</div>

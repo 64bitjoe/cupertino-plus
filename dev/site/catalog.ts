@@ -13,7 +13,13 @@
  * applied last precisely because it must never end up in that YAML.
  */
 
-import { mdiBatteryHigh, mdiCalendarMonth, mdiFormatListChecks, mdiGaugeLow } from '@mdi/js'
+import {
+  mdiBatteryHigh,
+  mdiCalendarMonth,
+  mdiFormatListChecks,
+  mdiGaugeLow,
+  mdiWeatherPartlyCloudy,
+} from '@mdi/js'
 
 import { DEMO_SCENARIOS, DEFAULT_DEMO_SCENARIO } from '../../src/cards/calendar/demo-data'
 import {
@@ -22,9 +28,15 @@ import {
   STYLE_LABELS,
   type ComplicationStyle,
 } from '../../src/cards/complication/style'
-import { BATTERY_CARD_TAG, CALENDAR_CARD_TAG, COMPLICATION_CARD_TAG } from '../../src/index'
+import {
+  BATTERY_CARD_TAG,
+  CALENDAR_CARD_TAG,
+  COMPLICATION_CARD_TAG,
+  WEATHER_CARD_TAG,
+} from '../../src/index'
 import { DEFAULT_DEVICE_SET, DEVICE_SETS, deviceSet } from '../battery-devices'
 import { DEFAULT_ENTITY_SET, ENTITY_SETS, entitySet } from '../complication-entities'
+import { DEFAULT_WEATHER_SET, WEATHER_SETS, weatherEntity } from '../weather-fixtures'
 import {
   DEFAULT_SCALE,
   MAX_SCALE,
@@ -329,7 +341,57 @@ const complication: Widget = {
   },
 }
 
-export const WIDGETS: readonly Widget[] = [calendar, battery, complication]
+/**
+ * Readable names for the weather sets, each naming the branch it lands on rather than
+ * the place it pretends to be — the same rule `ENTITY_LABELS`/`DEVICE_LABELS` follow.
+ */
+const WEATHER_LABELS: Record<string, string> = {
+  'full-week': 'A full week: real spread across the bars',
+  'flat-week': 'A flat week: same low and high, every day',
+  'daily-only': 'Daily forecast only: no hourly strip',
+  night: 'A night-time reading',
+  unavailable: 'Not reporting',
+}
+
+const weather: Widget = {
+  id: 'weather',
+  name: 'Weather',
+  tagline: 'Now, the next few hours, and the week that follows them.',
+  icon: mdiWeatherPartlyCloudy,
+  tag: WEATHER_CARD_TAG,
+
+  props: [
+    {
+      kind: 'select',
+      name: 'set',
+      label: 'Forecast',
+      description: 'A mock weather entity, chosen for the branch each one lands on.',
+      group: 'card',
+      options: Object.keys(WEATHER_SETS).map(value => ({
+        value,
+        label: WEATHER_LABELS[value] ?? titleCase(value),
+      })),
+      initial: DEFAULT_WEATHER_SET,
+    },
+  ],
+
+  /**
+   * In the **Card** group and printed in the Config pane, the same reasoning as the
+   * battery and complication cards' own `toConfig`: this card has no fixtures either —
+   * everything it draws comes off `hass.states` and a live forecast subscription, so the
+   * YAML above the control is the config that produced what is on screen. `entity` is the
+   * mock installation's, which is the one thing a visitor has to substitute for their own.
+   */
+  toConfig(args) {
+    return { entity: weatherEntity(readString(args, 'set', DEFAULT_WEATHER_SET)) }
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+export const WIDGETS: readonly Widget[] = [calendar, battery, complication, weather]
 
 export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => w.id === id)
 

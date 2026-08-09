@@ -10,9 +10,14 @@ import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { registerCard } from '../../core/register'
+import type { LovelaceCardEditor } from '../../core/types/ha'
 import { packFor, spanFor, weekRange, type Span } from './layout'
 import { readWeather, type WeatherDay, type WeatherHour, type WeatherNow } from './model'
 import { subscribeForecast, supportsForecast, type ForecastItem, type ForecastKind } from './source'
+// Imported for the side effect as well as the constant: the editor tag has to be
+// defined by the time getConfigElement is asked for it, and this is the only thing
+// that reaches it.
+import { WEATHER_EDITOR_TAG } from './weather-card-editor'
 
 export const WEATHER_CARD_TAG = 'cupertino-plus-weather'
 
@@ -316,11 +321,13 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
     return { type: `custom:${WEATHER_CARD_TAG}` }
   }
 
-  // getConfigElement arrives in Task 8. A card with none loses its Visibility and
-  // Layout tabs too (see the calendar card's note on that contract), so the interim
-  // cost is real, but a stub editor standing in for one that does not exist yet would
-  // be dead code wearing the shape of a later task — the same call the complication
-  // card's brief made before its own editor existed.
+  /**
+   * A card with no editor loses its **Visibility** and **Layout** tabs too — the tab strip
+   * is rendered only inside the GUI branch. See the contract on `CupertinoCardEditor`.
+   */
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement(WEATHER_EDITOR_TAG) as LovelaceCardEditor
+  }
 
   /** The two live forecast pushes, kept as plain arrays for `readWeather` to fold in. */
   @state() private _daily: ForecastItem[] = []

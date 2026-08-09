@@ -19,7 +19,7 @@ const { version } = JSON.parse(readFileSync('./package.json', 'utf8')) as { vers
  * licence actually asks for: the offer has to lead to the source of *this* binary, and
  * upstream does not carry these modifications.
  */
-const LICENCE_BANNER = `/*! cupertino-widgets v${version} | Copyright (C) 2026 Kirill Verenih | Modifications Copyright (C) 2026 Joe Speakman | AGPL-3.0-only | Source: https://github.com/64bitjoe/cupertino-widgets */`
+const LICENCE_BANNER = `/*! cupertino-plus v${version} | Copyright (C) 2026 Kirill Verenih | Modifications Copyright (C) 2026 Joe Speakman | AGPL-3.0-only | Source: https://github.com/64bitjoe/cupertino-plus */`
 
 /**
  * Where the showcase site is served from, as a URL path.
@@ -30,7 +30,7 @@ const LICENCE_BANNER = `/*! cupertino-widgets v${version} | Copyright (C) 2026 K
  *
  *     SITE_BASE=/ pnpm build:site
  */
-const SITE_BASE = process.env.SITE_BASE ?? '/cupertino-widgets/'
+const SITE_BASE = process.env.SITE_BASE ?? '/cupertino-plus/'
 
 /**
  * Three jobs, one config:
@@ -81,7 +81,7 @@ export default defineConfig(({ command, mode }) => {
             entry: 'src/index.ts',
             formats: ['es'],
             // Fixed name: it is baked into every user's dashboard resource URL.
-            fileName: () => 'cupertino-widgets.js',
+            fileName: () => 'cupertino-plus.js',
           },
           rollupOptions: {
             output: { banner: LICENCE_BANNER },

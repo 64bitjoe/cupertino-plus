@@ -28,14 +28,14 @@
 import { readFile, writeFile } from 'node:fs/promises'
 
 const CONFIG = new URL('./ha-config/configuration.yaml', import.meta.url)
-const RESOURCE = /(cupertino-widgets\.js\?v=)(\d+)/
+const RESOURCE = /(cupertino-plus\.js\?v=)(\d+)/
 
 const yaml = await readFile(CONFIG, 'utf8')
 const match = RESOURCE.exec(yaml)
 
 if (!match) {
   console.error(
-    'Could not find `cupertino-widgets.js?v=<n>` in dev/ha-config/configuration.yaml.\n' +
+    'Could not find `cupertino-plus.js?v=<n>` in dev/ha-config/configuration.yaml.\n' +
       'If the resource URL was reshaped, teach this script the new form: silently not\n' +
       'bumping would hand you a stale card with nothing to say so.',
   )

@@ -1,7 +1,7 @@
 name: Pages
 
 # Publishes the showcase site (dev/index.html, built by `pnpm build:site`) to
-# https://64bitjoe.github.io/cupertino-widgets/
+# https://64bitjoe.github.io/cupertino-plus/
 #
 # One manual step before the first run: in Settings -> Pages, set Source to
 # "GitHub Actions". Without it `deploy-pages` fails with a 404 on an environment

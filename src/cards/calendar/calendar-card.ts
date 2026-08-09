@@ -24,7 +24,7 @@ import { itemTarget, type CalendarItem } from './model'
 import { CalendarFeed, calendarsFor, subscriptionWindow } from './source'
 import { TodoFeed, remindersEnabled, todoListsFor } from './todo-source'
 
-export const CALENDAR_CARD_TAG = 'cupertino-widgets-calendar'
+export const CALENDAR_CARD_TAG = 'cupertino-plus-calendar'
 
 export interface CalendarCardConfig extends CupertinoCardConfig {
   /** Calendar entities to show. Empty/absent means "every calendar", decided at render. */

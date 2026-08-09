@@ -112,7 +112,7 @@ lovelace:
   # explicitly also survives 2026.8, which drops the fallback to `mode`.
   resource_mode: yaml
   resources:
-    # ./dist is bind-mounted to /config/www/cupertino-widgets by docker-compose,
+    # ./dist is bind-mounted to /config/www/cupertino-plus by docker-compose,
     # so `pnpm watch` output is served straight from here.
     #
     # The `?v=` is load-bearing, and a hard reload is not a substitute for bumping it.
@@ -131,5 +131,5 @@ lovelace:
     # empty directory and serving 404 for a bundle that is sitting right there on the
     # host. `ha:up` force-recreates, which re-resolves the mount. Same failure the README
     # warns about for `rm -rf dist`, reached by a different route.
-    - url: /local/cupertino-widgets/cupertino-widgets.js?v=16
+    - url: /local/cupertino-plus/cupertino-plus.js?v=16
       type: module

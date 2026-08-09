@@ -35,5 +35,5 @@ jobs:
         # HACS downloads `filename` from hacs.json out of the release assets.
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/cupertino-widgets.js
+          files: dist/cupertino-plus.js
           generate_release_notes: true

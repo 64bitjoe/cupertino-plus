@@ -10,7 +10,7 @@ import './device-list-editor'
 import type { DevicesChangedDetail } from './device-list-editor'
 import { deviceConfigs } from './model'
 
-export const BATTERY_EDITOR_TAG = 'cupertino-widgets-battery-editor'
+export const BATTERY_EDITOR_TAG = 'cupertino-plus-battery-editor'
 
 /**
  * The battery card's visual editor: the device list, then the **Scale** every card shares.
@@ -47,11 +47,11 @@ class CupertinoBatteryCardEditor extends CupertinoCardEditor<BatteryCardConfig> 
     // are part of the template rather than values in it: `<${TAG}>` does not compile. The
     // constant beside it is what `defineElement` was given, and the two have to agree.
     return html`
-      <cupertino-widgets-battery-devices
+      <cupertino-plus-battery-devices
         .hass=${this.hass}
         .devices=${deviceConfigs(this._config.entities)}
         @devices-changed=${this._devicesChanged}
-      ></cupertino-widgets-battery-devices>
+      ></cupertino-plus-battery-devices>
     `
   }
 

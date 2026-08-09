@@ -23,7 +23,7 @@ line of a megabyte. For a wide window, ask python for a fixed slice instead, wit
 around the match at all:
 
 ```bash
-docker exec cupertino-widgets-ha python3 -c "
+docker exec cupertino-plus-ha python3 -c "
 import re, glob
 for p in glob.glob('/usr/local/lib/python3.*/site-packages/hass_frontend/frontend_latest/*.js'):
     s = open(p, encoding='utf8', errors='replace').read()
@@ -523,7 +523,7 @@ holding this up:
 
 ```bash
 # -i is required: without it docker does not forward the heredoc to python's stdin.
-docker exec -i cupertino-widgets-ha python3 - <<'PY'
+docker exec -i cupertino-plus-ha python3 - <<'PY'
 import re, glob, os
 D = "/usr/local/lib/python3.14/site-packages/hass_frontend/frontend_latest"
 files = [p for p in glob.glob(D + "/*.js") if not p.endswith((".map", ".br", ".gz"))]
@@ -1129,7 +1129,7 @@ to be installed separately... migrate to transformWithOxc instead.`
 
 ```ts
 build: {
-  lib: { entry: 'src/…', formats: ['es'], fileName: () => 'cupertino-widgets.js' },
+  lib: { entry: 'src/…', formats: ['es'], fileName: () => 'cupertino-plus.js' },
   codeSplitting: false,
   minify: 'oxc',
   target: 'es2022',
@@ -1157,8 +1157,8 @@ decorators; it is the path with zero friction across TS 7 + Vite 8 + Lit 3.
 
 ## Dev-loop plumbing, proven end to end
 
-Host `./dist` -> container `/config/www/cupertino-widgets/` -> served at
-`/local/cupertino-widgets/cupertino-widgets.js`, **HTTP 200 verified with curl**.
+Host `./dist` -> container `/config/www/cupertino-plus/` -> served at
+`/local/cupertino-plus/cupertino-plus.js`, **HTTP 200 verified with curl**.
 
 Caveat found: HA serves `/local/` with `Cache-Control: public, max-age=2678400`
 (31 days). Combined with the fact that `customElements.define` cannot re-register an
@@ -1231,7 +1231,7 @@ in `components/lovelace/const.py`), independent of the dashboard `mode`:
 lovelace:
   resource_mode: yaml # resource pinned declaratively
   resources:
-    - url: /local/cupertino-widgets/cupertino-widgets.js
+    - url: /local/cupertino-plus/cupertino-plus.js
       type: module
 ```
 

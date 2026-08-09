@@ -7,7 +7,7 @@ import { watchedIds } from './model'
 import { COMPLICATION_STYLES, DEFAULT_STYLE, STYLE_LABELS } from './style'
 import { TINTS } from './tint'
 
-export const COMPLICATION_EDITOR_TAG = 'cupertino-widgets-complication-editor'
+export const COMPLICATION_EDITOR_TAG = 'cupertino-plus-complication-editor'
 
 const capitalise = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1)
 

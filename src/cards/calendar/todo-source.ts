@@ -318,7 +318,7 @@ export class TodoFeed {
       // `invalid_entity_id` for a list that is not there, which is what a config pointing
       // at a deleted list looks like. It costs that list's rows and nothing else.
       if (this._live.get(entityId)?.token === token) this._live.delete(entityId)
-      console.warn(`[cupertino-widgets] cannot read ${entityId}`, error)
+      console.warn(`[cupertino-plus] cannot read ${entityId}`, error)
     }
   }
 

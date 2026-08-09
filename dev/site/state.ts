@@ -52,7 +52,7 @@ const seed = (controls: readonly Control[]): Record<string, ArgValue> =>
 
 // ---- Theme ---------------------------------------------------------------------
 
-const THEME_KEY = 'cupertino-widgets:theme'
+const THEME_KEY = 'cupertino-plus:theme'
 
 /**
  * Whatever the visitor chose last time, or what their system is set to.

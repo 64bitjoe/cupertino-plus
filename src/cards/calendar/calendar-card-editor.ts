@@ -5,7 +5,7 @@ import type { CalendarCardConfig } from './calendar-card'
 import { TIME_FORMAT_OPTIONS } from './datetime'
 import { remindersEnabled } from './todo-source'
 
-export const CALENDAR_EDITOR_TAG = 'cupertino-widgets-calendar-editor'
+export const CALENDAR_EDITOR_TAG = 'cupertino-plus-calendar-editor'
 
 /**
  * Partly localised: Home Assistant has a translated string for the calendar list (its own

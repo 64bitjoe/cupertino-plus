@@ -44,7 +44,7 @@ import {
 
 defineHaStubs()
 
-const REPO = 'https://github.com/64bitjoe/cupertino-widgets'
+const REPO = 'https://github.com/64bitjoe/cupertino-plus'
 
 /**
  * Links out, not routes.

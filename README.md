@@ -1,4 +1,4 @@
-# Cupertino Widgets
+# Cupertino Plus
 
 Widget cards for [Home Assistant](https://www.home-assistant.io/) dashboards, styled like the
 ones on a phone's home screen: sensible defaults instead of a config to fill in, and a shape
@@ -7,8 +7,8 @@ taken from the box you drag them into rather than from a size setting.
 **[Install](#install)** · **[The cards](#the-cards)** · **[Configuring](#configuring)** ·
 **[Development](docs/development.md)**
 
-[![CI status](https://github.com/64bitjoe/cupertino-widgets/actions/workflows/ci.yml/badge.svg)](https://github.com/64bitjoe/cupertino-widgets/actions/workflows/ci.yml)
-[![License: AGPL-3.0](https://img.shields.io/github/license/64bitjoe/cupertino-widgets)](./LICENSE)
+[![CI status](https://github.com/64bitjoe/cupertino-plus/actions/workflows/ci.yml/badge.svg)](https://github.com/64bitjoe/cupertino-plus/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/github/license/64bitjoe/cupertino-plus)](./LICENSE)
 [![Home Assistant 2026.7+](https://img.shields.io/badge/Home%20Assistant-2026.7%2B-41BDF5?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
 
 > **A fork.** This is a fork of
@@ -25,17 +25,17 @@ APIs rather than carrying compatibility shims.
 **HACS.** Add this repository as a custom repository of type **Dashboard**:
 
 ```
-https://github.com/64bitjoe/cupertino-widgets
+https://github.com/64bitjoe/cupertino-plus
 ```
 
-Then install **Cupertino Widgets** and reload your browser.
+Then install **Cupertino Plus** and reload your browser.
 
-**Manually.** Download `cupertino-widgets.js` from the
-[latest release](https://github.com/64bitjoe/cupertino-widgets/releases), drop it in
+**Manually.** Download `cupertino-plus.js` from the
+[latest release](https://github.com/64bitjoe/cupertino-plus/releases), drop it in
 `config/www/`, and add it under **Settings → Dashboards → Resources** as a JavaScript module:
 
 ```
-/local/cupertino-widgets.js
+/local/cupertino-plus.js
 ```
 
 ## The cards
@@ -102,11 +102,11 @@ footprint**, and the card re-lays itself out for whatever box you drag it into.
 
 The three types, if you do want to paste config:
 
-| Card         | Type                                    | Asks for                          |
-| ------------ | --------------------------------------- | --------------------------------- |
-| Calendar     | `custom:cupertino-widgets-calendar`     | nothing — it finds your calendars |
-| Complication | `custom:cupertino-widgets-complication` | entities, and a style             |
-| Battery      | `custom:cupertino-widgets-battery`      | which battery sensors             |
+| Card         | Type                                 | Asks for                          |
+| ------------ | ------------------------------------ | --------------------------------- |
+| Calendar     | `custom:cupertino-plus-calendar`     | nothing — it finds your calendars |
+| Complication | `custom:cupertino-plus-complication` | entities, and a style             |
+| Battery      | `custom:cupertino-plus-battery`      | which battery sensors             |
 
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.

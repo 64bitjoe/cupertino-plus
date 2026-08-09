@@ -1,5 +1,5 @@
 {
-  "name": "cupertino-widgets",
+  "name": "cupertino-plus",
   "version": "1.3.2",
   "private": true,
   "type": "module",
@@ -7,10 +7,10 @@
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/64bitjoe/cupertino-widgets.git"
+    "url": "git+https://github.com/64bitjoe/cupertino-plus.git"
   },
-  "homepage": "https://github.com/64bitjoe/cupertino-widgets",
-  "bugs": "https://github.com/64bitjoe/cupertino-widgets/issues",
+  "homepage": "https://github.com/64bitjoe/cupertino-plus",
+  "bugs": "https://github.com/64bitjoe/cupertino-plus/issues",
   "packageManager": "pnpm@10.11.0",
   "engines": {
     "node": ">=22"

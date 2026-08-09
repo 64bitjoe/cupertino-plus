@@ -20,7 +20,7 @@ import {
 import { DEFAULT_STYLE, isRectangular, type ComplicationStyle } from './style'
 import { onTintVar, tintVar, type TintName } from './tint'
 
-export const COMPLICATION_CARD_TAG = 'cupertino-widgets-complication'
+export const COMPLICATION_CARD_TAG = 'cupertino-plus-complication'
 
 export interface ComplicationCardConfig extends CupertinoCardConfig {
   /**

@@ -1,6 +1,6 @@
 {
-  "name": "Cupertino Widgets",
-  "filename": "cupertino-widgets.js",
+  "name": "Cupertino Plus",
+  "filename": "cupertino-plus.js",
   "render_readme": true,
   "homeassistant": "2026.7.0"
 }

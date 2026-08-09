@@ -456,7 +456,7 @@ export class CalendarFeed {
         if (chosen) this._colors.set(entityId, chosen)
       }
     } catch (error) {
-      console.debug('[cupertino-widgets] no calendar colours from the registry', error)
+      console.debug('[cupertino-plus] no calendar colours from the registry', error)
     }
   }
 
@@ -499,7 +499,7 @@ export class CalendarFeed {
       // did work; a config pointing at a deleted calendar should cost that calendar's
       // rows and nothing else.
       if (this._live.get(entityId)?.token === token) this._live.delete(entityId)
-      console.warn(`[cupertino-widgets] cannot read ${entityId}`, error)
+      console.warn(`[cupertino-plus] cannot read ${entityId}`, error)
     }
   }
 
@@ -519,7 +519,7 @@ export class CalendarFeed {
       // failed to fetch. Not an error frame, and not the end of the subscription: the
       // next poll may well succeed, so the calendar is emptied rather than forgotten.
       this._snapshots.set(entityId, [])
-      console.warn(`[cupertino-widgets] ${entityId} could not be read by Home Assistant`)
+      console.warn(`[cupertino-plus] ${entityId} could not be read by Home Assistant`)
       this._publish()
       return
     }

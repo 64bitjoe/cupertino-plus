@@ -57,7 +57,7 @@ import {
   type BatteryDeviceConfig,
 } from './model'
 
-export const BATTERY_DEVICES_TAG = 'cupertino-widgets-battery-devices'
+export const BATTERY_DEVICES_TAG = 'cupertino-plus-battery-devices'
 
 /** The event this element reports with. The detail is the whole list, in order. */
 export interface DevicesChangedDetail {

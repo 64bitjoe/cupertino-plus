@@ -32,7 +32,7 @@ jobs:
         # Home Assistant loads the file directly, so a leftover bare import would
         # 404 at runtime rather than at build time.
         run: |
-          if grep -qE "(^|[;[:space:]])import[^;]*from[\"'][^./]" dist/cupertino-widgets.js; then
+          if grep -qE "(^|[;[:space:]])import[^;]*from[\"'][^./]" dist/cupertino-plus.js; then
             echo "::error::dist bundle contains an unresolved external import"
             exit 1
           fi

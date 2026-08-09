@@ -8,7 +8,7 @@ declare global {
   }
 }
 
-const REPO_URL = 'https://github.com/64bitjoe/cupertino-widgets'
+const REPO_URL = 'https://github.com/64bitjoe/cupertino-plus'
 
 /**
  * Define one custom element, tolerating a bundle that has already been loaded once.
@@ -24,7 +24,7 @@ const REPO_URL = 'https://github.com/64bitjoe/cupertino-widgets'
 export function defineElement(tag: string, ctor: CustomElementConstructor): boolean {
   if (customElements.get(tag)) {
     console.warn(
-      `[cupertino-widgets] <${tag}> is already defined, skipping. ` +
+      `[cupertino-plus] <${tag}> is already defined, skipping. ` +
         'The bundle is probably loaded twice; check your dashboard resources.',
     )
     return false
@@ -61,7 +61,7 @@ export function printBanner(): void {
   if (bannerShown) return
   bannerShown = true
   console.info(
-    `%c Cupertino Widgets %c ${VERSION} `,
+    `%c Cupertino Plus %c ${VERSION} `,
     'background:#0a84ff;color:#fff;border-radius:3px 0 0 3px;padding:1px 6px;font-weight:600',
     'background:#3a3a3c;color:#fff;border-radius:0 3px 3px 0;padding:1px 6px',
   )

@@ -12,7 +12,7 @@ pnpm test         # the layout rules, as unit tests
 ## The showcase
 
 `pnpm dev` serves the same page that is published at
-[64bitjoe.github.io/cupertino-widgets](https://64bitjoe.github.io/cupertino-widgets/), with
+[64bitjoe.github.io/cupertino-plus](https://64bitjoe.github.io/cupertino-plus/), with
 full HMR: every card against a mock `hass` object, in a box the sections grid would have
 given it. This is the fast loop.
 
@@ -261,8 +261,8 @@ const host = document.createElement('div')
 host.style.cssText = 'display:grid;height:184px;width:600px;overflow:hidden'
 document.body.append(host)
 
-const card = document.createElement('cupertino-widgets-calendar')
-card.setConfig({ type: 'cupertino-widgets-calendar', scale: 80, demo_scenario: 'default' })
+const card = document.createElement('cupertino-plus-calendar')
+card.setConfig({ type: 'cupertino-plus-calendar', scale: 80, demo_scenario: 'default' })
 host.append(card)
 card.hass = existingCard.hass
 

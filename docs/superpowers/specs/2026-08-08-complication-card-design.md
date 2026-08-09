@@ -191,7 +191,7 @@ Derived, and only where the range is real:
 | `cover` (`current_position`)                                                  | 0–100                                     |
 | `light` (`brightness`)                                                        | 0–255, presented as %                     |
 | `number` / `input_number`                                                     | the entity's own `min` / `max` attributes |
-| `climate` current temperature                                                 | `min_temp` / `max_temp` attributes        |
+| `climate` current temperature                                                 | **none** — see below                      |
 | anything else                                                                 | **none** — no arc, no bar                 |
 
 The `climate` row is the one I am least sure of and it is called out for review in §10.
@@ -199,10 +199,11 @@ Everything else is a range the integration itself asserts.
 
 ### Colour
 
-From `device_class` first, then domain, to a small named palette of Apple's system colours
-added to `theme/tokens.ts` as `--cw-tint-*`. Each token bridges to a Home Assistant theme
-variable where a sensible one exists, then falls back to the Apple value — the rule
-`tokens.ts` already sets for every other colour in the library.
+From `device_class` first, then domain, to the palette `theme/tokens.ts` already carries:
+`--cw-red`, `--cw-orange`, `--cw-yellow`, `--cw-green`, `--cw-blue`, `--cw-indigo`,
+`--cw-purple`, `--cw-pink` and `--cw-accent`, each already given an Apple value per
+appearance. Only `--cw-teal` is missing and gets added. No new token layer: a second
+palette that had to agree with the first is a way to get it wrong.
 
 `TintName` is exactly that palette and nothing wider: `red`, `orange`, `yellow`, `green`,
 `teal`, `blue`, `indigo`, `pink`, `accent`. A closed set rather than a free colour value,
@@ -226,16 +227,24 @@ The colour is fixed per entity and does not move with the reading. See decision 
 
 ### Icon
 
-Generic entities need generic icons, and the library cannot inline an MDI path for every
-domain the way the battery card inlines one bolt. So this card uses Home Assistant's own
-`<ha-state-icon>`, which resolves the entity's icon exactly as the rest of the frontend does
-— including a user's custom icon and any state-dependent icon a domain defines. A
-config-supplied `icon` is inlined from `@mdi/js` as elsewhere.
+The model always answers with an `mdi:` name, and `<ha-icon>` draws it — the element the
+battery card already uses, which needs no import dance and resolves whatever name a user put
+in `attributes.icon`. The chain is: the config's `icon`, then the entity's own
+`attributes.icon`, then a small table keyed on `device_class` and then domain, then
+`mdi:eye` as the mark that means "something, unspecified".
 
-This is a deliberate departure from the battery card's "nothing waits on the icon registry"
-note, and the trade is worth stating: correctness for arbitrary entities is worth a frame of
-icon-registry latency, and the alternative is a lookup table that is wrong for somebody on
-day one.
+`<ha-state-icon>` was the first answer and is the more obviously correct one — it resolves an
+entity's icon exactly as the rest of the frontend does. Two things ruled it out. The dev
+harness has no stub for it (`dev/ha-stubs.ts` stubs `ha-icon` and `ha-svg-icon` only), so the
+showcase would draw nothing and the one place this card gets looked at properly would be
+blind. And its state-dependent resolution is the wrong behaviour here for the reason the
+battery card's own icon note gives: `mdi:battery-70` restates the number the ring has already
+drawn, at a coarser resolution, which is the same mistake as a colour that moves with the
+reading.
+
+The cost is a lookup table that will be missing somebody's device class on day one. That is
+a table anybody can extend in one line, and `attributes.icon` is ahead of it in the chain for
+everybody who has set one.
 
 ## 6. Layout and sizing
 
@@ -309,9 +318,10 @@ Unit tests, in the style already established (`layout.test.ts`, `model.test.ts`)
 
 ## 10. Assumptions flagged for review
 
-1. **`climate` gauge range.** Drawing current temperature against `min_temp`/`max_temp`
-   gives an arc that is nearly always mid-scale and barely moves. It may be better to draw no
-   gauge for `climate` and let the user set `min`/`max`. Leaning towards dropping it.
+1. ~~**`climate` gauge range.**~~ **Resolved: `climate` gets no derived range.** Drawing a
+   current temperature against a thermostat's own `min_temp`/`max_temp` gives an arc that sits
+   mid-scale and barely moves, which is a gauge that says nothing. `min`/`max` are how somebody
+   who wants one gets it. Pinned by a test in the implementation plan.
 2. **`getGridOptions()` recomputation.** The floors depend on config, so HA must re-query
    after a config change for decision 6 to hold in the editor. If it does not, the floors are
    still correct on load and the fallback is to shrink to fit rather than to add an overflow

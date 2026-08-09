@@ -166,10 +166,27 @@ const columnsFor = (px: number): number => {
   return GRID_COLUMNS
 }
 
-/** The fewest whole grid rows whose height covers `px`, floored at 1. */
+/**
+ * The fewest whole grid rows whose height covers `px`, floored at 1 — and, unlike
+ * `columnsFor`, not capped.
+ *
+ * `columnsFor`'s cap at `GRID_COLUMNS` is safe because 12 is a real ceiling: a section is
+ * never wider than its own 12 columns, so no `px` this module ever asks it to cover can
+ * exceed what column 12 provides. Rows have no such ceiling. `core/size.ts` sets no maximum
+ * row count — a section simply keeps scrolling — and this card's own entity list is
+ * uncapped by design (`model.ts`'s `readComplications` never drops one, the way the battery
+ * card's four-device cap does). A `for (r = 1; r < N; r++)` with a hardcoded fallback would
+ * silently under-report the floor the moment a config's content needed more than N rows,
+ * which is exactly the bug this function used to have: it returned a bare `12` for any `px`
+ * past `rowsToPx(11)`, with nothing checking that 12 rows actually covered it. Unbounded
+ * instead, so the postcondition — `rowsToPx(rowsFor(px)) >= px` — holds for every `px`, not
+ * just the ones a test happened to try. It still terminates: `rowsToPx` is strictly
+ * increasing in `r`, so the loop always finds one.
+ */
 const rowsFor = (px: number): number => {
-  for (let r = 1; r < 12; r++) if (rowsToPx(r) >= px) return r
-  return 12
+  let r = 1
+  while (rowsToPx(r) < px) r++
+  return r
 }
 
 // ---- Packing ------------------------------------------------------------------

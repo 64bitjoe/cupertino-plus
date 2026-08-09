@@ -105,4 +105,22 @@ describe('floorsFor', () => {
   it('treats no entities as one, so an unconfigured card still has a shape', () => {
     expect(floorsFor('circular', 0)).toEqual(floorsFor('circular', 1))
   })
+
+  /**
+   * Regression: `rowsFor` used to search `r = 1..11` and fall back to a bare `12` with
+   * nothing checking that 12 rows actually covered the content — safe for `columnsFor`,
+   * where 12 is a real ceiling (a section has no more than 12 columns), but there is no
+   * such ceiling on rows, and this card's entity list is uncapped by design. Seven
+   * rectangular blocks is a perfectly ordinary config, and it already needs more than 12.
+   *
+   * Worked by hand: `content = n * RECT_BLOCK + (n - 1) * GAP + 2 * INSET
+   * = 7*104 + 6*14 + 32 = 728 + 84 + 32 = 844` design units. `rowsToPx(12) = 12*56 + 11*8
+   * = 672 + 88 = 760`, which is 84 short — nearly a whole `RECT_BLOCK` — so 12 rows is not
+   * enough and the old code was silently wrong here. `rowsToPx(13) = 728 + 96 = 824` is
+   * still short; `rowsToPx(14) = 784 + 104 = 888` is the first row count that covers 844,
+   * so `min_rows: 14` is the correct floor.
+   */
+  it('keeps asking for more rows past the old hardcoded ceiling', () => {
+    expect(floorsFor('rectangular', 7)).toEqual({ min_columns: 6, min_rows: 14 })
+  })
 })

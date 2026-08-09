@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
+import type { WidgetLayout } from '../../core/size'
 import { RING_MAX, RING_MIN, gridFor, type Box } from './layout'
 
 /**
- * The two footprints the rings were laid out for, in the box a section of the usual ~500px
- * gives them: 6 columns is a ~246px square, 12 is the 2:1. Both 4 rows tall.
+ * The three footprints the rings were laid out for, in the box a section of the usual
+ * ~500px gives them: 6 columns is a ~246px square, 12 is the 2:1, and `large` is that same
+ * 2:1 dragged to twice its default height rather than a shape of its own.
  */
 const SMALL: Box = { width: 246, height: 248 }
 const MEDIUM: Box = { width: 500, height: 248 }
+const LARGE: Box = { width: 500, height: 512 }
 
 /** The shortest and the narrowest the Layout tab hands out: `min_rows` / `min_columns`. */
 const SHORT: Box = { width: 246, height: 184 }
@@ -18,7 +21,7 @@ const TALL: Box = { width: 246, height: 456 }
 const TALL_WIDE: Box = { width: 500, height: 456 }
 
 /** The shape a reader would see: the view, the grid, and how much of the list survived it. */
-const shape = (mode: 'small' | 'medium', count: number, box: Box, scale = 1): string => {
+const shape = (mode: WidgetLayout, count: number, box: Box, scale = 1): string => {
   const grid = gridFor(mode, count, box, scale)
   return `${grid.view} ${grid.columns}×${grid.rows}, ${grid.visible} of ${count}`
 }
@@ -50,8 +53,8 @@ describe('the reference table', () => {
    *
    * The wide card in particular never stacks a second row: 4 + 2 fits perfectly well and
    * reads as a card that ran out of something, where one row of four reads as the widget it
-   * is. Six devices are still worth configuring; they are for the `large` footprint, which
-   * is the one with two rows of four to give them.
+   * is. Six devices are still worth configuring: the `large` footprint below is the one
+   * with two rows of four to give them.
    */
   it('draws four and no more, however many devices are configured', () => {
     expect(shape('small', 5, SMALL)).toBe('compact 2×2, 4 of 5')
@@ -59,6 +62,24 @@ describe('the reference table', () => {
     expect(shape('medium', 5, MEDIUM)).toBe('labeled 4×1, 4 of 5')
     expect(shape('medium', 6, MEDIUM)).toBe('labeled 4×1, 4 of 6')
     expect(shape('medium', 9, MEDIUM)).toBe('labeled 4×1, 4 of 9')
+  })
+
+  /**
+   * `large` is the footprint the six-device case above was always waiting for: the same
+   * 500px width as medium, dragged to twice its default height, so the second row that
+   * medium refuses to stack finally has somewhere to go.
+   *
+   * `compact` rather than `labeled` at five and up, and that is the caption rule doing
+   * exactly what it does at medium: `labeled` requires `visible <= columns` (4), and eight
+   * rings over two rows of four is not one row, so the percentages come off the same way
+   * a fifth device takes them off medium.
+   */
+  it('gives the large footprint two rows of four, which is what six devices were waiting for', () => {
+    expect(shape('large', 5, LARGE)).toBe('compact 4×2, 5 of 5')
+    expect(shape('large', 6, LARGE)).toBe('compact 4×2, 6 of 6')
+    expect(shape('large', 8, LARGE)).toBe('compact 4×2, 8 of 8')
+    // Still capped: nine devices is not a reason to grow a third row.
+    expect(shape('large', 9, LARGE)).toBe('compact 4×2, 8 of 9')
   })
 
   /**

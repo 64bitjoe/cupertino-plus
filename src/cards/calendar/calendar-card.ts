@@ -19,7 +19,7 @@ import { demoItems } from './demo-data'
 import { LOOKAHEAD_DAYS, buildFlow } from './flow'
 import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
 import type { FormatContext, ItemTime, TimeToken } from './format'
-import { geometryFor, packFlow, type LayoutColumn, type LayoutRow } from './layout'
+import { geometryFor, packFlow, type LayoutColumn, type LayoutMode, type LayoutRow } from './layout'
 import { itemTarget, type CalendarItem } from './model'
 import { CalendarFeed, calendarsFor, subscriptionWindow } from './source'
 import { TodoFeed, remindersEnabled, todoListsFor } from './todo-source'
@@ -720,7 +720,12 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     const { locale, hour12 } = timePreferences(this.hass?.locale, this._config.time_format)
     const ctx: FormatContext = { locale, timeZone: this._timeZone, hour12 }
 
-    const mode = this.cwLayout
+    // The calendar still has two shapes, not three: `large` is a `medium` grown downwards
+    // rather than a column count of its own (see `core/size.ts`), and `geometryFor` already
+    // answers a taller box on `this.boxHeight` alone. Folding it into `medium` here is that
+    // fact stated once rather than a third case threaded through this card's own layout for
+    // no drawing that would differ from what `medium` already does with the extra height.
+    const mode: LayoutMode = this.cwLayout === 'small' ? 'small' : 'medium'
     const fixtures = this._fixtures
     // One pile, and `buildFlow` sorts it: events and reminders share a stream rather than
     // being drawn in sections of their own (§2). The fixtures already hold both.

@@ -212,7 +212,7 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    */
   private _applyLayout(): void {
     this.cwLayout = this._measuredWidth
-      ? layoutFromBox(this._measuredWidth, this.scaleFactor)
+      ? layoutFromBox(this._measuredWidth, this._measuredHeight, this.scaleFactor)
       : DEFAULT_LAYOUT
   }
 

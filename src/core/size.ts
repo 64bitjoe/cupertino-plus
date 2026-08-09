@@ -15,7 +15,7 @@ import type { LovelaceGridOptions } from './types/ha'
  * So: Home Assistant owns the footprint, this file owns the arithmetic, and the layout
  * is a consequence of the box rather than a thing the user is asked about twice.
  */
-export const WIDGET_LAYOUTS = ['small', 'medium'] as const
+export const WIDGET_LAYOUTS = ['small', 'medium', 'large'] as const
 export type WidgetLayout = (typeof WIDGET_LAYOUTS)[number]
 
 /**
@@ -135,17 +135,33 @@ export const DEFAULT_WIDTH = 500
 export const LAYOUT_THRESHOLD = 340
 
 /**
+ * The measured height, in design units, at which a wide card becomes `large`.
+ *
+ * 380 is six grid rows (`rowsToPx(6)` is 376, and a card is never asked to be exact),
+ * against the four a card defaults to. That gap is the point: `large` has to be a size
+ * somebody deliberately dragged to, not one they land in by nudging an edge, or every
+ * medium card in a roomy section would quietly become a different card.
+ *
+ * Height only decides `large`. It does not decide `small` versus `medium`, which stays a
+ * question about width for the reason `LAYOUT_THRESHOLD` gives: two columns of content
+ * need width before their type stops truncating, and no amount of height supplies it.
+ */
+export const LARGE_HEIGHT_THRESHOLD = 380
+
+/**
  * Which layout to render, given the box the card actually ended up in.
  *
- * Only width decides. The two layouts differ in how many columns of content they hold,
- * not in how tall they are; height feeds the row budgets instead, so a card dragged
- * taller shows more rows rather than changing shape.
+ * Width still decides `small` from `medium`, and height is what promotes a `medium` to
+ * `large`. Both are compared in design units rather than pixels, for the reason the width
+ * threshold already gives: draw the type 30% larger and a box that was just big enough is
+ * not any more.
  *
- * `scale` is the factor from `config.scale`, and the threshold is compared against the
- * width in design units rather than in pixels, which is the only reading of it that
- * stays true. The threshold is a statement about type: two columns of event rows need so
- * much room before every title truncates. Draw that type 20% larger and the room they
- * need grows with it, so a card that was just wide enough is not any more.
+ * `large` is deliberately not reachable from a narrow box however tall it is. A tall
+ * narrow card is a column, which is a different shape rather than a bigger one, and a card
+ * that answered `large` there would be asked to draw a wide arrangement in a space that
+ * cannot hold it.
  */
-export const layoutFromBox = (width: number, scale = 1): WidgetLayout =>
-  width / scale < LAYOUT_THRESHOLD ? 'small' : 'medium'
+export const layoutFromBox = (width: number, height: number, scale = 1): WidgetLayout => {
+  if (width / scale < LAYOUT_THRESHOLD) return 'small'
+  return height / scale >= LARGE_HEIGHT_THRESHOLD ? 'large' : 'medium'
+}

@@ -306,7 +306,7 @@ for (const shot of SHOTS) {
     // Stated rather than read back, so a card that never reaches it is a failed run
     // instead of a screenshot of the wrong layout. `layoutFromBox` is pure, so the
     // answer is knowable before the card has measured anything.
-    layout: layoutFromBox(width),
+    layout: layoutFromBox(width, height),
     name: shot.name,
     box: { width, height },
   })

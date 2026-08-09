@@ -95,29 +95,35 @@ export const RING_MIN = 40
  * Rings across, from the layout the measured width implies.
  *
  * Two and four rather than a number worked out from the width, and that is the same choice
- * `core/size.ts` makes for the whole library: there are two shapes, the square and the 2:1,
- * and a third column count arriving somewhere between them would be a shape nobody
- * designed. What the in-between footprints get instead is a ring that grows with the box.
+ * `core/size.ts` makes for the whole library: there are two column counts, the square and
+ * the 2:1, and a third arriving somewhere between them would be a shape nobody designed.
+ * `large` is the 2:1 grown downwards rather than sideways, so it shares medium's four
+ * rather than earning a column count of its own; what changes for it is the row cap below.
+ * What the in-between footprints get instead of a third count is a ring that grows with
+ * the box.
  */
-const COLUMNS: Record<WidgetLayout, number> = { small: 2, medium: 4 }
+const COLUMNS: Record<WidgetLayout, number> = { small: 2, medium: 4, large: 4 }
 
 /**
  * Rings down, and it is a cap on the shape rather than on the height.
  *
- * Four devices is what either of these two footprints draws, and that number is the design
- * rather than an arithmetic consequence: the square holds its 2 × 2, and the wide card holds
- * one row of four and does **not** stack a second under it. A wide card with 4 + 2 fits
- * perfectly well and looks wrong: a full row with a stub centred beneath it reads as a card
- * that ran out of something, where one row of four reads as the widget it is.
+ * Four devices is what small and medium draw, and that number is the design rather than an
+ * arithmetic consequence: the square holds its 2 × 2, and the wide card holds one row of
+ * four and does **not** stack a second under it. A wide card with 4 + 2 fits perfectly well
+ * and looks wrong: a full row with a stub centred beneath it reads as a card that ran out of
+ * something, where one row of four reads as the widget it is.
  *
- * So a config may name six devices and see four. That is deliberate and it is not the end of
- * the story: the six exist for a `large` footprint, which is the one that has two rows of
- * four to give them, and which will arrive here as a third entry in this record.
+ * `large` is the exception, and it is the reason six devices were ever worth configuring: it
+ * is a medium grown downwards rather than sideways, so the second row it gained is exactly
+ * where a second row of four belongs, without the stub problem a wide card has. Two rows of
+ * four is the cap there, not because eight is a round number, but because a third row would
+ * repeat the same argument that stops medium at one: a card that keeps growing a grid every
+ * time it is given more devices is a table, not a widget.
  *
  * The other direction (fewer rows than this when the box is too short for them) is still
  * the measurement's call, below.
  */
-const MAX_ROWS: Record<WidgetLayout, number> = { small: 2, medium: 1 }
+const MAX_ROWS: Record<WidgetLayout, number> = { small: 2, medium: 1, large: 2 }
 
 export type BatteryView = 'labeled' | 'compact'
 

@@ -64,12 +64,19 @@ describe('the bounds', () => {
   const SECTION = 500
   const SMALL = Math.round(columnsToPx(6, SECTION))
   const MEDIUM = Math.round(columnsToPx(12, SECTION))
+  /**
+   * The default footprint's height (4 rows), held constant through this file's whole
+   * range of scale so that these tests stay about the width threshold they were written
+   * for. Neither box crosses into `large` at it: 248 design units at MIN_SCALE is still
+   * under `LARGE_HEIGHT_THRESHOLD`, and `large` is not this describe block's question.
+   */
+  const HEIGHT = 248
 
   it('leaves the two designed footprints in their own layouts, end to end', () => {
     for (let percent = MIN_SCALE; percent <= MAX_SCALE; percent += 1) {
       const factor = scaleFactor(percent)
-      expect(layoutFromBox(SMALL, factor)).toBe('small')
-      expect(layoutFromBox(MEDIUM, factor)).toBe('medium')
+      expect(layoutFromBox(SMALL, HEIGHT, factor)).toBe('small')
+      expect(layoutFromBox(MEDIUM, HEIGHT, factor)).toBe('medium')
     }
   })
 
@@ -77,7 +84,7 @@ describe('the bounds', () => {
     // The floor has ~7 points of margin on it. This is the check that it is margin
     // against something real: keep going down and the 6 × 4 square turns into two
     // narrow columns, which is the reason MIN_SCALE exists.
-    expect(layoutFromBox(SMALL, scaleFactor(MIN_SCALE) - 0.1)).toBe('medium')
+    expect(layoutFromBox(SMALL, HEIGHT, scaleFactor(MIN_SCALE) - 0.1)).toBe('medium')
   })
 
   it('brackets the default rather than starting at it', () => {

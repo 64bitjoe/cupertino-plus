@@ -120,6 +120,16 @@ const HEADER = 160
  * units of breathing room above and below it — a list of six or more of these rows reads
  * as cramped without it, where the hourly strip gets away with none because it is a single
  * row rather than a stack of them.
+ *
+ * **Reconciled against real CSS, unlike when this comment was first written** (see the
+ * module comment's own note on `HEADER`/`DAY_ROW` being reasoned estimates until Task 6/7
+ * existed to check them against): `weather-card.ts`'s `.daily > *` rule gives every cell
+ * in a row `min-height: calc(28px * var(--cw-scale))`, so the 24-unit glyph centred inside
+ * it by `align-items: center` gets exactly the two units of breathing room above and below
+ * this comment already claimed — 24 + 2 + 2 = 28, built to match rather than measured
+ * after the fact, and correct for the same reason `HEADER`'s reconciliation was: nothing
+ * in that row is taller than the glyph, so the row's content never asks for more than the
+ * height this constant already promises `packFor` it would take.
  */
 const DAY_ROW = 28
 

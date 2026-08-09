@@ -75,6 +75,9 @@ describe('readWeather', () => {
     // Not "75 °F", not "24°C" (a Celsius conversion nothing here should ever perform) —
     // the entity's own unit string, tight against the numeral.
     expect(view?.now.temperature).toBe('75°F')
+    // The raw number behind that label, for Task 7's range-bar dot — not reconstructed
+    // from the formatted string, read straight off the same attribute.
+    expect(view?.now.temperatureValue).toBe(75)
   })
 
   it("reads a daily entry's temperature as the HIGH and templow as the LOW", () => {
@@ -225,6 +228,7 @@ describe('readWeather', () => {
 
     expect(view?.unavailable).toBe(true)
     expect(view?.now.temperature).toBe('—')
+    expect(view?.now.temperatureValue).toBeNull()
   })
 
   it('labels today\'s daily row "Today" and later rows by weekday', () => {

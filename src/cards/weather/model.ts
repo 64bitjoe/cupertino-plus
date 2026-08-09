@@ -46,6 +46,16 @@ export interface WeatherNow {
   location: string
   /** Formatted, unit included. An em dash when the entity has no numeric reading. */
   temperature: string
+  /**
+   * The same reading as `temperature`, unformatted. Carried for the same reason
+   * `WeatherDay.low`/`.high` are carried alongside their own labels: Task 7's range bar
+   * places today's current reading as a dot on the week's shared scale, which needs a
+   * number to compare against `weekRange`'s `{ min, max }`, and parsing the degree glyph
+   * back off `temperature` would tie the card's arithmetic to whatever punctuation
+   * `Intl.NumberFormat` happened to choose for the viewer's locale. `null` exactly when
+   * `temperature` is the dash — no numeric attribute to read.
+   */
+  temperatureValue: number | null
   condition: string
   /** An MDI path. */
   icon: string
@@ -292,6 +302,7 @@ export const readWeather = (
     location: entity.attributes.friendly_name ?? entity.entity_id,
     temperature:
       currentTemperature !== null ? formatTemperature(hass, currentTemperature, unit) : VALUE_DASH,
+    temperatureValue: currentTemperature,
     condition: conditionLabel(entity.state),
     icon: conditionIcon(entity.state, nightNow),
     high: today ? formatTemperature(hass, today.temperature, unit) : null,

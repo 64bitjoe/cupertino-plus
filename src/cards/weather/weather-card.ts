@@ -10,8 +10,8 @@ import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { registerCard } from '../../core/register'
-import { packFor } from './layout'
-import { readWeather, type WeatherHour, type WeatherNow } from './model'
+import { packFor, spanFor, weekRange, type Span } from './layout'
+import { readWeather, type WeatherDay, type WeatherHour, type WeatherNow } from './model'
 import { subscribeForecast, supportsForecast, type ForecastItem, type ForecastKind } from './source'
 
 export const WEATHER_CARD_TAG = 'cupertino-plus-weather'
@@ -36,21 +36,18 @@ const NO_ENTITY = 'No Entity'
 const RANGE_DASH = '—'
 
 /**
- * The weather widget: current conditions, and — at `medium` and `large` — the six-hour
- * strip beneath it.
+ * The weather widget: current conditions, the six-hour strip at `medium` and `large`, and
+ * — at `large` only — the daily rows underneath it.
  *
  * `model.ts` is where a Home Assistant `weather` entity and its two forecast
  * subscriptions become the one shape this class draws (`WeatherView`); `layout.ts` prices
- * how much of that shape a `medium`/`large` box has room for; `source.ts` is the socket
- * underneath. This class's own job, on top of measuring the box and drawing the answer
- * the way every sibling card does, is the one thing none of those three files can own:
- * holding the two live subscriptions open for exactly as long as this element is on the
- * dashboard pointed at exactly this entity, and not a moment longer — see `_resubscribe`.
- *
- * **`small` and `medium` only.** The daily list `large` grows into is Task 7's markup, and
- * this class's `render` simply does not call it yet: at `large` today it draws the same
- * header block `medium` does, the way `calendar-card.ts`'s own `render` folds `large`
- * into `medium`'s two-column flow rather than giving it a third arrangement of its own.
+ * how much of that shape a `medium`/`large` box has room for and carries the range-bar
+ * arithmetic (`weekRange`/`spanFor`) this class calls but does not own; `source.ts` is the
+ * socket underneath. This class's own job, on top of measuring the box and drawing the
+ * answer the way every sibling card does, is the one thing none of those three files can
+ * own: holding the two live subscriptions open for exactly as long as this element is on
+ * the dashboard pointed at exactly this entity, and not a moment longer — see
+ * `_resubscribe`.
  */
 class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
   static override styles: CSSResultGroup = [
@@ -183,6 +180,124 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
         font: var(--cw-text-footnote);
         color: var(--cw-label);
         font-variant-numeric: tabular-nums;
+      }
+
+      /* ---- Daily rows: large only ---------------------------------------------------- */
+
+      /* One CSS grid rather than a stack of five-column flex rows: a grid's column tracks
+         are sized once, across every row that feeds into them, so "Wed"/"Today"'s label
+         column and the low/high columns line up down the whole list for free. Each day
+         below contributes five direct children (label, glyph, low, bar, high) rather than
+         one wrapper element per row — 'display: contents' would do the same, but skipping
+         the wrapper entirely means there is no extra box whose own margins or line-height
+         could quietly add height DAY_ROW doesn't know about. 'auto' on every column but
+         the bar's lets the grid size label/glyph/low/high to their own content instead of
+         a guessed pixel width, which is one fewer number this file has to keep in sync
+         with layout.ts; only the bar column, '1fr', has to be told to take what's left,
+         since it is the one column with no intrinsic content width of its own to measure.
+         'align-items: center' centres every cell — text and icon alike — within whatever
+         height 'min-height' below gives its row. */
+      .daily {
+        display: grid;
+        grid-template-columns: auto auto auto 1fr auto;
+        column-gap: var(--cw-space-2);
+        /* Matches layout.ts's GAP (12, same constant the module comment says this rhythm
+           and the section-to-section gap above share) — the space between one day and
+           the next, not a number restated here. */
+        row-gap: var(--cw-space-3);
+        align-items: center;
+        min-width: 0;
+      }
+
+      /* Every direct child of .daily is one of the five per-row cells, so a single rule
+         here is what turns layout.ts's DAY_ROW (28) from an estimate into the row height
+         this stylesheet actually draws: a 24-unit glyph (.day-glyph below) centred by
+         'align-items: center' inside a 28-unit-tall track leaves exactly two units of
+         breathing room above and below it, which is the arithmetic DAY_ROW's own comment
+         already gives. Every other cell in the row (label, low, bar, high) is shorter than
+         24 units at --cw-text-footnote's 18px line-height, so the glyph — not the text —
+         is what actually sets the row's height; giving every cell the same 'min-height'
+         rather than only the glyph's is what makes that height computed and not depend on
+         the accident of the icon being the tallest cell. */
+      .daily > * {
+        min-height: calc(28px * var(--cw-scale));
+      }
+
+      .day-label {
+        font: var(--cw-text-footnote);
+        color: var(--cw-label);
+      }
+
+      .day-glyph {
+        --mdc-icon-size: calc(24px * var(--cw-scale));
+        color: var(--cw-label-secondary);
+        justify-self: center;
+      }
+
+      .day-low {
+        font: var(--cw-text-footnote);
+        color: var(--cw-label-secondary);
+        font-variant-numeric: tabular-nums;
+        /* Right-aligned so the reading sits flush against the bar's cold end, the way the
+           reference does — "L" and the bar's own left edge read as one unit. */
+        text-align: right;
+      }
+
+      .day-high {
+        font: var(--cw-text-footnote);
+        color: var(--cw-label);
+        font-variant-numeric: tabular-nums;
+        text-align: left;
+      }
+
+      .day-bar {
+        position: relative;
+        height: calc(6px * var(--cw-scale));
+        border-radius: var(--cw-radius-pill);
+        background: var(--cw-track);
+        /* A floor under the one column with no content of its own to hold it open: the
+           four 'auto' columns beside it are sized by their text/icon, but the track is
+           '1fr' and would go to 0 rather than negative if a narrow card and a long
+           locale's weekday name both crowded it at once. A judgement call, the same kind
+           layout.ts's own FLOOR_WIDTH is, not a number with a --cw-* twin. */
+        min-width: calc(40px * var(--cw-scale));
+      }
+
+      .day-bar-fill {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        border-radius: var(--cw-radius-pill);
+        /* A gradient, not a solid tint, because this bar is the one place in the card that
+           encodes two numbers at once rather than one: its left end is the day's low, its
+           right end is the day's high, and only a colour that itself changes across the
+           span can carry both without a second glance at the numerals either side of it.
+           Cool to warm — --cw-blue through --cw-yellow to --cw-orange — reads the
+           same way a real thermometer does, and reuses the palette every other card in
+           this library already draws from rather than adding a token that exists solely
+           for this one bar. */
+        background: linear-gradient(to right, var(--cw-blue), var(--cw-yellow), var(--cw-orange));
+      }
+
+      /* Today's current reading, placed on the same week-wide scale the bar itself is —
+         see the class comment on _dailyDot. Centred on its 'left' percentage by a
+         negative margin equal to half its own size rather than 'transform:
+         translateX(-50%)', so it composes with the 'left' percentage _renderDaily already
+         sets inline without a second transform fighting it. The ring is the card's own
+         surface colour rather than a plain border, which is what keeps the dot legible
+         sitting on top of every colour the gradient underneath it passes through, warm or
+         cool. */
+      .day-bar-dot {
+        position: absolute;
+        top: 50%;
+        width: calc(8px * var(--cw-scale));
+        height: calc(8px * var(--cw-scale));
+        margin-top: calc(-4px * var(--cw-scale));
+        margin-left: calc(-4px * var(--cw-scale));
+        border-radius: 50%;
+        background: var(--cw-label);
+        border: calc(2px * var(--cw-scale)) solid var(--cw-surface);
+        box-sizing: border-box;
       }
 
       /* Secondary, not tertiary: with no entity configured this line is the entire
@@ -427,6 +542,82 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
     `
   }
 
+  /**
+   * Where today's live reading sits on `week`'s shared scale — the same 0-to-1 track
+   * fraction `spanFor`'s own `start`/`width` are, so `_renderDaily` can position it with
+   * the identical `left: N%` it gives the bar.
+   *
+   * Deliberately not a call into `spanFor`: that function answers a *span* — a width to
+   * floor and a start to pull back from the track's far edge so the floored width still
+   * fits — and a single point has neither. Writing this out separately means the floor
+   * and clamp logic that exists only for a range's own failure modes never has to be
+   * explained away for a call site that has no width to floor in the first place.
+   *
+   * A flat week (`spread <= 0`, `spanFor`'s own zero-spread guard) resolves to the same
+   * point `spanFor` draws its own floor-width mark at — the track's start — rather than a
+   * hidden dot, so the two marks read as one row making one honest claim: "everything was
+   * this temperature," not "the bar knows something the dot doesn't." A live reading
+   * outside today's forecast low/high (`attributes.temperature` and the daily forecast are
+   * two independent reports and can disagree by a degree) is clamped to the track's own
+   * ends rather than drawn off it.
+   */
+  private _dailyDot(value: number, week: { min: number; max: number }): number {
+    const spread = week.max - week.min
+    if (spread <= 0) return 0
+    return Math.max(0, Math.min(1, (value - week.min) / spread))
+  }
+
+  /**
+   * The daily list: one row per day, all seven (or however many `days` holds) sharing one
+   * scale.
+   *
+   * `weekRange` is called exactly once, here, for the whole list handed in — never inside
+   * the `map` below, and never per day. That is the one thing this method exists to get
+   * right: a `weekRange` call per day would hand `spanFor` a week of exactly one day every
+   * time, and every bar would come back full-width and identical — each individually
+   * "correct" by `spanFor`'s own math, and together telling the reader nothing, which is
+   * the failure `layout.ts`'s module comment names directly. `week` is computed once and
+   * the same object flows into every `spanFor` call below instead.
+   *
+   * Each day contributes five direct children — label, glyph, low, the bar, high — rather
+   * than one wrapping row element; see `.daily`'s own stylesheet comment for why the grid
+   * this renders into depends on that shape.
+   */
+  private _renderDaily(days: WeatherDay[], now: WeatherNow): TemplateResult {
+    const week = weekRange(days)
+    return html`
+      <div class="daily">
+        ${days.map(day => {
+          const span: Span = spanFor(day, week)
+          // Only today's row carries a dot — see the class comment on `_dailyDot` — and
+          // only when there is a live reading to place: an entity that has never posted
+          // `attributes.temperature` has nothing here to draw.
+          const dot =
+            day.label === 'Today' && now.temperatureValue !== null
+              ? this._dailyDot(now.temperatureValue, week)
+              : null
+          return html`
+            <span class="day-label">${day.label}</span>
+            <ha-icon class="day-glyph" .icon=${day.icon}></ha-icon>
+            <span class="day-low">${day.lowLabel}</span>
+            <div class="day-bar">
+              <div
+                class="day-bar-fill"
+                style=${`left:${span.start * 100}%;width:${span.width * 100}%`}
+              ></div>
+              ${
+                dot !== null
+                  ? html`<div class="day-bar-dot" style=${`left:${dot * 100}%`}></div>`
+                  : nothing
+              }
+            </div>
+            <span class="day-high">${day.highLabel}</span>
+          `
+        })}
+      </div>
+    `
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config || !this.hass) return nothing
 
@@ -436,21 +627,23 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
     const view = readWeather(this.hass, entityId, this._daily, this._hourly)
     if (!view) return html`<ha-card><div class="empty">${NO_ENTITY}</div></ha-card>`
 
-    // `large` is not its own arrangement yet — Task 7 draws the daily list beneath this
-    // block — so it gets exactly what `medium` draws, the same fold `calendar-card.ts`'s
-    // own render() makes for the same reason: a large card should not sit on a blank
-    // space where its header ought to be while its own markup is still unwritten.
+    // `medium` and `large` share the header block and the hourly strip; only `large`
+    // grows the daily list underneath them, the same two-way split `calendar-card.ts`'s
+    // own render() makes between its shared flow and a size-specific addition.
     const wide = this.cwLayout !== 'small'
+    const large = this.cwLayout === 'large'
 
-    // `packFor`'s `hours` is fixed at 6 for both `medium` and `large`; its `days` is
-    // Task 7's to read and clamp against `daily.length`, so it is not asked for here —
-    // this card never touches it, at any layout.
     const pack = packFor(
       this.cwLayout,
       { width: this.boxWidth, height: this.boxHeight },
       this.scaleFactor,
     )
     const hours = wide ? view.hours.slice(0, pack.hours) : []
+    // `packFor`'s `days` prices only the box, never the forecast (see its own doc
+    // comment) — this `Math.min` is the clamp that comment hands to this card: a tall
+    // `large` box asking for eight rows from an entity that only forecasts five gets
+    // five, not three undefined ones.
+    const days = large ? view.days.slice(0, Math.min(pack.days, view.days.length)) : []
 
     const label = `${view.now.location}: ${
       view.unavailable ? 'unavailable' : `${view.now.condition}, ${view.now.temperature}`
@@ -473,6 +666,7 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
             <div class="detail cw-truncate">${this._detailLine(view.now)}</div>
           </div>
           ${wide ? this._renderHourly(hours) : nothing}
+          ${large ? this._renderDaily(days, view.now) : nothing}
         </div>
       </ha-card>
     `

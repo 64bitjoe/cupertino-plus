@@ -874,6 +874,57 @@ label reading `Heat` instead of a translated one) rather than a broken card. Re-
 grep above once docker is available and correct the key shape here and in `model.ts` if
 it differs.
 
+## Weather data
+
+### Weather forecasts (NOT VERIFIED — assumed from the frontend's structure)
+
+`cards/weather/source.ts`'s `subscribeForecast` sends:
+
+```js
+hass.connection.subscribeMessage(callback, {
+  type: 'weather/subscribe_forecast',
+  forecast_type: 'daily' | 'hourly',
+  entity_id: entityId,
+})
+```
+
+modelled on the calendar's own `calendar/event/subscribe` shape one section above, on the
+assumption that a weather forecast subscription follows the same `{type, entity_id, ...}`
+convention. The one thing not confirmed against a live socket is the `forecast_type` key
+specifically — whether that is really its name, whether it nests some other way, or
+whether the command is shaped entirely differently.
+
+What **is** established, against a live installation rather than assumed: `weather.
+pirateweather` carries no `forecast` attribute at all, so the state-attribute forecast
+tutorials still describe is gone on a current core; a daily entry carries `temperature`
+(the high) and `templow` (the low), an hourly entry carries `temperature` only and no
+`templow`; and both carry `datetime`, `condition`, `precipitation_probability`,
+`precipitation`, `humidity`, `cloud_coverage`, `uv_index`, `wind_speed`,
+`wind_gust_speed`, `wind_bearing`, `dew_point`, `pressure`. `supported_features` is a
+bitmask, read off the same entity: `1` daily, `2` hourly, `4` twice-daily; the reference
+entity reports `7`, all three.
+
+Not run: this environment has no `docker` binary (`which docker` fails, no daemon to
+reach either), so the grep this project otherwise runs against a live core image could
+not be run for this key. Re-check with:
+
+```bash
+docker run --rm --entrypoint bash ghcr.io/home-assistant/home-assistant:stable -c \
+  'grep -roh -- "weather/subscribe_forecast" /usr/local/lib/python3.*/site-packages/hass_frontend/frontend_latest/*.js | head'
+```
+
+and, for the request schema itself (the calendar section's `cv.entity_domain` equivalent):
+
+```bash
+docker run --rm --entrypoint bash ghcr.io/home-assistant/home-assistant:stable -c \
+  'grep -roh -E ".{0,200}forecast_type.{0,200}" /usr/local/lib/python3.*/site-packages/hass_frontend/frontend_latest/*.js | head'
+```
+
+If the key turns out to be something other than `forecast_type`, or nested differently,
+fix `subscribeForecast` and `source.test.ts` together — the test asserts the exact
+outgoing message, so a wrong key fails loudly there rather than silently on a live
+dashboard.
+
 ## Icons and more-info (VERIFIED)
 
 ### `ha-icon` needs no loading either, same as `ha-form`

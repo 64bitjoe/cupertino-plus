@@ -691,6 +691,10 @@ Call `_resubscribe` from `connectedCallback` and from `setConfig`; call `_unsubs
 
 Both methods return promises that nothing awaits, which is deliberate and worth a comment: a lifecycle callback cannot be async, and there is nothing useful to do with a failure to unsubscribe from a socket that is already going away.
 
+**The sample above guards one race and not another, and the second one is real.** The map is the only "already subscribing" signal, but it is populated _after_ `subscribeForecast` resolves and cleared _before_ `stop()` resolves — so two overlapping calls to `_resubscribe` both see `has(kind)` as false, both open a live subscription, and the second `set` orphans the first for the life of the element. The route that makes this concrete is a DOM move: `disconnectedCallback` clears the map synchronously while leaving the `stop()` promises pending and never resets `_subscribedTo`, so an immediate reconnect skips its own teardown and subscribes again over the top. `calendar-card.ts:472-476` documents DOM moves as a real occurrence in this codebase rather than a hypothetical.
+
+Close it. A generation counter incremented on entry, checked after every await, is the cheapest shape and composes with the torn-down check already there; reserving the map slot with a pending marker before awaiting also works. `_unsubscribeAll` must additionally reset `_subscribedTo`, or a reconnect mistakes itself for an unchanged entity. `CalendarFeed` solved this same problem in this codebase — it is described as built to "survive a reconcile racing its own in-flight subscribe call" — so the answer should read as its sibling rather than as a new invention.
+
 - [ ] **Step 3: Render small**
 
 Location, temperature at `--cw-text-large-title`, the condition glyph, and one line under it. Tap opens the more-info dialog, via the same `hass-more-info` event the other cards fire.

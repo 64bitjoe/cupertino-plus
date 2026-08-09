@@ -220,8 +220,23 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
    * subscriptions deliver into the same fields and whichever message arrives last wins.
    * That failure is intermittent, which is the worst kind — it looks like a flickering
    * forecast rather than like a bug.
+   *
+   * Each slot carries a `token` alongside the eventual `stop`, and that is what closes a
+   * second failure mode the entity check above does not: two `_resubscribe` calls racing
+   * each other — a config edit that leaves the entity unchanged, a rapid layout flip, or a
+   * disconnect immediately followed by a reconnect when the card is moved rather than
+   * removed (`calendar-card.ts`'s own `connectedCallback` documents that move as a real
+   * occurrence, not a hypothetical). `_subscriptions.has(kind)` is the only signal
+   * `_resubscribe` has for "already subscribing", and if that check only went true once
+   * `subscribeForecast` resolved, two overlapping calls would both pass it and both open a
+   * live subscription to the same kind. The token is set synchronously, before that await,
+   * so the second call sees the kind as claimed and skips it — the same reservation
+   * `CalendarFeed._live` makes per calendar in `calendar/source.ts`, and the shape this
+   * follows rather than reinventing. `stop` starts absent and is filled in once the
+   * subscribe resolves; see `_resubscribe`'s own comments for what happens to a slot
+   * that is superseded before or after that point.
    */
-  private _subscriptions = new Map<ForecastKind, () => Promise<void>>()
+  private _subscriptions = new Map<ForecastKind, { token: object; stop?: () => Promise<void> }>()
   // `string | undefined` rather than the bare `?: string` shorthand: `exactOptionalPropertyTypes`
   // treats those as different types, and `_resubscribe` below assigns `entityId` — itself
   // `string | undefined` — straight into this field rather than only ever omitting it.
@@ -244,28 +259,74 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
       if (this._subscriptions.has(kind)) continue
       if (!supportsForecast(entity, kind)) continue
 
-      const stop = await subscribeForecast(this.hass, entity.entity_id, kind, forecast => {
-        if (kind === 'daily') this._daily = forecast
-        else this._hourly = forecast
-      })
+      // Reserved before the subscribe below is awaited, not after — see the class
+      // comment on `_subscriptions` for why the order matters. A second `_resubscribe`
+      // racing this one now finds `has(kind)` true and skips it, the same claim
+      // `CalendarFeed.reconcile` makes on `_live` before its own subscribe calls.
+      const token = {}
+      this._subscriptions.set(kind, { token })
 
-      // The await above is a window: the card can be torn down, or repointed, while it is
-      // open. If that happened, this subscription is already orphaned — close it rather
-      // than filing it under a card that has moved on.
-      if (this._subscribedTo !== entityId || !this.isConnected) {
-        void stop()
-        return
+      let stop: () => Promise<void>
+      try {
+        stop = await subscribeForecast(this.hass, entity.entity_id, kind, forecast => {
+          // A push arriving for a slot this token no longer owns — superseded by a
+          // later `_resubscribe`, or the card has moved on to a different entity — is
+          // dropped rather than applied. Without this, two live subscriptions to the
+          // same kind (an old one on its way out, a new one just opened) would both
+          // write into `_daily`/`_hourly`, and whichever push happened to arrive last
+          // would win: the exact flicker the class comment above warns about. Checked
+          // by identity against the map's current entry rather than against
+          // `_subscribedTo`, because a kind-level race (two calls for the SAME entity)
+          // never touches `_subscribedTo` at all — only the per-kind token moves.
+          if (this._subscriptions.get(kind)?.token !== token) return
+          if (kind === 'daily') this._daily = forecast
+          else this._hourly = forecast
+        })
+      } catch (error) {
+        // Home Assistant refusing the command outright (an entity that stopped
+        // existing between `supportsForecast` and this call, say), not this slot being
+        // superseded — that case is handled below, once there is a `stop` to close.
+        // The reservation still has to be let go here, or a kind that failed once would
+        // read as permanently claimed and never be retried.
+        if (this._subscriptions.get(kind)?.token === token) this._subscriptions.delete(kind)
+        console.warn(
+          `[cupertino-plus] cannot read the ${kind} forecast for ${entity.entity_id}`,
+          error,
+        )
+        continue
       }
-      this._subscriptions.set(kind, stop)
+
+      // The await above is a window: the card can be torn down, repointed at another
+      // entity, or asked to resubscribe again for the same one, while it is open. Any of
+      // those clears or replaces this slot, so if the token reserved above is no longer
+      // the one sitting in the map, this subscription is already orphaned — close it
+      // rather than filing it under a card that has moved on.
+      const slot = this._subscriptions.get(kind)
+      if (slot?.token !== token || !this.isConnected) {
+        void stop()
+        continue
+      }
+      slot.stop = stop
     }
   }
 
   private async _unsubscribeAll(): Promise<void> {
-    const stops = [...this._subscriptions.values()]
+    // Reset before anything below awaits: a reconnect immediately following a
+    // disconnect (the card moved in the DOM rather than removed — see the class comment
+    // on `_subscriptions`) runs its own `_resubscribe` before the `stop()` calls below
+    // have settled, and that call must not read the entity it is tearing down as the one
+    // it is still subscribed to and skip its own teardown on that account.
+    this._subscribedTo = undefined
+    // Captured into a plain array, and only then cleared — a slot still in its
+    // reservation gap (claimed by `_resubscribe` but not yet resolved to a real `stop`)
+    // has nothing here to close; that attempt finds its token missing from the map once
+    // its own await resolves and closes itself then, the same self-check `_resubscribe`
+    // makes for every other way a slot can be superseded.
+    const slots = [...this._subscriptions.values()]
     this._subscriptions.clear()
     this._daily = []
     this._hourly = []
-    await Promise.all(stops.map(stop => stop()))
+    await Promise.all(slots.map(slot => slot.stop?.()))
   }
 
   public override connectedCallback(): void {

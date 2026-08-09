@@ -1306,7 +1306,7 @@ git commit -m "feat: complication packing, and the floors that make overflow unr
 
 **Interfaces:**
 
-- Consumes: `CupertinoCard`, `CupertinoCardConfig` (`core/base-card`); `registerCard` (`core/register`); `RING_BOX`, `RING_RADIUS`, `RING_STROKE`, `RING_CIRCUMFERENCE` (`core/ring`, Task 1); `ComplicationStyle`, `DEFAULT_STYLE`, `isRectangular` (Task 2); `TintName`, `tintVar` (Task 2); `Complication`, `ComplicationEntityConfig`, `readComplications`, `watchedIds` (Task 4); `packFor`, `floorsFor` (Task 5).
+- Consumes: `CupertinoCard`, `CupertinoCardConfig` (`core/base-card`); `registerCard` (`core/register`); `RING_BOX`, `RING_RADIUS`, `RING_STROKE`, `RING_CIRCUMFERENCE` (`core/ring`, Task 1); `ComplicationStyle`, `DEFAULT_STYLE` (Task 2); `TintName`, `tintVar` (Task 2); `Complication`, `ComplicationEntityConfig`, `readComplications`, `watchedIds` (Task 4); `packFor`, `floorsFor` (Task 5).
 - Produces: `COMPLICATION_CARD_TAG = 'cupertino-widgets-complication'`, `interface ComplicationCardConfig` from `complication-card.ts`.
 
 - [ ] **Step 1: Write the card's shell — config, sizing, tap, watched entities**
@@ -1328,7 +1328,7 @@ import {
   type Complication,
   type ComplicationEntityConfig,
 } from './model'
-import { DEFAULT_STYLE, isRectangular, type ComplicationStyle } from './style'
+import { DEFAULT_STYLE, type ComplicationStyle } from './style'
 import { tintVar, type TintName } from './tint'
 
 export const COMPLICATION_CARD_TAG = 'cupertino-widgets-complication'
@@ -1516,12 +1516,11 @@ There is deliberately no `getConfigElement` yet — Task 8 adds it along with th
     labels: boolean,
   ): TemplateResult {
     if (style === 'inline') return this._renderInline(item)
-    if (isRectangular(style)) return this._renderRectangular(style, item)
     return this._renderCircular(item, labels)
   }
 ```
 
-`_renderRectangular` arrives in Task 7. Until then, have it return `this._renderInline(item)` so the file compiles; Task 7 replaces the body.
+Note what is deliberately absent: there is no `_renderRectangular` and no branch to it. Task 7 adds both together. Do NOT write a stub that returns another face — a function whose body is a placeholder is dead code a reviewer is right to reject, and `isRectangular` is imported by Task 7 rather than by this one. Until Task 7 lands, the three rectangular styles fall through to the circular face, which is a working card rather than a broken one.
 
 - [ ] **Step 5: Write the styles for these two faces**
 
@@ -1722,9 +1721,19 @@ git commit -m "feat: the complication card, circular and inline"
 **Interfaces:**
 
 - Consumes: everything Task 6 established.
-- Produces: no new exports; replaces the `_renderRectangular` stub.
+- Produces: no new exports; adds `_renderRectangular` and the `_renderCell` branch that reaches it.
 
-- [ ] **Step 1: Replace the `_renderRectangular` stub**
+- [ ] **Step 1: Add `_renderRectangular`, and the branch to it**
+
+Add `isRectangular` to the import from `./style`, and add the middle line to `_renderCell`:
+
+```ts
+if (style === 'inline') return this._renderInline(item)
+if (isRectangular(style)) return this._renderRectangular(style, item)
+return this._renderCircular(item, labels)
+```
+
+Then the face itself:
 
 ```ts
   /**

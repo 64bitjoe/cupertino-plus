@@ -1,0 +1,108 @@
+import { describe, expect, it } from 'vitest'
+
+import { floorsFor, packFor, type Box } from './layout'
+
+/** The two footprints the library designs for, in a section of the usual ~500px. */
+const SMALL: Box = { width: 246, height: 248 }
+const MEDIUM: Box = { width: 500, height: 248 }
+const TALL: Box = { width: 500, height: 456 }
+
+const shape = (style: Parameters<typeof packFor>[0], count: number, box: Box): string => {
+  const pack = packFor(style, count, box)
+  return `${pack.columns}×${pack.rows}, ring ${pack.ring}, ${pack.labels ? 'labelled' : 'bare'}`
+}
+
+describe('packFor, circular', () => {
+  it('gives one entity the whole card, named', () => {
+    expect(shape('circular', 1, SMALL)).toBe('1×1, ring 96, labelled')
+  })
+
+  it('puts them across before it puts them down', () => {
+    expect(packFor('circular', 2, MEDIUM).columns).toBe(2)
+    expect(packFor('circular', 3, MEDIUM).columns).toBe(3)
+    expect(packFor('circular', 4, MEDIUM).columns).toBe(4)
+  })
+
+  it('wraps once a row would take the rings under the minimum', () => {
+    const pack = packFor('circular', 6, SMALL)
+    expect(pack.columns * pack.rows).toBeGreaterThanOrEqual(6)
+    expect(pack.ring).toBeGreaterThanOrEqual(40)
+  })
+
+  it('drops the names when a cell is too narrow to caption', () => {
+    expect(packFor('circular', 4, SMALL).labels).toBe(false)
+    expect(packFor('circular', 2, MEDIUM).labels).toBe(true)
+  })
+
+  it('never draws a ring outside its bounds', () => {
+    for (const count of [1, 2, 3, 4, 6, 8]) {
+      for (const box of [SMALL, MEDIUM, TALL]) {
+        const { ring } = packFor('circular', count, box)
+        expect(ring).toBeGreaterThanOrEqual(40)
+        expect(ring).toBeLessThanOrEqual(96)
+      }
+    }
+  })
+
+  it('prices the box in design units, so scale moves the answer', () => {
+    expect(packFor('circular', 4, MEDIUM, 1).labels).toBe(true)
+    expect(packFor('circular', 4, MEDIUM, 1.6).labels).toBe(false)
+  })
+})
+
+describe('packFor, the stacking styles', () => {
+  it('stacks rectangular one per row, full width, with no ring', () => {
+    expect(shape('rectangular', 3, MEDIUM)).toBe('1×3, ring 0, labelled')
+    expect(shape('rectangular-header', 2, MEDIUM)).toBe('1×2, ring 0, labelled')
+    expect(shape('rectangular-bleed', 1, MEDIUM)).toBe('1×1, ring 0, labelled')
+  })
+
+  it('stacks inline the same way', () => {
+    expect(shape('inline', 4, MEDIUM)).toBe('1×4, ring 0, labelled')
+  })
+})
+
+/**
+ * The floors are the whole of the overflow story: the Layout tab clamps its sliders to
+ * these, so a card cannot be dragged smaller than the entities it was given.
+ */
+describe('floorsFor', () => {
+  /**
+   * Reference table, worked by hand from `gridColumnsToPx(c) = c * 34.33 + (c - 1) * 8` and
+   * `rowsToPx(r) = r * 56 + (r - 1) * 8`, the same two functions `layout.ts` computes from.
+   * If a case here changes, it should be because the constants above it changed, not because
+   * the number was inconvenient.
+   *
+   * The `circular, 12` case was originally written as `min_rows: 4`. Reconciling it by hand:
+   * at 12 entities, `across = min(12, 4) = 4` and `rows = ceil(12 / 4) = 3`, so the height
+   * needed is `3 * RING_MIN + 2 * GAP + 2 * INSET = 120 + 28 + 32 = 180` design units.
+   * `rowsToPx(3) = 3 * 56 + 2 * 8 = 184`, which already covers 180, so three grid rows are
+   * enough and a fourth is not needed. `rowsFor(180)` returns 3, not 4 — the table's original
+   * 4 was a hand-arithmetic slip, not a property of the geometry, and `packFor` confirms it:
+   * fed a box exactly at `{ columns: 6, rows: 3 }` (246×184px, 212×150 design units inside
+   * the insets), 12 circular entities tile 4×3 with `ring` landing exactly on `RING_MIN`
+   * (40) — tight, but never below the floor. Changed to `min_rows: 3` below.
+   */
+  it('asks for more height as the entities pile up', () => {
+    expect(floorsFor('circular', 1)).toEqual({ min_columns: 4, min_rows: 3 })
+    expect(floorsFor('circular', 4)).toEqual({ min_columns: 6, min_rows: 3 })
+    expect(floorsFor('circular', 8)).toEqual({ min_columns: 6, min_rows: 3 })
+    expect(floorsFor('circular', 12)).toEqual({ min_columns: 6, min_rows: 3 })
+  })
+
+  it('gives the stacking styles a floor per entity', () => {
+    expect(floorsFor('rectangular', 1)).toEqual({ min_columns: 6, min_rows: 3 })
+    expect(floorsFor('rectangular', 2)).toEqual({ min_columns: 6, min_rows: 5 })
+    expect(floorsFor('rectangular', 3)).toEqual({ min_columns: 6, min_rows: 6 })
+  })
+
+  it('lets inline be the shortest card in the library', () => {
+    expect(floorsFor('inline', 1)).toEqual({ min_columns: 6, min_rows: 2 })
+    expect(floorsFor('inline', 2)).toEqual({ min_columns: 6, min_rows: 2 })
+    expect(floorsFor('inline', 4)).toEqual({ min_columns: 6, min_rows: 4 })
+  })
+
+  it('treats no entities as one, so an unconfigured card still has a shape', () => {
+    expect(floorsFor('circular', 0)).toEqual(floorsFor('circular', 1))
+  })
+})

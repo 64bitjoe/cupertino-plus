@@ -387,6 +387,21 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
     const wanted: ForecastKind[] = ['daily']
     if (this.cwLayout !== 'small') wanted.push('hourly')
 
+    // A card dragged down to `small` stops drawing the hourly strip, and the socket behind
+    // it has to go with it. The loop below only ever adds, so `wanted` shrinking is not
+    // something it can notice: without this, a card that spent one moment at `medium` would
+    // hold an hourly subscription open for the rest of its life, pushing forecasts into a
+    // field nothing reads. Deleting the slot is also exactly what a subscribe still in
+    // flight for that kind tests itself against once it resolves (see the token comment
+    // below), so a kind dropped mid-subscribe closes itself rather than opening behind this.
+    for (const [kind, slot] of [...this._subscriptions]) {
+      if (wanted.includes(kind)) continue
+      this._subscriptions.delete(kind)
+      if (kind === 'hourly') this._hourly = []
+      else this._daily = []
+      void slot.stop?.()
+    }
+
     for (const kind of wanted) {
       if (this._subscriptions.has(kind)) continue
       if (!supportsForecast(entity, kind)) continue
@@ -487,10 +502,29 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
    * that crosses the small/medium threshold is not a config change — nothing else calls
    * `_resubscribe` for it. `willUpdate` is where the base card already watches
    * `cwLayout` for exactly this kind of consequence.
+   *
+   * `hass` is in here for a failure that has nothing to do with layout. `_resubscribe` can
+   * only subscribe to an entity that is in `hass.states` and has already declared what it
+   * publishes, and neither is guaranteed at the moment the card is first built: an entity
+   * whose integration has not finished loading is absent from `states` outright, and one
+   * that is `unavailable` is present with its attributes stripped, which `supportsForecast`
+   * reads — correctly, see its own comment — as "publishes nothing". Either way that first
+   * pass subscribes to nothing, and `connectedCallback`/`setConfig` have both already
+   * fired, so without this the card would keep that verdict for as long as it stayed on the
+   * dashboard: current conditions would reappear the moment the entity came back (the base
+   * card repaints on any watched state change) while the forecast behind the H/L line, the
+   * hourly strip and the daily rows never arrived, until a reload or a drag across a layout
+   * threshold happened to call `_resubscribe` again. An HA restart or an integration reload
+   * under a dashboard that is already open is exactly that case. This is the same reason
+   * `calendar-card.ts` reconciles its own feed on `hass` rather than on its config alone.
+   *
+   * Cheap to run this often: `shouldUpdate` has already dropped every `hass` swap that does
+   * not touch a watched entity, and a pass with nothing left to do is one map lookup per
+   * kind.
    */
   protected override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed)
-    if (changed.has('cwLayout')) void this._resubscribe()
+    if (changed.has('cwLayout') || changed.has('hass')) void this._resubscribe()
   }
 
   /**

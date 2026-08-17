@@ -5,7 +5,7 @@ import { isPressable, runAction } from '../../core/actions'
 import { watchedIds } from '../../core/entity-view'
 import { withFloors } from '../../core/floors'
 import { registerCard } from '../../core/register'
-import type { LovelaceGridOptions } from '../../core/types/ha'
+import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { bandFor, floorsFor, rowHeightFor } from './layout'
 import {
   DEFAULT_CONTAINER,
@@ -14,16 +14,11 @@ import {
   type ChipsContainer,
   type ChipView,
 } from './model'
+// Imported for the side effect as well as the constant: the editor tag has to be defined by
+// the time getConfigElement is asked for it, and this is the only thing that reaches it.
+import { CHIPS_EDITOR_TAG } from './chips-card-editor'
 
 export const CHIPS_CARD_TAG = 'cupertino-plus-chips'
-
-// Re-exported so the editor (Task 8) can pull the default as a *value* from this module
-// without a runtime import cycle: it needs `DEFAULT_CONTAINER` to seed the form, and this
-// element will need the editor's own tag once `getConfigElement` exists (see the comment on
-// that below). `complication/style.ts` holds its card's own style constants for the same
-// reason. The values themselves live in `./model`, not here — declaring them twice would be
-// a duplicate definition.
-export { DEFAULT_CONTAINER, type ChipsContainer }
 
 export interface ChipsCardConfig extends CupertinoCardConfig {
   entities?: unknown
@@ -163,11 +158,13 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     return { type: `custom:${CHIPS_CARD_TAG}` }
   }
 
-  // getConfigElement arrives in Task 8. A card with none loses its Visibility and
-  // Layout tabs too (see the calendar card's note on that contract), so the interim
-  // cost is real, but a stub editor standing in for one that does not exist yet would
-  // be dead code wearing the shape of a later task — the same call the weather and
-  // complication cards' own briefs made before their editors existed.
+  /**
+   * A card with no editor loses its **Visibility** and **Layout** tabs too — the tab strip is
+   * rendered only inside the GUI branch. See the contract on `CupertinoCardEditor`.
+   */
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement(CHIPS_EDITOR_TAG) as LovelaceCardEditor
+  }
 
   protected override watchedEntities(): string[] {
     return watchedIds(this._config?.entities)

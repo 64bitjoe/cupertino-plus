@@ -19,7 +19,8 @@
  * picker cannot express.
  */
 
-import { entityConfigs, type ComplicationEntityConfig } from './model'
+import { entityRows } from '../../core/entity-view'
+import type { ComplicationEntityConfig } from './model'
 
 /**
  * Rebuild `entities` from the ids the picker reported, restoring each id's prior override
@@ -49,7 +50,7 @@ export const mergeEntities = (
   ids: readonly string[],
 ): (string | ComplicationEntityConfig)[] => {
   const queues = new Map<string, ComplicationEntityConfig[]>()
-  for (const row of entityConfigs(prior)) {
+  for (const row of entityRows<ComplicationEntityConfig>(prior)) {
     const queue = queues.get(row.entity)
     if (queue) queue.push(row)
     else queues.set(row.entity, [row])

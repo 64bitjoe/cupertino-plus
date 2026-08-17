@@ -23,16 +23,25 @@
  *    gallery while nothing fed them; they come off `todo` entities now, so a shot led by
  *    them would be advertising a feature the card has. It still applies to anything else
  *    the fixtures can draw and the card cannot yet fill.
- *  - **Only the two footprints**, 6×4 and 12×4 — with one deliberate exception. Every
- *    card up to the weather one only ever draws `small` or `medium`, both of which fit
- *    inside 4 rows, so those were the only two shapes worth a picture. The weather card's
- *    `large` layout (`core/size.ts`'s `LARGE_HEIGHT_THRESHOLD`) needs a box taller than 4
- *    rows can ever measure — no combination of 6×4/12×4 can reach it — so `Shot.rows`
- *    also allows `8`, purely for that one layout. It is still not a free-for-all: 7 rows
- *    is already tall enough to cross the threshold, but `packFor` only fits 6 daily rows
- *    in it; `8` is the shortest count that fits every day of a seven-day fixture, which is
- *    the shape worth showing — the whole point of this shot is a full week's worth of
- *    bars next to each other.
+ *  - **Only the two footprints**, 6×4 and 12×4 — with two deliberate exceptions, one in
+ *    each direction, and both of them a card whose own shape cannot be photographed inside
+ *    4 rows. Every card up to the weather one only ever draws `small` or `medium`, both of
+ *    which fit inside 4 rows, so those were the only two shapes worth a picture. The
+ *    weather card's `large` layout (`core/size.ts`'s `LARGE_HEIGHT_THRESHOLD`) needs a box
+ *    taller than 4 rows can ever measure — no combination of 6×4/12×4 can reach it — so
+ *    `Shot.rows` also allows `8`, purely for that one layout. It is still not a
+ *    free-for-all: 7 rows is already tall enough to cross the threshold, but `packFor`
+ *    only fits 6 daily rows in it; `8` is the shortest count that fits every day of a
+ *    seven-day fixture, which is the shape worth showing — the whole point of this shot is
+ *    a full week's worth of bars next to each other.
+ *
+ *    The chips card is the exception the other way, and `2` and `3` are here for it alone.
+ *    It draws a Lock Screen strip rather than a Home Screen square: one line of chips is 44
+ *    design units of content inside a 16-unit inset, which `chips/layout.ts` floors at two
+ *    grid rows, and two lines at three. Photographed in a 4-row box it would ship a picture
+ *    that is mostly empty dashboard, and imply a card somebody is meant to drag that tall.
+ *    So each chips shot below is taken at the shortest box its own floor allows, which is
+ *    the footprint that card actually wants.
  */
 
 import '../src/index'
@@ -44,12 +53,14 @@ import type { LitElement } from 'lit'
 import {
   BATTERY_CARD_TAG,
   CALENDAR_CARD_TAG,
+  CHIPS_CARD_TAG,
   COMPLICATION_CARD_TAG,
   WEATHER_CARD_TAG,
 } from '../src/index'
 import { columnsToPx, layoutFromBox, rowsToPx } from '../src/core/size'
 import type { LovelaceCard, LovelaceCardConfig } from '../src/core/types/ha'
 import { deviceSet } from './battery-devices'
+import { chipSet } from './chip-fixtures'
 import {
   EV_CHARGER,
   LOUNGE_HUMIDITY,
@@ -105,8 +116,11 @@ interface Shot {
    * and let the Layout tab be discovered as the thing that also permits the rest.
    */
   columns: 6 | 12
-  /** See the module comment: `8` exists only for the weather card's `large` layout. */
-  rows: 4 | 8
+  /**
+   * See the module comment: `8` exists only for the weather card's `large` layout, and
+   * `2`/`3` only for the chips card's much shorter one.
+   */
+  rows: 2 | 3 | 4 | 8
   theme: 'light' | 'dark'
 }
 
@@ -129,6 +143,16 @@ const complicationShot = (
 ): Partial<LovelaceCardConfig> => ({ entities: [...entities], style })
 
 const weatherShot = (entityId: string): Partial<LovelaceCardConfig> => ({ entity: entityId })
+
+/**
+ * Routed through `chipSet`, unlike the complication card's own helper: a chips fixture is
+ * already chosen for the branch it lands on rather than for a household, so the set the
+ * showcase offers a visitor is exactly the set a shot wants to photograph.
+ */
+const chipsShot = (
+  set: string,
+  over: Record<string, unknown> = {},
+): Partial<LovelaceCardConfig> => ({ entities: [...chipSet(set)], ...over })
 
 const SHOTS: readonly Shot[] = [
   {
@@ -283,6 +307,60 @@ const SHOTS: readonly Shot[] = [
     config: weatherShot(WEATHER_CABIN),
     columns: 12,
     rows: 8,
+    theme: 'dark',
+  },
+  {
+    name: 'chips-glass',
+    caption: 'a mixed row on glass: one ink, no card behind the pills',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('mixed'),
+    columns: 12,
+    rows: 3,
+    theme: 'light',
+  },
+  {
+    name: 'chips-card',
+    caption: 'the same row with a surface under it, for a busy background',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('mixed', { container: 'card' }),
+    columns: 12,
+    rows: 3,
+    theme: 'light',
+  },
+  {
+    name: 'chips-labeled',
+    caption: 'labeled: a caption over each reading, and every chip the taller height',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('mixed', { content: 'labeled' }),
+    columns: 12,
+    rows: 3,
+    theme: 'light',
+  },
+  {
+    name: 'chips-icons',
+    caption: 'icon only: the tightest the row goes',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('mixed', { content: 'icon' }),
+    columns: 6,
+    rows: 3,
+    theme: 'light',
+  },
+  {
+    name: 'chips-wrapped',
+    caption: 'twelve chips: the row wraps rather than clipping, and the floor grew with it',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('many'),
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'chips-dark',
+    caption: 'dark: the same one ink, resolved the other way, with a dashed chip for a dead sensor',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('unavailable'),
+    columns: 6,
+    rows: 2,
     theme: 'dark',
   },
 ]

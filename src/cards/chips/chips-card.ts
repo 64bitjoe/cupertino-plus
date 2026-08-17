@@ -67,11 +67,20 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
 
       /* The pressable box, not the pill. layout.ts prices the row at 44 units for this: a
          press can toggle a light now, so the target is a real one even though the paint
-         inside it is smaller. */
+         inside it is smaller.
+
+         The min-width is the same 44 in the other direction, and it is not redundant: an
+         icon-only pill is 13 + 17 + 13 = 43 units across, one short of the target the row
+         is being priced at, and a row of them was measured at exactly that in
+         docs/images/chips-icons.png. It cannot widen a chip that is already wider than 44,
+         so no other content mode notices, and it stays under layout.ts's NOMINAL_WIDTH.icon
+         of 52 — the floor arithmetic still errs generous. */
       .chip {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         min-height: calc(var(--cw-chip-row) * 1px * var(--cw-scale));
+        min-width: calc(44px * var(--cw-scale));
         border-radius: var(--cw-radius-pill);
       }
 
@@ -82,6 +91,9 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         padding: calc(7px * var(--cw-scale)) calc(13px * var(--cw-scale));
         border-radius: var(--cw-radius-pill);
         min-width: 0;
+        /* The other half of the press dip below: the chip keeps the transform and hands the
+           opacity down here, so the fade needs the same easing the chip's own transition has. */
+        transition: opacity var(--cw-duration-fast) var(--cw-ease);
       }
 
       .chip.labeled .pill {
@@ -139,6 +151,23 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       /* Dashed and dimmed, the library's contract for an entity that is not reporting. */
       .chip.unknown .pill {
         opacity: 0.55;
+      }
+
+      /* The press dip moves off the chip and onto the pill, and it has to. The shared
+         .cw-pressable:active rule (base-styles.ts) sets opacity 0.8 on this element, and an
+         element with opacity below 1 is a backdrop root: the pill inside it then has nothing
+         behind it to sample, so the glass goes flat for as long as a finger is down — on the
+         one card in the library whose whole point is the blur. Checked in Chromium rather than
+         reasoned about: over a striped background, opacity on the PARENT killed the blur
+         outright, opacity on the blurred element itself only dimmed it. The scale(0.97) stays
+         where it is, on the whole chip, because a transformed ancestor is not a backdrop
+         root. */
+      .chip.cw-pressable:active {
+        opacity: 1;
+      }
+
+      .chip.cw-pressable:active .pill {
+        opacity: 0.8;
       }
 
       .chip[role='button']:focus-visible {

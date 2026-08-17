@@ -18,10 +18,18 @@ import {
   mdiCalendarMonth,
   mdiFormatListChecks,
   mdiGaugeLow,
+  mdiRhombusOutline,
   mdiWeatherPartlyCloudy,
 } from '@mdi/js'
 
 import { DEMO_SCENARIOS, DEFAULT_DEMO_SCENARIO } from '../../src/cards/calendar/demo-data'
+import {
+  CHIP_CONTENTS,
+  DEFAULT_CONTAINER,
+  DEFAULT_CONTENT,
+  type ChipContent,
+  type ChipsContainer,
+} from '../../src/cards/chips/model'
 import {
   COMPLICATION_STYLES,
   DEFAULT_STYLE,
@@ -31,10 +39,12 @@ import {
 import {
   BATTERY_CARD_TAG,
   CALENDAR_CARD_TAG,
+  CHIPS_CARD_TAG,
   COMPLICATION_CARD_TAG,
   WEATHER_CARD_TAG,
 } from '../../src/index'
 import { DEFAULT_DEVICE_SET, DEVICE_SETS, deviceSet } from '../battery-devices'
+import { CHIP_SETS, DEFAULT_CHIP_SET, chipSet } from '../chip-fixtures'
 import { DEFAULT_ENTITY_SET, ENTITY_SETS, entitySet } from '../complication-entities'
 import { DEFAULT_WEATHER_SET, WEATHER_SETS, weatherEntity } from '../weather-fixtures'
 import {
@@ -391,7 +401,86 @@ const weather: Widget = {
   },
 }
 
-export const WIDGETS: readonly Widget[] = [calendar, battery, complication, weather]
+/**
+ * Readable names for the chip sets, each naming the branch it lands on rather than the
+ * entities in it — the same rule `ENTITY_LABELS`/`DEVICE_LABELS`/`WEATHER_LABELS` follow.
+ */
+const CHIP_SET_LABELS: Record<string, string> = {
+  mixed: 'A mixed row',
+  one: 'A single chip',
+  many: 'Twelve chips: the row wraps',
+  actions: 'Tap actions: toggle, more-info, and one that does nothing',
+  unavailable: 'Not reporting',
+}
+
+const chips: Widget = {
+  id: 'chips',
+  name: 'Chips',
+  tagline: 'A row of small things, each one tappable.',
+  icon: mdiRhombusOutline,
+  tag: CHIPS_CARD_TAG,
+
+  props: [
+    {
+      kind: 'select',
+      name: 'set',
+      label: 'Entities',
+      description: 'A mock set, chosen for the branch each one lands on.',
+      group: 'card',
+      options: Object.keys(CHIP_SETS).map(value => ({
+        value,
+        label: CHIP_SET_LABELS[value] ?? titleCase(value),
+      })),
+      initial: DEFAULT_CHIP_SET,
+    },
+    {
+      kind: 'select',
+      name: 'content',
+      label: 'Chip content',
+      description: 'The default for every chip in the card.',
+      group: 'card',
+      options: CHIP_CONTENTS.map(value => ({ value, label: titleCase(value) })),
+      initial: DEFAULT_CONTENT,
+    },
+    {
+      kind: 'select',
+      name: 'container',
+      label: 'Background',
+      description: 'Glass floats on the dashboard; card draws its own surface.',
+      group: 'card',
+      options: [
+        { value: 'glass', label: 'Glass' },
+        { value: 'card', label: 'Card' },
+      ],
+      initial: DEFAULT_CONTAINER,
+    },
+  ],
+
+  /**
+   * In the **Card** group and printed in the Config pane, the same reasoning as the three
+   * cards above: this card has no fixtures either, so the YAML above the control is the config
+   * that produced what is on screen — including the `actions` set's per-chip `tap_action`
+   * rows, which are YAML-only in this release and have nowhere else to be seen.
+   *
+   * `content` and `container` are written whether or not they sit at their defaults, the rule
+   * `cardOptions` states for `scale`: a key that appears and disappears as a select moves
+   * changes the height of the YAML above the controls, which moves the control itself out from
+   * under the cursor.
+   */
+  toConfig(args) {
+    return {
+      entities: [...chipSet(readString(args, 'set', DEFAULT_CHIP_SET))],
+      content: readString(args, 'content', DEFAULT_CONTENT) as ChipContent,
+      container: readString(args, 'container', DEFAULT_CONTAINER) as ChipsContainer,
+    }
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+export const WIDGETS: readonly Widget[] = [calendar, battery, complication, weather, chips]
 
 export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => w.id === id)
 
@@ -521,6 +610,24 @@ const yamlScalar = (value: unknown): string => {
   return /^[\w.:/-]+$/.test(text) ? text : JSON.stringify(text)
 }
 
+const isMapping = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/**
+ * A mapping's lines, one key each, a nested mapping indented one level under its own key.
+ *
+ * The nesting is not decoration: the chips card's `tap_action` is an object sitting on an
+ * entity row (`{ entity: light.kitchen, tap_action: { action: toggle } }`), and a printer that
+ * stringified it would put `[object Object]` in a pane whose entire purpose is being pasted
+ * into somebody's dashboard.
+ */
+const yamlMapping = (map: Record<string, unknown>, indent: string): string[] =>
+  Object.entries(map).flatMap(([key, value]) =>
+    isMapping(value)
+      ? [`${indent}${key}:`, ...yamlMapping(value, `${indent}  `)]
+      : [`${indent}${key}: ${yamlScalar(value)}`],
+  )
+
 /**
  * One item of a list: a scalar, or a mapping whose first key rides on the dash.
  *
@@ -530,15 +637,13 @@ const yamlScalar = (value: unknown): string => {
  * as every Home Assistant document writes it.
  */
 const yamlItem = (item: unknown): string => {
-  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-    return `  - ${yamlScalar(item)}`
-  }
-  return Object.entries(item)
-    .map(([key, value], index) => `  ${index === 0 ? '-' : ' '} ${key}: ${yamlScalar(value)}`)
-    .join('\n')
+  if (!isMapping(item)) return `  - ${yamlScalar(item)}`
+
+  const lines = yamlMapping(item, '    ')
+  return [`  - ${(lines[0] ?? '').trimStart()}`, ...lines.slice(1)].join('\n')
 }
 
-/** Just enough YAML for a card config: scalars, and lists of scalars or flat mappings. */
+/** Just enough YAML for a card config: scalars, and lists of scalars or nested mappings. */
 export const configToYaml = (config: LovelaceCardConfig): string =>
   Object.entries(config)
     .map(([key, value]) =>

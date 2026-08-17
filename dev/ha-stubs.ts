@@ -9,6 +9,7 @@
  */
 
 import {
+  mdiAccount,
   mdiBattery,
   mdiBatteryUnknown,
   mdiCellphone,
@@ -19,6 +20,8 @@ import {
   mdiHeadphones,
   mdiHelpCircleOutline,
   mdiLaptop,
+  mdiLightbulb,
+  mdiLock,
   mdiRayVertex,
   mdiTablet,
   mdiThermometer,
@@ -181,10 +184,15 @@ const HA_FORM_CSS = `
  * into the showcase that GitHub Pages then serves to every visitor, for the sake of icons only
  * this file's own mock devices ever ask for.
  *
- * So: add an entry when `battery-devices.ts` or `complication-entities.ts` grows one. A name
- * with no entry draws the question mark rather than nothing, on the same grounds as the
- * `ha-form` stub's unsupported row: a silently blank icon reads as a broken card, and the
- * cards are what this page is for.
+ * So: add an entry when `battery-devices.ts`, `complication-entities.ts` or
+ * `chip-fixtures.ts` grows one. A name with no entry draws the question mark rather than
+ * nothing, on the same grounds as the `ha-form` stub's unsupported row: a silently blank icon
+ * reads as a broken card, and the cards are what this page is for.
+ *
+ * That fallback is loud on the page and quiet in a review, which is how three of the chips
+ * card's six shipped screenshots came to show a question mark where a lock, a lightbulb and a
+ * person belonged: the entries below were the only thing missing, and nothing but reading the
+ * PNGs was ever going to say so.
  */
 const ICONS: Record<string, string> = {
   'mdi:battery': mdiBattery,
@@ -208,6 +216,12 @@ const ICONS: Record<string, string> = {
   'mdi:ray-vertex': mdiRayVertex,
   'mdi:eye': mdiEye,
   'mdi:flash': mdiFlash,
+  // The chips card's mock entities, resolved off the domain by `core/entity-view.ts`'s own
+  // `iconFor`: a lock, a light and a person. Its temperature and battery chips share the
+  // two entries above.
+  'mdi:lock': mdiLock,
+  'mdi:lightbulb': mdiLightbulb,
+  'mdi:account': mdiAccount,
 }
 
 /**

@@ -17,10 +17,13 @@
  * reorder. `complication-card-editor.ts`'s `toForm` flattens `entities` to ids for the picker
  * to render; `mergeEntities` here is `fromForm`'s other half, rebuilding the object rows the
  * picker cannot express.
+ *
+ * Generic since the chips card arrived: the rule ("a row is worth keeping when it says more
+ * than its own id") is about the picker, not about what any one card's rows carry, and the
+ * `Object.keys(row).length > 1` test that implements it never needed to know either.
  */
 
-import { entityRows } from '../../core/entity-view'
-import type { ComplicationEntityConfig } from './model'
+import { entityRows, type EntityRow } from './entity-view'
 
 /**
  * Rebuild `entities` from the ids the picker reported, restoring each id's prior override
@@ -45,12 +48,12 @@ import type { ComplicationEntityConfig } from './model'
  * bare string rather than reusing an already-claimed row, so no override is ever attributed
  * to two rows at once.
  */
-export const mergeEntities = (
+export const mergeEntities = <T extends EntityRow = EntityRow>(
   prior: unknown,
   ids: readonly string[],
-): (string | ComplicationEntityConfig)[] => {
-  const queues = new Map<string, ComplicationEntityConfig[]>()
-  for (const row of entityRows<ComplicationEntityConfig>(prior)) {
+): (string | T)[] => {
+  const queues = new Map<string, T[]>()
+  for (const row of entityRows<T>(prior)) {
     const queue = queues.get(row.entity)
     if (queue) queue.push(row)
     else queues.set(row.entity, [row])

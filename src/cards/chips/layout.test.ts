@@ -43,9 +43,9 @@ describe('floorsFor', () => {
   })
 
   it('asks for more height for a labeled band than for a plain one', () => {
-    const plain = floorsFor(Array.from({ length: 6 }, () => chip('value')))
-    const labeled = floorsFor([...Array.from({ length: 5 }, () => chip('value')), chip('labeled')])
-    expect(labeled.min_rows).toBeGreaterThanOrEqual(plain.min_rows)
+    const plain = floorsFor(Array.from({ length: 7 }, () => chip('value')))
+    const labeled = floorsFor([...Array.from({ length: 6 }, () => chip('value')), chip('labeled')])
+    expect(labeled.min_rows).toBeGreaterThan(plain.min_rows)
   })
 
   it('fits more icon-only chips on a line than labeled ones', () => {

@@ -14,8 +14,8 @@ taken from the box you drag them into rather than from a size setting.
 > **A fork.** This is a fork of
 > [sabbaken/cupertino-widgets](https://github.com/sabbaken/cupertino-widgets) by
 > **Kirill Verenih**, who wrote the calendar and battery cards and everything they stand on.
-> The complication card is the addition here. Same AGPL-3.0 licence, and the original
-> copyright notice travels with every build.
+> The complication and weather cards are the additions here. Same AGPL-3.0 licence, and the
+> original copyright notice travels with every build.
 
 It needs a current Home Assistant, **2026.7 or newer**: the cards track the latest frontend
 APIs rather than carrying compatibility shims.

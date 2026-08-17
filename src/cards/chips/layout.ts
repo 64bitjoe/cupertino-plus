@@ -18,7 +18,18 @@
  */
 
 import { columnsFor, gridColumnsToPx, rowsFor, type Floors } from '../../core/floors'
-import { DEFAULT_CONTENT, type ChipContent, type ChipView } from './model'
+import { DEFAULT_CONTENT, type ChipContent } from './model'
+
+/**
+ * The one thing `bandFor`/`floorsFor` actually read off a chip: its content mode. Both a
+ * full `ChipView` and a bare config row satisfy this, and that is the point of stating it
+ * narrowly — the floor arithmetic below prices only `.content` and the array's own
+ * `.length`, neither of which depends on `hass`, and the parameter type says so rather than
+ * merely happening to be true of whatever `ChipView[]` was passed historically.
+ */
+export interface ChipBand {
+  content: ChipContent
+}
 
 /** Must match `--cw-inset`, the padding inside the card. */
 const INSET = 16
@@ -67,7 +78,7 @@ const NOMINAL_WIDTH: Record<ChipContent, number> = {
  * An empty card answers the default rather than throwing, because `getGridOptions()` is called
  * on a card with no entities yet, the moment it is dropped from the picker.
  */
-export const bandFor = (chips: readonly ChipView[]): ChipContent => {
+export const bandFor = (chips: readonly ChipBand[]): ChipContent => {
   if (chips.some(chip => chip.content === 'labeled')) return 'labeled'
   if (chips.some(chip => chip.content === 'value')) return 'value'
   return chips.length === 0 ? DEFAULT_CONTENT : 'icon'
@@ -102,7 +113,7 @@ const FLOOR_CHIPS_ACROSS = 3
  * The floor: wide enough that the chips cannot be crushed into a column, and tall enough for
  * every line they wrap onto at exactly that width.
  */
-export const floorsFor = (chips: readonly ChipView[]): Floors => {
+export const floorsFor = (chips: readonly ChipBand[]): Floors => {
   const band = bandFor(chips)
   const width = NOMINAL_WIDTH[band]
 

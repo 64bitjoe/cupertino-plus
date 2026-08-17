@@ -25,21 +25,22 @@ export interface EntityRow {
 
 export const UNAVAILABLE_STATES = new Set(['unavailable', 'unknown'])
 
-/** Not localised, like the rest of the library's own marks. */
+/** Not localised, like the rest of the library's own marks. Matches the battery card's. */
 export const VALUE_DASH = '—'
 
 /** Whether an entity is present but not currently reporting. */
 export const isUnavailable = (entity: HassEntity): boolean => UNAVAILABLE_STATES.has(entity.state)
 
 /**
- * The rows the config asked for, in the order it asked for them, forgiving of every shape a
- * hand-written config can take. (Moved from `complication/model.ts`'s `entityConfigs`; see
- * that function's original reasoning, preserved below.)
+ * The rows the config asked for, in the order it asked for them, forgiving of every shape
+ * a hand-written config can take.
  *
- * A card config is not typechecked on its way in, so `entities: sensor.phone` — a bare scalar
- * where a list was meant — is what somebody writes first, and it is worth reading as
- * `['sensor.phone']` rather than rejecting. Equally, a row with no usable `entity` is worth
- * skipping rather than crashing the whole card over one bad line.
+ * A card config is not typechecked on its way in, so `entities: sensor.phone` — a bare
+ * scalar where a list was meant — is what somebody writes first, and it is worth reading
+ * as `['sensor.phone']` rather than rejecting. Equally, a row with no usable `entity` (an
+ * object missing it, a stray number, `null`) is worth skipping rather than crashing the
+ * whole card over one bad line: a config with three good rows and one mistake should draw
+ * three of them, not zero.
  *
  * Generic in the row type, and unchecked beyond `entity`: the cast is the same trust the
  * original made, and each card's own reader is what decides whether the rest of a row means
@@ -58,7 +59,13 @@ export const entityRows = <T extends EntityRow = EntityRow>(entities: unknown): 
   })
 }
 
-/** Every entity id a card's rendering depends on: what `watchedEntities()` answers with. */
+/**
+ * Every entity id a card's rendering depends on: what `watchedEntities()` answers with.
+ *
+ * `hass` is replaced wholesale on every state change anywhere in the installation, so this
+ * is what decides whether the card re-renders when the configured entity changes — getting
+ * it short would be a card that silently stops updating.
+ */
 export const watchedIds = (entities: unknown): string[] =>
   entityRows(entities).map(row => row.entity)
 

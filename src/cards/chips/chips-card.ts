@@ -6,9 +6,11 @@ import { watchedIds } from '../../core/entity-view'
 import { withFloors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
-import { bandFor, floorsFor, rowHeightFor } from './layout'
+import { bandFor, floorsFor, rowHeightFor, type ChipBand } from './layout'
 import {
+  chipConfigs,
   DEFAULT_CONTAINER,
+  DEFAULT_CONTENT,
   readChips,
   type ChipContent,
   type ChipsContainer,
@@ -108,7 +110,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       }
 
       /* One ink for the whole row: this card has no per-entity colour at all, which is
-         §4 of its rules and the whole difference between a Lock Screen accessory and the
+         §3 of its rules and the whole difference between a Lock Screen accessory and the
          Home Screen widget the complication card draws. */
       .glass .pill {
         color: var(--cw-label);
@@ -170,6 +172,16 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         opacity: 0.8;
       }
 
+      /* .chip.unknown .pill above is three classes (0,3,0); this is four (0,4,0) and has
+         to be, or the press rule above outranks it on specificity alone and a dimmed chip
+         goes 0.55 -> 0.8 on press instead of dimming further. Every dead chip is still
+         pressable — more-info is the default action — so this fires on every press of one.
+         0.44 is 0.55 * 0.8: the same press dip the rest of the row gets, applied on top of
+         the dim rather than overriding it. */
+      .chip.unknown.cw-pressable:active .pill {
+        opacity: 0.44;
+      }
+
       .chip[role='button']:focus-visible {
         outline: 2px solid var(--cw-accent);
         outline-offset: 2px;
@@ -179,6 +191,15 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         font: var(--cw-text-callout);
         color: var(--cw-label-secondary);
         margin: auto;
+      }
+
+      /* base-styles.ts's own prefers-reduced-motion block silences .cw-pressable's
+         transition; .pill's is a separate declaration (above) and needs the same
+         treatment, or the opacity fade it drives still animates with motion reduced. */
+      @media (prefers-reduced-motion: reduce) {
+        .pill {
+          transition: none;
+        }
       }
     `,
   ]
@@ -206,11 +227,32 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   }
 
   /**
+   * The floor's own view of the row: config alone, never `hass`. `bandFor`/`floorsFor` read
+   * only `.content` and the array's `.length`, both of which come from `chipConfigs` and the
+   * card-level `content` default, so this reproduces just that shape rather than routing
+   * through `_chips`/`readChips` — the complication card's `getGridOptions` makes the same
+   * call, off `entityConfigs(this._config?.entities).length` alone.
+   *
+   * That independence is not tidiness: `getGridOptions()` can be asked before `hass` is ever
+   * assigned (Home Assistant does this the moment a card is dropped from the picker), and
+   * `_chips` answers `[]` until it is. A floor built on `_chips` would report the empty-row
+   * floor — `min_columns: 4, min_rows: 1` — for a card about to hold several chips, and the
+   * Layout tab would offer a box too short for content it has not measured yet, exactly the
+   * clipping failure the floors exist to prevent.
+   */
+  private get _floorBand(): ChipBand[] {
+    const defaultContent = this._config?.content ?? DEFAULT_CONTENT
+    return chipConfigs(this._config?.entities).map(row => ({
+      content: row.content ?? defaultContent,
+    }))
+  }
+
+  /**
    * The floors, recomputed on every call: both halves depend on a config that changes under
    * the card, exactly as the complication card's own `getGridOptions` does.
    */
   public override getGridOptions(): LovelaceGridOptions {
-    return withFloors(super.getGridOptions(), floorsFor(this._chips))
+    return withFloors(super.getGridOptions(), floorsFor(this._floorBand))
   }
 
   /**
@@ -245,7 +287,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    */
   private _renderChip(chip: ChipView, band: ChipContent): TemplateResult {
     const pressable = isPressable(chip.action)
-    const label = `${chip.name}, ${chip.value}`
+    const label = `${chip.name}, ${chip.unavailable ? 'unavailable' : chip.value}`
 
     const body =
       band === 'labeled'

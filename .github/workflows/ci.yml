@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # So a check can be asked for without a push to hang it on — the fork's Actions were
+  # dormant for its first two releases, and "did that actually run?" needs an answer that
+  # does not require inventing a commit to find out.
+  workflow_dispatch:
 
 jobs:
   check:

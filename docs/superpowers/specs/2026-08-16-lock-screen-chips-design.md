@@ -37,7 +37,7 @@ A new card, `cupertino-plus-chips`, in `src/cards/chips/`:
 | `chips-card.ts`        | The element: measures, draws the flow, owns tap and keyboard |
 | `model.ts`             | Config + `hass` → `ChipView[]`                               |
 | `layout.ts`            | Flow packing, wrapping, and the floors that follow from them |
-| `chips-card-editor.ts` | Entity rows, per-chip content mode, per-chip action          |
+| `chips-card-editor.ts` | Entity rows, and the card-level content mode and container   |
 
 Not a sixth style on the complication card. That card has rules — the colour is identity (§2),
 the ring appears only against a real range (§3), a supporting line under the reading (§8) — and
@@ -45,16 +45,23 @@ a chip contradicts every one of them while adding a tap action no other style ha
 style would mean "except for chips" in four places in a shipped rules document. The weather
 card set the precedent: reuse `core/`, and go your own way.
 
-Three modules move to `core/`, each because a second card now needs it. §10 of the family spec
+Four modules move to `core/`, each because a second card now needs it. §10 of the family spec
 already names this test — the same argument that moved `ring.ts`.
 
 - **`core/entity-view.ts`** — `iconFor`, `formatValue`, `numberOf`, the unavailable set and its
   dash, name resolution. `complication/model.ts` keeps what is genuinely its own (the
-  supporting line, ranges, tints) and imports the rest. Two findings deferred from the
-  complication review get fixed here rather than copied: a non-numeric fallback leaving
-  underscores in place (`not_home` rendering as `Not_home`), and unit spacing being `%`-only,
-  so a bare `°` renders as `21.4 °`. The complication card's existing tests are the net under
-  the extraction.
+  supporting line, ranges, tints) and imports the rest. One finding deferred from the
+  complication review gets fixed here rather than copied: unit spacing is `%`-only, so every
+  temperature in the library renders as `21.4 °C` rather than `21.4°C`. (The sibling finding
+  about `not_home` rendering as `Not_home` was already fixed during that card's final review;
+  `formatValue` replaces underscores today.) The complication card's existing tests are the net
+  under the extraction.
+- **`core/floors.ts`** — `Floors`, `columnsFor`, `rowsFor`, `withFloors` and the grid constants,
+  out of `complication/layout.ts`. Not in the first draft of this spec, and it belongs: how many
+  whole grid columns cover a width is a fact about Home Assistant's grid, not a judgement about
+  a widget, which is exactly the line that card's own `RING_MIN` comment draws when it declines
+  to share a number that _is_ a judgement. It also settles a deferred finding — the grid
+  constants were re-declared per card, with drift risk noted and no owner.
 - **`core/actions.ts`** — new. The action config type and the dispatch that runs it.
 - **`core/entities-form.ts`** — `mergeEntities`, out of the complication editor. Chips need the
   identical round-trip, and that function exists because of a real bug: HA's multiple-entity
@@ -172,13 +179,18 @@ to this same config shape; none of them changes the design if they arrive later.
 ## 8. The editor
 
 Entity rows as the complication editor draws them, through the now-shared `mergeEntities`, plus
-a per-chip expandable section carrying the content mode and the tap action. Card-level: the
-default content mode, the container, and the library-wide scale.
+card-level rows for the default content mode, the container, and the library-wide scale.
 
-Two things the repo's type layer does not model yet and this needs: an `expandable` form node,
-and HA's `ui_action` selector for the action picker. `core/types/ha.ts` already notes that
-`ha-form` accepts nodes carrying a `type` instead of a `selector` and that no editor here has
-needed one.
+**Per-chip overrides — `name`, `icon`, `content`, `tap_action` — are YAML, not form fields, in
+this release.** That is a reduction from this section's first draft, taken while planning and
+recorded here rather than discovered later. The per-chip form would need two frontend APIs this
+environment cannot verify: an `expandable` form node and HA's `ui_action` selector (see §11).
+Shipping unverified API on the critical path of a new card is how the weather card's one
+untested assumption happened, and here there is a precedent that costs nothing: the complication
+card's editor also surfaces only the entity list while its rows carry five possible overrides,
+and `mergeEntities` is precisely what guarantees hand-written rows survive a trip through the
+form. The per-chip editor becomes its own task once either API can be checked against a running
+frontend, and the YAML written before then keeps working.
 
 ## 9. Degradation
 

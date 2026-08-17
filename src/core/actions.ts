@@ -103,12 +103,7 @@ export const runAction = (
         return
       }
       void hass
-        .callService(
-          service.slice(0, dot),
-          service.slice(dot + 1),
-          resolved.data,
-          resolved.target ?? { entity_id: target },
-        )
+        .callService(service.slice(0, dot), service.slice(dot + 1), resolved.data, resolved.target)
         .catch(() => warn(`${service} failed`))
       return
     }

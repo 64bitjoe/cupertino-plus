@@ -70,6 +70,23 @@ describe('runAction', () => {
     ])
   })
 
+  it('calls a service with no target when the config names none', () => {
+    const calls: ServiceCall[] = []
+    const config: ActionConfig = {
+      action: 'call-service',
+      service: 'script.goodnight',
+      data: { speed: 'slow' },
+    }
+    runAction(stubHass(calls), stubElement([]), config, 'sensor.hall')
+    expect(calls).toEqual([
+      {
+        domain: 'script',
+        service: 'goodnight',
+        data: { speed: 'slow' },
+      },
+    ])
+  })
+
   it('warns rather than throwing when call-service has no usable service', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const calls: ServiceCall[] = []

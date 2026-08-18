@@ -1,5 +1,6 @@
 import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
 import { BATTERY_STATES } from './battery-devices'
+import { CHIP_STATES } from './chip-fixtures'
 import { COMPLICATION_STATES } from './complication-entities'
 import {
   WEATHER_DAILY_FORECASTS,
@@ -28,6 +29,36 @@ const entity = (
   last_changed: '2026-07-25T06:00:00.000Z',
   last_updated: '2026-07-25T06:00:00.000Z',
 })
+
+/**
+ * The four fixture files' entities, in one map, with a duplicate id treated as the bug it is.
+ *
+ * Spreading each file's array into the literal below is what this replaces, and the difference
+ * is not tidiness. The files are written independently, they are merged in source order, and a
+ * `Record` resolves a collision silently in favour of whoever is spread last: the chips card's
+ * first draft claimed `sensor.phone_battery`, which the battery card already owned, and the
+ * only symptom was four battery screenshots quietly redrawn with a stranger's 41%. Nothing
+ * failed. Nothing warned. So this throws, and names the ids, on the way in.
+ */
+const fixtureStates = (
+  ...groups: readonly (readonly HassEntity[])[]
+): Record<string, HassEntity> => {
+  const states: Record<string, HassEntity> = {}
+  const clashes: string[] = []
+
+  for (const group of groups) {
+    for (const one of group) {
+      if (one.entity_id in states) clashes.push(one.entity_id)
+      states[one.entity_id] = one
+    }
+  }
+
+  if (clashes.length > 0) {
+    throw new Error(`[mock-hass] two fixture files claim the same entity id: ${clashes.join(', ')}`)
+  }
+
+  return states
+}
 
 /** Mirrors what the `demo` integration gives the dev Home Assistant instance. */
 const STATES: Record<string, HassEntity> = {
@@ -66,15 +97,15 @@ const STATES: Record<string, HassEntity> = {
     friendly_name: 'Shopping',
     supported_features: 127,
   }),
-  // The battery card's devices, which are a list of their own; see `battery-devices.ts`,
-  // where the config that points at them lives beside them.
-  ...Object.fromEntries(BATTERY_STATES.map(one => [one.entity_id, one])),
-  // The complication card's entities; see `complication-entities.ts`, wired in the same way.
-  ...Object.fromEntries(COMPLICATION_STATES.map(one => [one.entity_id, one])),
-  // The weather card's entities; see `weather-fixtures.ts`. Its forecasts are not states
-  // at all — they arrive over `weather/subscribe_forecast`, answered below alongside the
-  // calendar and to-do subscriptions.
-  ...Object.fromEntries(WEATHER_STATES.map(one => [one.entity_id, one])),
+  /*
+   * One file per card, each holding its mock entities beside the config that points at them:
+   * the battery card's devices in `battery-devices.ts`, the complication card's entities in
+   * `complication-entities.ts`, the chips card's in `chip-fixtures.ts`, and the weather card's
+   * in `weather-fixtures.ts` — whose forecasts are not states at all, arriving instead over
+   * `weather/subscribe_forecast`, answered below alongside the calendar and to-do
+   * subscriptions.
+   */
+  ...fixtureStates(BATTERY_STATES, COMPLICATION_STATES, CHIP_STATES, WEATHER_STATES),
 }
 
 /**

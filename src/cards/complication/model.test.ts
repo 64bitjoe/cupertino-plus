@@ -71,7 +71,9 @@ describe('readComplications', () => {
 
     const [lounge] = readComplications(hass, ['sensor.lounge'], {})
 
-    expect(lounge.value).toBe('21.4 °C')
+    // `°C` is a tight unit (see `core/entity-view.ts`'s `TIGHT_UNITS`), so this reads
+    // `21.4°C` rather than `21.4 °C` — the same fix this task's move applies everywhere.
+    expect(lounge.value).toBe('21.4°C')
     expect(lounge.range).toBeNull()
     expect(lounge.fraction).toBeNull()
     expect(lounge.tint).toBe('orange')

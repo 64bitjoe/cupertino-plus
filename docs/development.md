@@ -173,6 +173,16 @@ pnpm exec playwright install chromium
 Run it on macOS if you have the choice. The cards ask for `-apple-system` first, so that
 is where the type comes out as SF rather than as whatever the machine has instead.
 
+**Then open the PNGs and read them.** The suite runs in `environment: 'node'` and mounts no
+element, so for anything that only exists once a browser has laid it out, these images are the
+only test there is — which is not a rule of thumb, it is where the circular caption overflow,
+the `rectangular-bleed` that did not bleed, and three of the chips card's own defects were
+found. Two of those three were in this harness rather than in a card: `dev/ha-stubs.ts`'s icon
+table had no entry for a lock, a lightbulb or a person, so three chips drew a question mark;
+and a fixture file claimed an entity id `battery-devices.ts` already owned, which silently
+repainted four battery screenshots with a stranger's reading. `mock-hass.ts` now throws on the
+second of those rather than resolving it, but nothing warns about the first.
+
 One rule for how the README then shows them: each `<img>` is pinned to a width in the same
 proportion as its footprint (currently 420px for the 12-column shots against 222px for the
 6-column one, the same ratio as the 540 and 286 they were clipped at), and both are small
@@ -202,6 +212,9 @@ dev/
   ha-stubs.ts           stand-ins for the Home Assistant elements cards use
   mock-hass.ts          a `hass` object good enough to develop against
   battery-devices.ts    the battery card's mock devices, and the sets that point at them
+  chip-fixtures.ts      the same for the chips card, as complication-entities.ts and
+                        weather-fixtures.ts are for theirs: one file per card, holding its
+                        mock entities beside the config that points at them
   shots.ts              the README's screenshots, as a page a camera can point at
   ha-config/            the throwaway Home Assistant instance
 docs/images/            the README's screenshots, generated, never hand-edited
@@ -282,6 +295,9 @@ different way than it is. Keep the tab in front, or take a screenshot to bring i
 - [`battery-widget-rules.md`](battery-widget-rules.md). The same for the battery card: how
   many rings, when they get a percentage, and why the ring is never red. Its §8 table is
   `layout.test.ts`'s first two cases.
+- [`chips-widget-rules.md`](chips-widget-rules.md): what a chip is, why it has no colour of
+  its own, the two containers and the blur that only one of them can afford, and the five
+  things a press can be configured to do.
 - [`ha-api-notes.md`](ha-api-notes.md): the Home Assistant APIs this library depends on,
   each verified against the frontend bundle shipped in the HA image rather than against
   documentation, including several points where the widely-repeated advice is now wrong.

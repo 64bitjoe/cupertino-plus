@@ -62,4 +62,9 @@ describe('mergeEntities', () => {
     expect(mergeEntities(undefined, [])).toEqual([])
     expect(mergeEntities(undefined, ['sensor.a'])).toEqual(['sensor.a'])
   })
+
+  it('carries an override this module has never heard of', () => {
+    const prior = [{ entity: 'light.hall', tap_action: { action: 'toggle' } }]
+    expect(mergeEntities(prior, ['light.hall'])).toEqual(prior)
+  })
 })

@@ -2,7 +2,8 @@ import { CupertinoCardEditor } from '../../core/card-editor'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { ComplicationCardConfig } from './complication-card'
-import { mergeEntities } from './entities-form'
+import { mergeEntities } from '../../core/entities-form'
+import type { ComplicationEntityConfig } from './model'
 import { watchedIds } from './model'
 import { COMPLICATION_STYLES, DEFAULT_STYLE, STYLE_LABELS } from './style'
 import { TINTS } from './tint'
@@ -129,7 +130,10 @@ class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCa
     fields: readonly string[],
   ): ComplicationCardConfig {
     const next = super.fromForm(config, data, fields)
-    const merged = mergeEntities(config.entities, watchedIds(next.entities))
+    const merged = mergeEntities<ComplicationEntityConfig>(
+      config.entities,
+      watchedIds(next.entities),
+    )
 
     const withEntities: ComplicationCardConfig = { ...next }
     if (merged.length === 0) delete withEntities.entities

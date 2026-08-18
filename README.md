@@ -14,8 +14,8 @@ taken from the box you drag them into rather than from a size setting.
 > **A fork.** This is a fork of
 > [sabbaken/cupertino-widgets](https://github.com/sabbaken/cupertino-widgets) by
 > **Kirill Verenih**, who wrote the calendar and battery cards and everything they stand on.
-> The complication and weather cards are the additions here. Same AGPL-3.0 licence, and the
-> original copyright notice travels with every build.
+> The complication, weather and chips cards are the additions here. Same AGPL-3.0 licence, and
+> the original copyright notice travels with every build.
 
 It needs a current Home Assistant, **2026.7 or newer**: the cards track the latest frontend
 APIs rather than carrying compatibility shims.
@@ -40,7 +40,7 @@ Then install **Cupertino Plus** and reload your browser.
 
 ## The cards
 
-Four of them. Each one is in the card picker; none of them needs YAML.
+Five of them. Each one is in the card picker; none of them needs YAML.
 
 ### The calendar
 
@@ -65,7 +65,7 @@ is a range worth drawing an arc against.
 
 <p align="center">
   <img src="docs/images/complication-medium.png" width="420"
-       alt="A medium complication card: four cells — a temperature showing an icon and 21.4 °C with no ring, then humidity, water tank and phone battery as coloured rings">
+       alt="A medium complication card: four cells — a temperature showing an icon and 21.4°C with no ring, then humidity, water tank and phone battery as coloured rings">
 </p>
 
 Five styles: **circular** (a ring gauge), **rectangular**, **rectangular with header**,
@@ -119,20 +119,45 @@ because a sun's position is a snapshot and a forecast is not.
 The rules, including why the bars are never scaled against themselves, are in
 [`docs/weather-widget-rules.md`](docs/weather-widget-rules.md).
 
+### The chips
+
+A row of small pills, one per entity, each of them a press away from doing something. This is
+the Lock Screen family rather than the Home Screen one: no card behind it by default, no colour
+of its own, just one ink and a translucent scrim floating on your dashboard. A chip shows a
+glyph and its entity's reading, or the glyph alone, or a small caption stacked over the
+reading — and whichever of those you pick, every chip in the card draws at the same height, so
+the row reads as one band rather than as a ragged line.
+
+<p align="center">
+  <img src="docs/images/chips-glass.png" width="420"
+       alt="A row of six glass chips on a light dashboard: 21.4°C, 41%, Locked, Not home, On, and a dimmed chip with a dash for a sensor that is not reporting">
+</p>
+
+A press opens more-info by default, and per chip it can toggle, navigate to another view, call
+a service, or be turned off entirely — a chip that does nothing is drawn as a chip that does
+nothing, with no button role and no tab stop. The row wraps onto a second line rather than
+hiding a chip, and the card asks Home Assistant for the height that takes. Put it over a busy
+wallpaper and the translucency has nothing predictable behind it; `container: card` is the
+answer, and gives the pills an ordinary card surface to sit on.
+
+The rules, including the two containers and what a press can be made to do, are in
+[`docs/chips-widget-rules.md`](docs/chips-widget-rules.md).
+
 ## Configuring
 
 Every card has a visual editor — add it from the picker and fill in the form. Nobody needs to
 write YAML, and there is no size field in any of them: **Home Assistant's Layout tab owns the
 footprint**, and the card re-lays itself out for whatever box you drag it into.
 
-The four types, if you do want to paste config:
+The five types, if you do want to paste config:
 
-| Card         | Type                                 | Asks for                          |
-| ------------ | ------------------------------------ | --------------------------------- |
-| Calendar     | `custom:cupertino-plus-calendar`     | nothing — it finds your calendars |
-| Complication | `custom:cupertino-plus-complication` | entities, and a style             |
-| Battery      | `custom:cupertino-plus-battery`      | which battery sensors             |
-| Weather      | `custom:cupertino-plus-weather`      | one weather entity                |
+| Card         | Type                                 | Asks for                                    |
+| ------------ | ------------------------------------ | ------------------------------------------- |
+| Calendar     | `custom:cupertino-plus-calendar`     | nothing — it finds your calendars           |
+| Complication | `custom:cupertino-plus-complication` | entities, and a style                       |
+| Battery      | `custom:cupertino-plus-battery`      | which battery sensors                       |
+| Weather      | `custom:cupertino-plus-weather`      | one weather entity                          |
+| Chips        | `custom:cupertino-plus-chips`        | entities, and what a press on each one does |
 
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.

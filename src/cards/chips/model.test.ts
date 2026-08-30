@@ -469,6 +469,24 @@ describe('readChips with templates', () => {
     expect(chips.map(chip => chip.color)).toEqual(['var(--cw-red)', 'var(--cw-blue)'])
   })
 
+  it('resolves a templated card-level colour, which carries no entity of its own', () => {
+    const seen: (string | undefined)[] = []
+    const chips = readChips(
+      hassWith(HALL),
+      ['sensor.hall', { entity: 'sensor.hall', color: 'green' }],
+      { color: '{{ c }}' },
+      (template, entity) => {
+        seen.push(entity)
+        return template === '{{ c }}' ? 'red' : undefined
+      },
+    )
+    // The card-level colour is registered by `chipTemplates` with no variables, so it must be
+    // looked up the same way, or the key misses and the tint silently never appears.
+    expect(seen).toContain(undefined)
+    // A row's own colour still wins over the card's.
+    expect(chips.map(chip => chip.color)).toEqual(['var(--cw-red)', 'var(--cw-green)'])
+  })
+
   it('templates the tap action target', () => {
     const [chip] = readChips(
       hassWith(HALL),

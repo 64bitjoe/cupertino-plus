@@ -211,19 +211,26 @@ export const readChip = (
   // A field is its template's result when it has one, its literal otherwise, and `undefined`
   // when a template has not answered yet — which every caller below treats as "fall back",
   // so nothing is ever blank while a template resolves.
-  const field = (raw: string | undefined): string | undefined => {
+  //
+  // `entity` is explicit rather than closed over, because one caller — the card-level colour
+  // — has to resolve with none at all, exactly as `chipTemplates` registered it. A default
+  // parameter cannot do that job: JS substitutes a default for an *explicit* `undefined`
+  // argument exactly as it does for an omitted one, so `field(defaults.color, undefined)` would
+  // silently mean `field(defaults.color, row.entity)`. Every other call below passes
+  // `row.entity` by hand for the same reason.
+  const field = (raw: string | undefined, entity: string | undefined): string | undefined => {
     if (!isTemplate(raw)) return raw
-    const result = resolve(raw, row.entity)
+    const result = resolve(raw, entity)
     return result === undefined || result === '' ? undefined : result
   }
 
   const entity = hass?.states[row.entity]
   const content = row.content ?? defaults.content ?? DEFAULT_CONTENT
-  const visible = row.show === undefined ? true : truthy(field(row.show))
-  const name = field(row.name)
-  const icon = field(row.icon)
+  const visible = row.show === undefined ? true : truthy(field(row.show, row.entity))
+  const name = field(row.name, row.entity)
+  const icon = field(row.icon, row.entity)
 
-  const action = readAction(row.tap_action, field)
+  const action = readAction(row.tap_action, field, row.entity)
 
   if (!hass || !entity) {
     return {
@@ -245,10 +252,15 @@ export const readChip = (
     entityId: row.entity,
     name: name ?? nameFor(entity),
     icon: icon ?? iconFor(entity),
-    value: unavailable ? VALUE_DASH : (field(row.value) ?? formatValue(hass, entity)),
+    value: unavailable ? VALUE_DASH : (field(row.value, row.entity) ?? formatValue(hass, entity)),
     content,
     unavailable,
-    color: unavailable ? undefined : colorValue(field(row.color) ?? field(defaults.color)),
+    // The row's own colour resolves against its own entity, exactly like every other field;
+    // the card-level fallback resolves with no entity at all, exactly as `chipTemplates`
+    // registered it — see the note on `field` above for why that has to be spelled out.
+    color: unavailable
+      ? undefined
+      : colorValue(field(row.color, row.entity) ?? field(defaults.color, undefined)),
     visible,
     action,
   }
@@ -263,14 +275,15 @@ export const readChip = (
  */
 const readAction = (
   action: ActionConfig | undefined,
-  field: (raw: string | undefined) => string | undefined,
+  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
+  entity: string | undefined,
 ): ActionConfig => {
   if (!action) return DEFAULT_ACTION
   if (!isTemplate(action.navigation_path) && !isTemplate(action.service)) return action
 
   const next: ActionConfig = { ...action }
-  const path = field(action.navigation_path)
-  const service = field(action.service)
+  const path = field(action.navigation_path, entity)
+  const service = field(action.service, entity)
   if (path === undefined) delete next.navigation_path
   else next.navigation_path = path
   if (service === undefined) delete next.service

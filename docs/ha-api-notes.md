@@ -1315,3 +1315,53 @@ this._element.layout = this.layout // "grid" | "panel" | ...
 clobbered. Hence `cwLayout` / the `cw-layout` attribute in `core/base-card.ts`.
 
 `preview` is the opposite case: Home Assistant sets it and we are meant to read it.
+
+## Template rendering
+
+`render_template`, the subscription behind `core/templates.ts`. Unlike the weather forecast
+subscription two sections up, this one is **verified**: read out of
+`homeassistant/components/websocket_api/commands.py` on `home-assistant/core@dev`, which is the
+handler itself rather than a frontend bundle's use of it.
+
+```python
+{
+    vol.Required("type"): "render_template",
+    vol.Required("template"): str,
+    vol.Optional("entity_ids"): cv.entity_ids,
+    vol.Optional("variables"): dict,
+    vol.Optional("timeout"): vol.Coerce(float),
+    vol.Optional("strict", default=False): bool,
+    vol.Optional("report_errors", default=False): bool,
+}
+```
+
+- A successful render is pushed as an **event**, `{"result": result, "listeners": info.listeners}`.
+- With `report_errors: true`, a failure is **also an event** — `{"error": str(result), "level":
+"ERROR"}` — not a rejected subscribe and not an error response. So a card that only handled a
+  rejection would sit on a silent, permanently unresolved field. `report_errors` defaults to
+  **false**, which is why this library passes it explicitly.
+- The subscribe resolves first and an initial render follows immediately
+  (`connection.send_result(msg["id"])`, then `call_soon_threadsafe(info.async_refresh)`), the
+  same order the calendar and weather subscriptions use.
+- `entity_ids` and `timeout` exist and are not used here: the template's own listeners are
+  worked out by Home Assistant, and a card that guessed at them would subscribe to less than
+  the template reads.
+
+### The result is a native type, not a string
+
+The one thing worth writing down, because it is where the obvious implementation is wrong.
+`result` is whatever the template rendered, parsed — so `{{ is_state('light.a','on') }}` arrives
+as a JSON **boolean**, not as Python's `True`. Over the wire and through `JSON.parse` that means
+a reader sees:
+
+| Template renders | `result` in JS | `String(result)`   |
+| ---------------- | -------------- | ------------------ |
+| a boolean        | `true`/`false` | `'true'`/`'false'` |
+| `None`           | `null`         | `'null'`           |
+| a number         | `42`           | `'42'`             |
+| a string         | `'Hall'`       | `'Hall'`           |
+
+Two consequences, both of which this library handles rather than discovers later:
+`'null'` is not a falsy word in any obvious list, so a `null` result is normalised to _absent_
+before it reaches a card; and a truthiness test has to accept the lower-case `'false'` that
+`String(false)` produces as well as the `'False'` a `| string` filter would give.

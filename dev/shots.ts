@@ -363,6 +363,16 @@ const SHOTS: readonly Shot[] = [
     rows: 2,
     theme: 'dark',
   },
+  {
+    name: 'chips-templates',
+    caption:
+      'templated: colors, names, icons, and values from Jinja templates; one chip removed by show',
+    tag: CHIPS_CARD_TAG,
+    config: chipsShot('templates'),
+    columns: 12,
+    rows: 3,
+    theme: 'light',
+  },
 ]
 
 /** What `screenshots.mjs` needs to know: one entry per file it is about to write. */

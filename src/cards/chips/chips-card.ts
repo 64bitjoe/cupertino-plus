@@ -1,18 +1,28 @@
-import { css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
+import {
+  css,
+  html,
+  nothing,
+  type CSSResultGroup,
+  type PropertyValues,
+  type TemplateResult,
+} from 'lit'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { isPressable, runAction } from '../../core/actions'
 import { watchedIds } from '../../core/entity-view'
 import { withFloors } from '../../core/floors'
 import { registerCard } from '../../core/register'
+import { requestKey, TemplatePool } from '../../core/templates'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { bandFor, floorsFor, rowHeightFor, type ChipBand } from './layout'
 import {
   chipConfigs,
+  chipTemplates,
   DEFAULT_CONTAINER,
   DEFAULT_CONTENT,
   readChips,
   type ChipContent,
+  type ChipDefaults,
   type ChipsContainer,
   type ChipView,
 } from './model'
@@ -25,6 +35,7 @@ export const CHIPS_CARD_TAG = 'cupertino-plus-chips'
 export interface ChipsCardConfig extends CupertinoCardConfig {
   entities?: unknown
   content?: ChipContent
+  color?: string
   container?: ChipsContainer
 }
 
@@ -130,6 +141,15 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         flex: none;
       }
 
+      /* The tint paints the glyph and nothing else: the reading, the caption and the pill stay
+         one ink, so a row of six chips still reads as one band rather than as six competing
+         highlights. §4 of the spec has the argument, and core/ring.ts has the older version of
+         it — a coloured number is a second, blurrier opinion about a number already printed.
+         The fallback is the row's own ink, so a chip with no colour is untouched. */
+      .glyph {
+        color: var(--cw-chip-tint, inherit);
+      }
+
       .value {
         font: var(--cw-text-footnote);
         font-variant-numeric: tabular-nums;
@@ -216,14 +236,51 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     return document.createElement(CHIPS_EDITOR_TAG) as LovelaceCardEditor
   }
 
+  /**
+   * The card's template subscriptions.
+   *
+   * `requestUpdate` rather than a state field: a resolved template changes what `_chips`
+   * computes, and `_chips` is a getter reading `this._config` and the pool. `shouldUpdate`
+   * would otherwise swallow the repaint, because nothing in `hass` changed.
+   */
+  private readonly _templates = new TemplatePool(() => this.requestUpdate())
+
+  public override disconnectedCallback(): void {
+    this._templates.disconnect()
+    super.disconnectedCallback()
+  }
+
+  /**
+   * Kept in step with the config on every update, not only on `setConfig`: the set of
+   * templates changes when the config does, and `sync` is a diff, so calling it when nothing
+   * moved costs a `Set` build and closes nothing.
+   */
+  protected override willUpdate(changed: PropertyValues): void {
+    super.willUpdate(changed)
+    if (!this.hass || !this._config) return
+    this._templates.sync(this.hass, chipTemplates(this._config.entities, this._defaults))
+  }
+
   protected override watchedEntities(): string[] {
     return watchedIds(this._config?.entities)
   }
 
+  /** The card-level defaults every row inherits from. */
+  private get _defaults(): ChipDefaults {
+    const content = this._config?.content
+    const color = this._config?.color
+    return { ...(content ? { content } : {}), ...(color ? { color } : {}) }
+  }
+
   private get _chips(): ChipView[] {
     if (!this.hass || !this._config) return []
-    const content = this._config.content
-    return readChips(this.hass, this._config.entities, content ? { content } : {})
+    return readChips(this.hass, this._config.entities, this._defaults, (template, entity) =>
+      this._templates.read(
+        requestKey(
+          entity === undefined ? { template } : { template, variables: { config: { entity } } },
+        ),
+      ),
+    )
   }
 
   /**
@@ -309,7 +366,11 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         @keydown=${this._key(chip)}
       >
         <span class="pill">
-          <ha-icon class="glyph" .icon=${chip.icon}></ha-icon>
+          <ha-icon
+            class="glyph"
+            style=${chip.color ? `--cw-chip-tint:${chip.color}` : nothing}
+            .icon=${chip.icon}
+          ></ha-icon>
           ${body}
         </span>
       </div>
@@ -319,7 +380,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config || !this.hass) return nothing
 
-    const chips = this._chips
+    const chips = this._chips.filter(chip => chip.visible)
     const container = this._config.container ?? DEFAULT_CONTAINER
     const klass = container === 'glass' ? 'glass' : 'surface'
 

@@ -83,6 +83,22 @@ const MANY = [...ALL, ...ALL]
  * the one place a visitor can see the three interesting outcomes side by side is a fixture that
  * writes them out. The Config pane prints exactly those rows.
  */
+/**
+ * What the mock installation answers for each template the fixtures use.
+ *
+ * The showcase cannot run Jinja, so this is a lookup keyed by the exact template string — a
+ * stub, and honest about being one in the way `dev/ha-stubs.ts` is about `ha-form`. It is
+ * enough to prove the wiring: that a template's result reaches the field, that an unresolved
+ * one falls back, and that `show: false` removes a chip from the row.
+ */
+export const TEMPLATE_RESULTS: Record<string, string> = {
+  "{{ 'Home' if is_state('person.joe','home') else 'Out' }}": 'Out',
+  "{{ 'mdi:lock-open' if is_state('lock.front_door','unlocked') else 'mdi:lock' }}": 'mdi:lock',
+  "{{ 'red' if states('sensor.hall_temperature')|float > 20 else 'blue' }}": 'red',
+  "{{ states('sensor.hall_temperature') }}° in the hall": '21.4° in the hall',
+  "{{ is_state('light.kitchen','on') }}": 'False',
+}
+
 export const CHIP_SETS: Record<string, readonly unknown[]> = {
   mixed: ALL,
   one: [HALL_TEMPERATURE],
@@ -93,6 +109,25 @@ export const CHIP_SETS: Record<string, readonly unknown[]> = {
     { entity: JOE, tap_action: { action: 'none' } },
   ],
   unavailable: [SHED_TEMPERATURE, HALL_TEMPERATURE],
+  templates: [
+    {
+      entity: HALL_TEMPERATURE,
+      color: "{{ 'red' if states('sensor.hall_temperature')|float > 20 else 'blue' }}",
+    },
+    {
+      entity: JOE,
+      name: "{{ 'Home' if is_state('person.joe','home') else 'Out' }}",
+      content: 'labeled',
+    },
+    {
+      entity: FRONT_DOOR,
+      icon: "{{ 'mdi:lock-open' if is_state('lock.front_door','unlocked') else 'mdi:lock' }}",
+      color: 'green',
+    },
+    { entity: HALL_TEMPERATURE, value: "{{ states('sensor.hall_temperature') }}° in the hall" },
+    // Hidden: the row draws four chips, not five.
+    { entity: KITCHEN_LIGHT, show: "{{ is_state('light.kitchen','on') }}" },
+  ],
 }
 
 export const DEFAULT_CHIP_SET = 'mixed'

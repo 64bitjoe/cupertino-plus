@@ -1,6 +1,6 @@
 import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
 import { BATTERY_STATES } from './battery-devices'
-import { CHIP_STATES } from './chip-fixtures'
+import { CHIP_STATES, TEMPLATE_RESULTS } from './chip-fixtures'
 import { COMPLICATION_STATES } from './complication-entities'
 import {
   WEATHER_DAILY_FORECASTS,
@@ -333,6 +333,21 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
           const forecasts =
             message.forecast_type === 'hourly' ? WEATHER_HOURLY_FORECASTS : WEATHER_DAILY_FORECASTS
           queueMicrotask(() => callback({ forecast: forecasts[entityId]?.() ?? [] } as never))
+        }
+
+        // The template engine's own subscription — see `core/templates.ts`. Keyed by the exact
+        // template string, because this harness cannot run Jinja; a template nobody wrote an
+        // answer for pushes an error, which is the branch worth being able to see.
+        if (message.type === 'render_template') {
+          const template = String(message.template)
+          const result = TEMPLATE_RESULTS[template]
+          queueMicrotask(() =>
+            callback(
+              (result === undefined
+                ? { error: 'no fixture for this template', level: 'ERROR' }
+                : { result }) as never,
+            ),
+          )
         }
 
         return async () => {

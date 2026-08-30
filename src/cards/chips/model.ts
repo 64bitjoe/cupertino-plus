@@ -26,6 +26,8 @@ import {
   VALUE_DASH,
   type EntityRow,
 } from '../../core/entity-view'
+import { isTemplate, type TemplateRequest } from '../../core/templates'
+import { colorValue } from '../../core/tint'
 import type { HomeAssistant } from '../../core/types/ha'
 
 /**
@@ -59,6 +61,12 @@ export const DEFAULT_CONTENT: ChipContent = 'value'
 
 export interface ChipConfig extends EntityRow {
   content?: ChipContent
+  /** A palette name, any CSS colour, or a template resolving to either. Tints the glyph. */
+  color?: string
+  /** Replaces the printed reading. Almost always a template; a literal is legal and odd. */
+  value?: string
+  /** Whether the chip is drawn at all. Hidden until it resolves; see `truthy`. */
+  show?: string
   tap_action?: ActionConfig
 }
 
@@ -72,11 +80,17 @@ export interface ChipView {
   value: string
   content: ChipContent
   unavailable: boolean
+  /** A resolved CSS value for the glyph, or `undefined` for the row's default ink. */
+  color: string | undefined
+  /** False only for a chip whose `show` template says so, or has not answered yet. */
+  visible: boolean
   action: ActionConfig
 }
 
 export interface ChipDefaults {
   content?: ChipContent
+  /** The card-level colour. A row's own `color` beats it, exactly as `content` works. */
+  color?: string
 }
 
 /**
@@ -92,6 +106,73 @@ export const FALLBACK_ICON = 'mdi:eye'
 export const chipConfigs = (entities: unknown): ChipConfig[] => entityRows<ChipConfig>(entities)
 
 /**
+ * How a template's result reaches the model.
+ *
+ * A function rather than a pool, so this module stays pure and node-testable: the card owns
+ * the subscription and passes its `read` in. `entity` is the row the template belongs to,
+ * which has to be part of the lookup for the same reason it is part of `requestKey` — two rows
+ * sharing `{{ states(config.entity) }}` have two different answers.
+ */
+export type TemplateResolver = (template: string, entity?: string) => string | undefined
+
+/** Every field of a chip that may hold a template, in the order the editor shows them. */
+const TEMPLATED_FIELDS = ['name', 'icon', 'color', 'value', 'show'] as const
+
+/**
+ * Every template a config asks for, ready for `TemplatePool.sync`.
+ *
+ * A field missed here is a field that never resolves, so this and the reading below have to
+ * agree about what is templatable; the shared `TEMPLATED_FIELDS` list is what keeps them
+ * honest, and the action's two argument fields are appended by hand because they live one
+ * level down.
+ *
+ * The card-level colour has no entity, so it carries no variables at all — which also makes
+ * it a different `requestKey` from the same template used on a row, correctly: they are two
+ * questions with two answers.
+ */
+export const chipTemplates = (entities: unknown, defaults: ChipDefaults): TemplateRequest[] => {
+  const requests: TemplateRequest[] = []
+
+  if (isTemplate(defaults.color)) requests.push({ template: defaults.color })
+
+  for (const row of chipConfigs(entities)) {
+    const variables = { config: { entity: row.entity } }
+
+    for (const field of TEMPLATED_FIELDS) {
+      const raw = row[field]
+      if (isTemplate(raw)) requests.push({ template: raw, variables })
+    }
+
+    // Bound first rather than reached through `row.tap_action?.…`: a type predicate narrows
+    // the expression it was handed, not the object behind it, so the optional-chain version
+    // passes `isTemplate` and then fails to compile on `action.navigation_path`.
+    const action = row.tap_action
+    if (action) {
+      if (isTemplate(action.navigation_path)) {
+        requests.push({ template: action.navigation_path, variables })
+      }
+      if (isTemplate(action.service)) requests.push({ template: action.service, variables })
+    }
+  }
+
+  return requests
+}
+
+/**
+ * What a rendered `show` means.
+ *
+ * Home Assistant may hand back a real boolean or Python's `True`/`False` as a string,
+ * depending on the template; `String()` in the pool makes both arrive here as text. The falsy
+ * set is deliberately generous — a user writing `{{ 'off' }}` means off — and `undefined` is
+ * false, which is the "hidden until it answers" rule: a chip that flashes *in* reads as a
+ * dashboard loading, a chip that flashes *out* reads as a bug.
+ */
+const FALSY = new Set(['', 'false', 'none', 'null', '0', 'off', 'unavailable', 'unknown'])
+
+export const truthy = (result: string | undefined): boolean =>
+  result !== undefined && !FALSY.has(result.trim().toLowerCase())
+
+/**
  * Every configured row, in order, as something drawable.
  *
  * Nothing is ever dropped. A row whose entity is missing from `hass.states` entirely still
@@ -105,7 +186,8 @@ export const readChips = (
   hass: HomeAssistant,
   entities: unknown,
   defaults: ChipDefaults,
-): ChipView[] => chipConfigs(entities).map(row => readChip(hass, row, defaults))
+  resolve?: TemplateResolver,
+): ChipView[] => chipConfigs(entities).map(row => readChip(hass, row, defaults, resolve))
 
 /**
  * One row, drawn.
@@ -124,19 +206,36 @@ export const readChip = (
   hass: HomeAssistant | undefined,
   row: ChipConfig,
   defaults: ChipDefaults = {},
+  resolve: TemplateResolver = () => undefined,
 ): ChipView => {
+  // A field is its template's result when it has one, its literal otherwise, and `undefined`
+  // when a template has not answered yet — which every caller below treats as "fall back",
+  // so nothing is ever blank while a template resolves.
+  const field = (raw: string | undefined): string | undefined => {
+    if (!isTemplate(raw)) return raw
+    const result = resolve(raw, row.entity)
+    return result === undefined || result === '' ? undefined : result
+  }
+
   const entity = hass?.states[row.entity]
   const content = row.content ?? defaults.content ?? DEFAULT_CONTENT
-  const action = row.tap_action ?? DEFAULT_ACTION
+  const visible = row.show === undefined ? true : truthy(field(row.show))
+  const name = field(row.name)
+  const icon = field(row.icon)
+
+  const action = readAction(row.tap_action, field)
 
   if (!hass || !entity) {
     return {
       entityId: row.entity,
-      name: row.name ?? row.entity,
-      icon: row.icon ?? FALLBACK_ICON,
+      name: name ?? row.entity,
+      icon: icon ?? FALLBACK_ICON,
       value: VALUE_DASH,
       content,
       unavailable: true,
+      // A chip that cannot be read is dimmed to say so; a dimmed orange chip says two things.
+      color: undefined,
+      visible,
       action,
     }
   }
@@ -144,13 +243,39 @@ export const readChip = (
   const unavailable = isUnavailable(entity)
   return {
     entityId: row.entity,
-    name: row.name ?? nameFor(entity),
-    icon: row.icon ?? iconFor(entity),
-    value: unavailable ? VALUE_DASH : formatValue(hass, entity),
+    name: name ?? nameFor(entity),
+    icon: icon ?? iconFor(entity),
+    value: unavailable ? VALUE_DASH : (field(row.value) ?? formatValue(hass, entity)),
     content,
     unavailable,
+    color: unavailable ? undefined : colorValue(field(row.color) ?? field(defaults.color)),
+    visible,
     action,
   }
+}
+
+/**
+ * The action, with its one argument resolved if it was a template.
+ *
+ * Rebuilt rather than mutated: `row.tap_action` is the user's config object, and a card that
+ * wrote a rendered path back into it would persist a template's output as though somebody had
+ * typed it.
+ */
+const readAction = (
+  action: ActionConfig | undefined,
+  field: (raw: string | undefined) => string | undefined,
+): ActionConfig => {
+  if (!action) return DEFAULT_ACTION
+  if (!isTemplate(action.navigation_path) && !isTemplate(action.service)) return action
+
+  const next: ActionConfig = { ...action }
+  const path = field(action.navigation_path)
+  const service = field(action.service)
+  if (path === undefined) delete next.navigation_path
+  else next.navigation_path = path
+  if (service === undefined) delete next.service
+  else next.service = service
+  return next
 }
 
 /**

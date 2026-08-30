@@ -4,12 +4,14 @@ import {
   chipFromForm,
   chipKeys,
   chipRows,
+  chipTemplates,
   chipToForm,
   CONTENT_INHERIT,
   inheritedIcon,
   inheritedName,
   readChip,
   readChips,
+  truthy,
   type ChipConfig,
 } from './model'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
@@ -48,6 +50,8 @@ describe('readChips', () => {
       value: '21.4°C',
       content: 'value',
       unavailable: false,
+      color: undefined,
+      visible: true,
       action: { action: 'more-info' },
     })
   })
@@ -287,5 +291,207 @@ describe('chipKeys', () => {
     expect(
       chipKeys([{ entity: 'sensor.a' }, { entity: 'light.b' }, { entity: 'sensor.a' }]),
     ).toEqual(['sensor.a', 'light.b', 'sensor.a#1'])
+  })
+})
+
+/**
+ * The template requests a config asks for. This is what the card hands `TemplatePool.sync`,
+ * so a field missed here is a field that never resolves.
+ */
+describe('chipTemplates', () => {
+  it('finds a template in every templatable field, and ignores literals', () => {
+    const requests = chipTemplates(
+      [
+        {
+          entity: 'light.a',
+          name: '{{ n }}',
+          icon: '{{ i }}',
+          color: '{{ c }}',
+          value: '{{ v }}',
+          show: '{{ s }}',
+          tap_action: {
+            action: 'navigate' as const,
+            navigation_path: '{{ p }}',
+          },
+        },
+        { entity: 'light.b', name: 'Plain' },
+      ],
+      {},
+    )
+
+    expect(requests.map(r => r.template).sort()).toEqual([
+      '{{ c }}',
+      '{{ i }}',
+      '{{ n }}',
+      '{{ p }}',
+      '{{ s }}',
+      '{{ v }}',
+    ])
+  })
+
+  it("carries the row's own entity as a variable, so one template serves every row", () => {
+    const requests = chipTemplates(
+      [
+        { entity: 'light.a', name: '{{ states(config.entity) }}' },
+        { entity: 'light.b', name: '{{ states(config.entity) }}' },
+      ],
+      {},
+    )
+
+    expect(requests).toHaveLength(2)
+    expect(requests.map(r => r.variables)).toEqual([
+      { config: { entity: 'light.a' } },
+      { config: { entity: 'light.b' } },
+    ])
+  })
+
+  it('includes a templated card-level colour, with no entity of its own', () => {
+    const requests = chipTemplates(['light.a'], { color: '{{ c }}' })
+    expect(requests).toEqual([{ template: '{{ c }}' }])
+  })
+
+  it('asks for nothing when a config holds no templates', () => {
+    expect(chipTemplates(['light.a', { entity: 'light.b', name: 'Plain' }], {})).toEqual([])
+  })
+})
+
+/**
+ * Home Assistant may render a boolean as a real boolean or as Python's `True`/`False`,
+ * depending on the template; Task 1 established which. Both are accepted, and so is the set of
+ * strings a user would reasonably expect to mean "no".
+ */
+describe('truthy', () => {
+  it('reads the falsy set as false', () => {
+    // `false` lower-case is what `String(false)` gives for the boolean HA actually sends;
+    // `False` is what a `| string` filter gives. Both arrive in practice, so both are here.
+    for (const no of [
+      '',
+      'false',
+      'False',
+      'False ',
+      'None',
+      'none',
+      'null',
+      '0',
+      'off',
+      'unavailable',
+    ]) {
+      expect(truthy(no)).toBe(false)
+    }
+  })
+
+  it('reads anything else as true', () => {
+    for (const yes of ['true', 'True', '1', 'on', 'yes', 'anything at all']) {
+      expect(truthy(yes)).toBe(true)
+    }
+  })
+
+  /** Before the first push. A `show` chip is hidden until its template answers. */
+  it('reads an unresolved template as false', () => {
+    expect(truthy(undefined)).toBe(false)
+  })
+})
+
+describe('readChips with templates', () => {
+  const resolve = (map: Record<string, string>) => (template: string) => map[template]
+
+  it('falls back to the entity own values before a template resolves', () => {
+    const [chip] = readChips(
+      hassWith(HALL),
+      [{ entity: 'sensor.hall', name: '{{ n }}', icon: '{{ i }}' }],
+      {},
+      () => undefined,
+    )
+    expect(chip).toMatchObject({ name: 'Hall', icon: 'mdi:thermometer', visible: true })
+  })
+
+  it('applies a resolved name, icon and value', () => {
+    const [chip] = readChips(
+      hassWith(HALL),
+      [{ entity: 'sensor.hall', name: '{{ n }}', icon: '{{ i }}', value: '{{ v }}' }],
+      {},
+      resolve({ '{{ n }}': 'Hallway', '{{ i }}': 'mdi:sofa', '{{ v }}': 'warm' }),
+    )
+    expect(chip).toMatchObject({ name: 'Hallway', icon: 'mdi:sofa', value: 'warm' })
+  })
+
+  it('falls back to the formatted state for a value that renders empty', () => {
+    const [chip] = readChips(
+      hassWith(HALL),
+      [{ entity: 'sensor.hall', value: '{{ v }}' }],
+      {},
+      resolve({ '{{ v }}': '' }),
+    )
+    expect(chip?.value).toBe('21.4°C')
+  })
+
+  it('hides a chip whose show template is false, and shows one that is true', () => {
+    const chips = readChips(
+      hassWith(HALL),
+      [
+        { entity: 'sensor.hall', show: '{{ a }}' },
+        { entity: 'sensor.hall', show: '{{ b }}' },
+        { entity: 'sensor.hall' },
+      ],
+      {},
+      resolve({ '{{ a }}': 'True', '{{ b }}': 'False' }),
+    )
+    expect(chips.map(chip => chip.visible)).toEqual([true, false, true])
+  })
+
+  it('resolves a colour through the palette, and passes a CSS colour through', () => {
+    const chips = readChips(
+      hassWith(HALL),
+      [
+        { entity: 'sensor.hall', color: 'red' },
+        { entity: 'sensor.hall', color: '#ff8800' },
+        { entity: 'sensor.hall', color: '{{ c }}' },
+        { entity: 'sensor.hall' },
+      ],
+      {},
+      resolve({ '{{ c }}': 'teal' }),
+    )
+    expect(chips.map(chip => chip.color)).toEqual([
+      'var(--cw-red)',
+      '#ff8800',
+      'var(--cw-teal)',
+      undefined,
+    ])
+  })
+
+  it("lets a chip own colour beat the card's", () => {
+    const chips = readChips(
+      hassWith(HALL),
+      [{ entity: 'sensor.hall', color: 'red' }, 'sensor.hall'],
+      { color: 'blue' },
+      () => undefined,
+    )
+    expect(chips.map(chip => chip.color)).toEqual(['var(--cw-red)', 'var(--cw-blue)'])
+  })
+
+  it('templates the tap action target', () => {
+    const [chip] = readChips(
+      hassWith(HALL),
+      [
+        {
+          entity: 'sensor.hall',
+          tap_action: { action: 'navigate' as const, navigation_path: '{{ p }}' },
+        },
+      ],
+      {},
+      resolve({ '{{ p }}': '/lovelace/people' }),
+    )
+    expect(chip?.action).toEqual({ action: 'navigate', navigation_path: '/lovelace/people' })
+  })
+
+  /** §4 of the spec: the dim is the signal, and a dimmed orange chip says two things. */
+  it('drops the colour of a chip that is not reporting', () => {
+    const dead = entity({
+      entity_id: 'sensor.hall',
+      state: 'unavailable',
+      attributes: { friendly_name: 'Hall' },
+    })
+    const [chip] = readChips(hassWith(dead), [{ entity: 'sensor.hall', color: 'red' }], {})
+    expect(chip).toMatchObject({ unavailable: true, color: undefined })
   })
 })

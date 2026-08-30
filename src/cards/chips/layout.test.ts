@@ -10,6 +10,8 @@ const chip = (content: ChipView['content']): ChipView => ({
   value: '1',
   content,
   unavailable: false,
+  color: undefined,
+  visible: true,
   action: { action: 'more-info' },
 })
 

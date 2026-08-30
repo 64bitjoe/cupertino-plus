@@ -254,14 +254,32 @@ export interface BooleanSelector {
 }
 
 /**
+ * Home Assistant's own view/dashboard picker: `ha-navigation-picker`, a searchable combo box
+ * over the installation's actual views. Verified against `home-assistant/frontend`'s own
+ * `ha-selector-navigation.ts` rather than assumed: it renders `ha-navigation-picker`, reports
+ * a plain string through `value-changed`, and its own selector type is
+ * `{ navigation: ActionRelatedContext | null }`. Modelled with no config at all — the same
+ * choice `BooleanSelector` makes — because nothing here ever needs `ActionRelatedContext`.
+ */
+export interface NavigationSelector {
+  navigation: Record<string, never>
+}
+
+/**
  * A selector, as `ha-selector` reads it.
  *
  * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful;
  * hence a union rather than a bag of optional keys. The shipped build knows 57 of
- * these; these are the six our editors ask for.
+ * these; these are the seven our editors ask for.
  */
 export type Selector =
-  EntitySelector | SelectSelector | NumberSelector | IconSelector | TextSelector | BooleanSelector
+  | EntitySelector
+  | SelectSelector
+  | NumberSelector
+  | IconSelector
+  | TextSelector
+  | BooleanSelector
+  | NavigationSelector
 
 /**
  * One row of an `ha-form`.

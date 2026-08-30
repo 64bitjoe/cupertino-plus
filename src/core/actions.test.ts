@@ -140,6 +140,37 @@ describe('runAction', () => {
     expect(calls).toEqual([])
   })
 
+  /** A chip with no entity and no `tap_action.entity` override — a spacer, or one built
+   *  entirely from templates — has nothing a toggle or a more-info dialog can target. */
+  it('warns rather than toggling nothing when there is no entity at all', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const calls: ServiceCall[] = []
+    runAction(stubHass(calls), stubElement([]), { action: 'toggle' }, undefined)
+    expect(calls).toEqual([])
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('warns rather than opening more-info for nothing when there is no entity at all', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const seen: CustomEvent[] = []
+    runAction(stubHass([]), stubElement(seen), undefined, undefined)
+    expect(seen).toEqual([])
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('still toggles when an explicit tap_action.entity supplies the target', () => {
+    const calls: ServiceCall[] = []
+    runAction(
+      stubHass(calls),
+      stubElement([]),
+      { action: 'toggle', entity: 'light.hall' },
+      undefined,
+    )
+    expect(calls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: { entity_id: 'light.hall' } },
+    ])
+  })
+
   it('lets a config name a different entity than the one pressed', () => {
     const seen: CustomEvent[] = []
     runAction(

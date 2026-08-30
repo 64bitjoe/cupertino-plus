@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  chipConfigs,
   chipFromForm,
   chipKeys,
   chipRows,
   chipTemplates,
   chipToForm,
+  chipWatchedIds,
   CONTENT_INHERIT,
   inheritedIcon,
   inheritedName,
@@ -52,6 +54,7 @@ describe('readChips', () => {
       unavailable: false,
       color: undefined,
       visible: true,
+      spacer: false,
       action: { action: 'more-info' },
     })
   })
@@ -265,8 +268,25 @@ describe('chipFromForm', () => {
     expect(chipFromForm(prior, chipToForm(prior))).toEqual(prior)
   })
 
-  it('answers nothing for a row whose entity has been cleared', () => {
-    expect(chipFromForm(bare, { ...chipToForm(bare), entity: '' })).toBeUndefined()
+  /**
+   * The behaviour change this whole feature turns on: clearing Entity used to delete the row
+   * (`chipRows` did the dropping); now it turns the chip into a spacer instead. `bare` has no
+   * `tap_action`, so the `more-info` the panel's own snapshot still carries at the moment of
+   * this edit is `chipToForm`'s cosmetic default rather than a real stored value, and must not
+   * survive into the config as one — see `chipFromForm`'s own note on `staleDefault`.
+   */
+  it('turns a chip into a spacer rather than deleting it when the entity is cleared', () => {
+    expect(chipFromForm(bare, { ...chipToForm(bare), entity: '' })).toEqual({})
+  })
+
+  it('keeps an explicit tap_action.entity override when the row is cleared to a spacer', () => {
+    const prior: ChipConfig = {
+      entity: 'sensor.hall',
+      tap_action: { action: 'toggle', entity: 'light.other' },
+    }
+    expect(chipFromForm(prior, { ...chipToForm(prior), entity: '' })).toEqual({
+      tap_action: { action: 'toggle', entity: 'light.other' },
+    })
   })
 
   it('falls back to the default action for a value that is not one', () => {
@@ -287,8 +307,16 @@ describe('chipRows', () => {
     ])
   })
 
-  it('drops a row with no entity at all', () => {
-    expect(chipRows([{ entity: '' }, { entity: 'sensor.a' }])).toEqual(['sensor.a'])
+  it('drops a blank entity key rather than persisting an empty string', () => {
+    expect(chipRows([{ entity: '' }, { entity: 'sensor.a' }])).toEqual([{}, 'sensor.a'])
+  })
+
+  it('keeps a row with no entity at all, whatever else it carries', () => {
+    expect(chipRows([{ name: 'Home' }, { entity: 'sensor.a' }, {}])).toEqual([
+      { name: 'Home' },
+      'sensor.a',
+      {},
+    ])
   })
 })
 
@@ -528,5 +556,123 @@ describe('readChips with templates', () => {
     })
     const [chip] = readChips(hassWith(dead), [{ entity: 'sensor.hall', color: 'red' }], {})
     expect(chip).toMatchObject({ unavailable: true, color: undefined })
+  })
+})
+
+/**
+ * A chip with no configured entity: a spacer, or one built entirely out of templates and
+ * literals. Neither gets the dashed/dimmed treatment `entity: 'sensor.gone'` earns above —
+ * that treatment says "this was configured and cannot be read", and nothing here was ever
+ * configured to read one.
+ */
+describe('readChip with no entity', () => {
+  it('is a spacer when nothing resolves for name, icon or value', () => {
+    const [chip] = readChips(hassWith(), [{}], {})
+    expect(chip).toMatchObject({
+      entityId: undefined,
+      name: '',
+      icon: '',
+      value: '',
+      unavailable: false,
+      spacer: true,
+    })
+  })
+
+  it('is not a spacer once any one of the three resolves', () => {
+    expect(readChips(hassWith(), [{ name: 'Home' }], {})[0]?.spacer).toBe(false)
+    expect(readChips(hassWith(), [{ icon: 'mdi:home' }], {})[0]?.spacer).toBe(false)
+    expect(readChips(hassWith(), [{ value: 'Out' }], {})[0]?.spacer).toBe(false)
+  })
+
+  it('reads as a spacer while its templates are unresolved, and stops once they answer', () => {
+    const row = { name: '{{ n }}' }
+    expect(readChips(hassWith(), [row], {}, () => undefined)[0]?.spacer).toBe(true)
+    expect(readChips(hassWith(), [row], {}, () => 'Home')[0]?.spacer).toBe(false)
+  })
+
+  it('defaults its press to doing nothing, not more-info', () => {
+    expect(readChips(hassWith(), [{ name: 'Home' }], {})[0]?.action).toEqual({ action: 'none' })
+  })
+
+  it('honours an explicit tap_action even with no entity of its own', () => {
+    const [chip] = readChips(
+      hassWith(),
+      [{ name: 'People', tap_action: { action: 'navigate', navigation_path: '/lovelace/people' } }],
+      {},
+    )
+    expect(chip?.action).toEqual({ action: 'navigate', navigation_path: '/lovelace/people' })
+  })
+
+  it('resolves its own colour and templated value with no entity to pass the resolver', () => {
+    const [chip] = readChips(
+      hassWith(),
+      [{ name: 'Kitchen', color: '{{ c }}', value: '{{ v }}' }],
+      {},
+      (template, entity) => {
+        expect(entity).toBeUndefined()
+        return template === '{{ c }}' ? 'orange' : 'On'
+      },
+    )
+    expect(chip).toMatchObject({ color: 'var(--cw-orange)', value: 'On' })
+  })
+})
+
+describe('chipTemplates with no entity', () => {
+  it("gives an entity-less row's own template no variables, matching the card-level colour", () => {
+    expect(chipTemplates([{ name: '{{ n }}' }], {})).toEqual([{ template: '{{ n }}' }])
+  })
+
+  it('still carries variables for a row that does have an entity, in the same list', () => {
+    const requests = chipTemplates(
+      [{ name: '{{ n }}' }, { entity: 'light.a', name: '{{ m }}' }],
+      {},
+    )
+    expect(requests).toEqual([
+      { template: '{{ n }}' },
+      { template: '{{ m }}', variables: { config: { entity: 'light.a' } } },
+    ])
+  })
+})
+
+describe('chipKeys with no entity', () => {
+  it('keys an entity-less row by its position', () => {
+    expect(chipKeys([{ entity: 'sensor.a' }, {}, { name: 'Home' }])).toEqual([
+      'sensor.a',
+      '#1',
+      '#2',
+    ])
+  })
+})
+
+/**
+ * The one thing this card's own row reader does differently from `core/entity-view.ts`'s
+ * `entityRows`: it keeps a row with no usable entity instead of dropping it.
+ */
+describe('chipConfigs', () => {
+  it('keeps an object row with no entity at all', () => {
+    expect(chipConfigs([{ name: 'Home' }])).toEqual([{ name: 'Home' }])
+  })
+
+  it('normalises a blank entity away to no key, on a bare string or inside an object', () => {
+    expect(chipConfigs([''])).toEqual([{}])
+    expect(chipConfigs([{ entity: '', name: 'Home' }])).toEqual([{ name: 'Home' }])
+  })
+
+  it('still drops what has nothing in it to be a chip at all', () => {
+    expect(chipConfigs([null, 42, 'sensor.a'])).toEqual([{ entity: 'sensor.a' }])
+  })
+
+  it('reads a bare entities scalar and a single object the same way the list form does', () => {
+    expect(chipConfigs('sensor.a')).toEqual([{ entity: 'sensor.a' }])
+    expect(chipConfigs({ name: 'Home' })).toEqual([{ name: 'Home' }])
+  })
+})
+
+describe('chipWatchedIds', () => {
+  it('contributes nothing to watch for a row with no entity', () => {
+    expect(chipWatchedIds(['sensor.a', { name: 'Home' }, { entity: 'sensor.b' }])).toEqual([
+      'sensor.a',
+      'sensor.b',
+    ])
   })
 })

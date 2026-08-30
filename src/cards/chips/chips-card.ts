@@ -9,8 +9,7 @@ import {
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { isPressable, runAction } from '../../core/actions'
-import { watchedIds } from '../../core/entity-view'
-import { withFloors } from '../../core/floors'
+import { withFloors, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
@@ -18,6 +17,7 @@ import { bandFor, floorsFor, rowHeightFor, type ChipBand } from './layout'
 import {
   chipConfigs,
   chipTemplates,
+  chipWatchedIds,
   DEFAULT_CONTAINER,
   DEFAULT_CONTENT,
   readChips,
@@ -286,7 +286,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   }
 
   protected override watchedEntities(): string[] {
-    return watchedIds(this._config?.entities)
+    return chipWatchedIds(this._config?.entities)
   }
 
   /** The card-level defaults every row inherits from. */
@@ -296,6 +296,13 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     return { ...(content ? { content } : {}), ...(color ? { color } : {}) }
   }
 
+  /**
+   * The reconstructed key here has to agree with `chipTemplates`' own, byte for byte, or the
+   * lookup silently misses and the field falls back forever. The one thing worth restating:
+   * "no entity" means no `variables` key at all, on a row or off it — `chipTemplates`'s own
+   * note has the reasoning, and a mismatch here was exactly the class of bug that note exists
+   * to prevent.
+   */
   private get _chips(): ChipView[] {
     if (!this.hass || !this._config) return []
     return readChips(this.hass, this._config.entities, this._defaults, (template, entity) =>
@@ -308,32 +315,73 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   }
 
   /**
-   * The floor's own view of the row: config alone, never `hass`. `bandFor`/`floorsFor` read
-   * only `.content` and the array's `.length`, both of which come from `chipConfigs` and the
-   * card-level `content` default, so this reproduces just that shape rather than routing
-   * through `_chips`/`readChips` — the complication card's `getGridOptions` makes the same
-   * call, off `entityConfigs(this._config?.entities).length` alone.
+   * The floor's own view of the row.
    *
-   * That independence is not tidiness: `getGridOptions()` can be asked before `hass` is ever
-   * assigned (Home Assistant does this the moment a card is dropped from the picker), and
-   * `_chips` answers `[]` until it is. A floor built on `_chips` would report the empty-row
-   * floor — `min_columns: 4, min_rows: 1` — for a card about to hold several chips, and the
-   * Layout tab would offer a box too short for content it has not measured yet, exactly the
-   * clipping failure the floors exist to prevent.
+   * Before `hass` exists — Home Assistant asks for `getGridOptions()` the moment a card is
+   * dropped from the picker, well before that — visibility cannot be known at all, so every
+   * configured row counts: the same generous default this always had, from before `show`
+   * existed to override it.
+   *
+   * Once `hass` exists, only what is actually going to be drawn counts: a chip whose `show`
+   * resolved false takes no room, which is what stops a card built mostly of hidden chips from
+   * reserving space for all of them anyway. `_floorFor` below is what stops that honesty from
+   * ever shrinking the box below what has already been shown.
    */
   private get _floorBand(): ChipBand[] {
     const defaultContent = this._config?.content ?? DEFAULT_CONTENT
-    return chipConfigs(this._config?.entities).map(row => ({
-      content: row.content ?? defaultContent,
-    }))
+    if (!this.hass) {
+      return chipConfigs(this._config?.entities).map(row => ({
+        content: row.content ?? defaultContent,
+      }))
+    }
+    return this._chips.filter(chip => chip.visible).map(chip => ({ content: chip.content }))
   }
 
   /**
-   * The floors, recomputed on every call: both halves depend on a config that changes under
-   * the card, exactly as the complication card's own `getGridOptions` does.
+   * The highest floor this card has actually needed, keyed to the entities and the card-level
+   * content default so a genuine edit re-baselines rather than carrying a stale high-water
+   * mark forward.
+   *
+   * `_floorBand` reads real visibility once `hass` exists, and a chip whose `show` template
+   * has not resolved yet reads as hidden — `readChip`'s own "hidden until it answers"
+   * contract — so the very FIRST tick's true count is usually too small, not too large.
+   * Answering with it verbatim would fix an oversized card built from mostly-hidden chips by
+   * overcorrecting into a worse failure: a floor frozen before any `show` template has had its
+   * first push, clipping every chip that resolves visible a moment later.
+   *
+   * Tracking a maximum instead means the floor grows to the true visible count within the
+   * first couple of renders and holds there. That convergence is not a hope: `getGridOptions()`
+   * is called by the sections grid on every render of its section (`hui-grid-section.ts`,
+   * checked directly against `home-assistant/frontend`), and `TemplatePool`'s first results
+   * land within a render or two of `hass` arriving, each one calling `requestUpdate()` and so
+   * triggering exactly the render this needs.
+   */
+  private _floorMax: { key: string; floors: Floors } | undefined
+
+  private _floorFor(band: ChipBand[]): Floors {
+    const floors = floorsFor(band)
+    const key = JSON.stringify([this._config?.entities ?? null, this._config?.content ?? null])
+
+    if (!this._floorMax || this._floorMax.key !== key) {
+      this._floorMax = { key, floors }
+      return floors
+    }
+
+    const merged: Floors = {
+      min_columns: Math.max(this._floorMax.floors.min_columns, floors.min_columns),
+      min_rows: Math.max(this._floorMax.floors.min_rows, floors.min_rows),
+    }
+    this._floorMax = { key, floors: merged }
+    return merged
+  }
+
+  /**
+   * The floors, recomputed on every call: both halves depend on a config — and, past the
+   * first tick, on live visibility — that changes under the card, exactly as the complication
+   * card's own `getGridOptions` does.
    */
   public override getGridOptions(): LovelaceGridOptions {
-    return withFloors(super.getGridOptions(), floorsFor(this._floorBand))
+    return withFloors(super.getGridOptions(), this._floorFor(this._floorBand))
   }
 
   /**
@@ -365,10 +413,23 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * One chip. A chip whose action is `none` is not a button: no role, no tab stop, no pressed
    * state — an affordance that lies about being interactive is worse than none, and eight of
    * them in a keyboard user's tab order is the concrete version of that.
+   *
+   * A spacer is drawn first and returns early: no pill, no glyph, not a button, nothing a
+   * screen reader announces — `aria-hidden` rather than a divider mark, so a row of chips
+   * groups by whitespace alone. `.chip`'s own `min-width`/`min-height` still apply, which is
+   * what makes it a gap the width of one chip rather than nothing at all.
    */
   private _renderChip(chip: ChipView, band: ChipContent): TemplateResult {
+    if (chip.spacer) return html`<div class="chip ${band}" aria-hidden="true"></div>`
+
     const pressable = isPressable(chip.action)
-    const label = `${chip.name}, ${chip.unavailable ? 'unavailable' : chip.value}`
+    // Ordinary entity-bearing chips always have both a name and a reading, so this produces
+    // the exact same string it always did for them: `${chip.name}, ${...}`. The `filter` and
+    // fallback only matter for an entity-less chip, where either half can resolve empty — an
+    // icon-only nav chip with no name and no value would otherwise announce a bare ", " to
+    // whoever is listening.
+    const readable = chip.unavailable ? 'unavailable' : chip.value
+    const label = [chip.name, readable].filter(part => part !== '').join(', ') || 'Chip'
 
     const body =
       band === 'labeled'

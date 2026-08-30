@@ -866,6 +866,11 @@ class HaFormStub extends HTMLElement {
       row.append(this._renderText(node.name, value, node.selector.text.placeholder))
     } else if ('boolean' in node.selector) {
       row.append(this._renderBoolean(node.name, value))
+    } else if ('navigation' in node.selector) {
+      // No stand-in for `ha-navigation-picker` here, the same call already made for
+      // `ha-entity-picker`/`ha-icon-picker`: a text box is the honest fallback, since the
+      // value it reports (a plain string path) is identical either way.
+      row.append(this._renderText(node.name, value, '/lovelace/0'))
     } else if (node.selector.entity.multiple) {
       row.append(this._renderEntities(node, node.selector.entity))
     } else {

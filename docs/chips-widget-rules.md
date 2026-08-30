@@ -18,12 +18,15 @@ reason chips are a fifth card rather than a sixth complication style. Where this
 
 ```ts
 {
-  entityId: string,     // identity, and what a tap acts on
+  entityId: string | undefined, // identity, and what a tap acts on; undefined for §1a
   name: string,         // the caption in `labeled`, and the accessible name in every mode
-  icon: string,         // always an `mdi:` name, never a raw path and never empty
+  icon: string,         // an `mdi:` name, never a raw path; empty only for a spacer (§1a)
   value: string,        // formatted, unit included; an em dash for nothing to read
   content: ChipContent, // `icon` | `value` | `labeled`
   unavailable: boolean,
+  color: string | undefined, // a resolved CSS value tinting the glyph, or the row's own ink
+  visible: boolean,     // whether the chip is drawn at all
+  spacer: boolean,      // an intentional gap; see §1a
   action: ActionConfig  // what a press does; see §7
 }
 ```
@@ -43,6 +46,41 @@ from the id it asked for. That follows the complication card rather than the wea
 for its reason: a chip has a configured identity of its own to draw, where a weather card
 without its entity has no location, no unit and nothing honest to put on the screen. It also
 means a typo shows up as a chip you can see instead of a row that silently is not there.
+
+### 1a. A chip without an entity
+
+`entity` is the one field in a chip's config that is not required. A row with nothing else
+configured either is a **spacer**: an intentional gap the width of one chip, drawn with no pill,
+no glyph and no tap target — `aria-hidden`, not a divider mark, so a row of chips groups by
+whitespace alone. Give the same row a `name`, an `icon` or a `value` — almost always a template,
+since there is no entity for a literal to describe — and it stops being a spacer and becomes a
+chip in its own right, built entirely out of what you wrote:
+
+```yaml
+entities:
+  - entity: sensor.hall_temperature
+
+  - {} # a blank spacer
+
+  - icon: "{{ 'mdi:weather-night' }}"
+    name: Goodnight
+    tap_action:
+      action: call-service
+      service: script.goodnight
+```
+
+This is not the same failure as an unreadable entity in §1 above. That treatment — dashed,
+dimmed — says "this was configured and cannot be read"; a spacer or a templated chip was never
+configured to read one, so it draws at full opacity and defaults its press to doing **nothing**
+rather than opening a more-info dialog for an entity that does not exist. An explicit
+`tap_action` — most usefully one carrying its own `entity` override, so an entity-less chip can
+still toggle or show more-info for something specific — is honoured exactly as it would be on
+any other chip.
+
+The editor's **Add a blank chip** button creates one directly, opened straight into its
+per-chip **Use templates** mode. Clearing a chip's Entity field does the same thing to an
+existing row — it does not delete it, the way it used to; the trash icon is the only thing that
+does now.
 
 ## 2. The three content modes, and the band
 
@@ -159,6 +197,17 @@ than the floor allowed; price it against a one-chip width and a twelve-chip card
 rows tall, because `withFloors` raises the default rows to the floor. Three makes the floors
 reachable and the clipping unreachable at the same time.
 
+**The floor is priced against what is actually visible, not against every configured row.** A
+chip hidden by its own `show` (§7) takes no room, which is what stops a card built mostly of
+chips that are usually hidden from reserving space for all of them anyway. But `getGridOptions()`
+can be asked before any `show` template has had its first result — every one of them reads as
+hidden until it answers — so the very first answer is usually too small, not too large.
+`chips-card.ts` tracks the highest floor the card has actually needed rather than the current
+one: the box shrinks to fit within the first render or two, once real visibility is known, and
+then holds there — growing again if more chips turn out visible later, never shrinking back
+below what has already been shown. A genuine config edit (a chip added or removed, the card's
+content default changed) resets that high-water mark rather than carrying it forward.
+
 ## 6. Never scrolls, never truncates the list
 
 The complication card's §5 and §6 apply here word for word, and are not restated: what a box too
@@ -179,9 +228,19 @@ tidiness; `docs/images/chips-icons.png` measured 43 before it was added.
 
 The config is Home Assistant's own, deliberately: YAML already written against other custom
 chip cards transfers unchanged, and so does the muscle memory of whoever wrote it. Five actions,
-`more-info` by default, and `core/actions.ts` is a dispatch table taking
+`more-info` by default for a chip with an entity — **`none` for a chip without one** (§1a),
+since opening a more-info dialog for an entity that does not exist is not a sensible default to
+fall back to — and `core/actions.ts` is a dispatch table taking
 `(hass, element, config, entityId)` — collaborators as arguments rather than globals, which is
-what makes it testable in the node environment this suite actually runs in.
+what makes it testable in the node environment this suite actually runs in. `entityId` may
+itself be `undefined` for the same reason; `toggle` and `more-info` both warn and do nothing
+rather than calling Home Assistant with no target, unless an explicit `tap_action.entity`
+supplies one.
+
+In the editor, **Go to a view** is Home Assistant's own view picker — a searchable list of the
+installation's actual dashboards — rather than a path typed by hand, outside the per-chip
+**Use templates** mode; a template cannot be typed into a picker, so that mode keeps the plain
+text field instead.
 
 | `action`       | Behaviour                                              |
 | -------------- | ------------------------------------------------------ |
@@ -282,6 +341,14 @@ Decided rather than known, each one edit away from being decided differently.
 - **A config may name the same entity twice**, and the card draws both chips. The editor
   renders both and refuses to _add_ a duplicate: its rows are keyed by entity id, so the second
   occurrence is keyed positionally (`chipKeys`) and a drag past its twin closes both panels.
-  The second chip is writable in YAML and fully editable once it is there.
-- **Per-chip colour, in any form.** Out of scope on purpose (§3). If it turns out to be wanted,
-  it is a change to that section and deserves the argument, not a config key added quietly.
+  The second chip is writable in YAML and fully editable once it is there. The same positional
+  keying now also covers a chip with no entity at all (§1a).
+- **Per-chip colour is implemented** — a palette name or any CSS colour, tinting the glyph only
+  and only when asked — which supersedes this section's earlier "out of scope on purpose"
+  answer. So are Jinja templates in most of a chip's fields, via a `core/templates.ts`
+  subscription pool shared with the rest of the library. Neither is written up in this document
+  yet; that is a known gap, not a decision, and the design rationale lives for now only in
+  `docs/superpowers/specs/2026-08-29-templates-and-colour-design.md`.
+- **Whether the gradient scrim (the material behind the glass pill) should reach
+  `container: card` and the other four cards' own surfaces.** Deliberately left for its own
+  argument rather than decided here.

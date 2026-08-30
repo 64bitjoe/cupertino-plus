@@ -77,12 +77,18 @@ const warn = (message: string): void => console.warn(`[cupertino-plus] ${message
  * anybody sees. There is no toast mechanism in this library and this is not the place to add
  * one — the console names the card and the service, which is what a user reporting "the chip
  * does nothing" can be asked for.
+ *
+ * `entityId` is optional because the chips card now allows a chip with no entity at all — a
+ * spacer, or one built entirely from templates. `toggle` and `more-info` both need a real
+ * target and warn rather than calling Home Assistant with `entity_id: undefined` when neither
+ * the chip nor an explicit `tap_action.entity` override supplies one; `navigate` and
+ * `call-service` never needed `entityId` in the first place, so they are unaffected.
  */
 export const runAction = (
   hass: HomeAssistant,
   element: EventTarget,
   config: ActionConfig | undefined,
-  entityId: string,
+  entityId: string | undefined,
 ): void => {
   const resolved = config ?? DEFAULT_ACTION
   const target = resolved.entity ?? entityId
@@ -92,6 +98,10 @@ export const runAction = (
       return
 
     case 'toggle':
+      if (!target) {
+        warn('a toggle action has no entity to toggle')
+        return
+      }
       void hass
         .callService('homeassistant', 'toggle', undefined, { entity_id: target })
         .catch(() => warn(`could not toggle ${target}`))
@@ -122,6 +132,10 @@ export const runAction = (
 
     case 'more-info':
     default:
+      if (!target) {
+        warn('a more-info action has no entity to show')
+        return
+      }
       element.dispatchEvent(
         new CustomEvent('hass-more-info', {
           detail: { entityId: target },

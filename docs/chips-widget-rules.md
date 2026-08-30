@@ -93,20 +93,63 @@ Set per card, overridable per chip.
 | `labeled` | Glyph, a small uppercase caption, and the reading stacked beneath |
 
 A `labeled` chip is two lines tall where the other two are one, and a row mixing them freely
-would be a ragged band of different heights. So: **the tallest mode present is the mode every
-chip in that card draws.** One `labeled` chip promotes the whole row rather than standing a head
-above its neighbours — the same instinct as the battery card refusing to draw a full row of
-rings with a stub beneath it.
+would be a ragged band of different heights. So: **the tallest mode present sets the height every
+chip in that card draws at.** One `labeled` chip promotes the whole row's height rather than
+standing a head above its neighbours — the same instinct as the battery card refusing to draw a
+full row of rings with a stub beneath it.
 
-Worth being precise about, because it is stronger than "they share a height": `bandFor` picks
-one mode for the card and `_renderChip` draws every chip in it. A `content: icon` chip sitting
-beside a `labeled` one is not an icon with extra padding, it is a labeled chip. The per-chip key
-therefore does two things — it sets that chip's own mode, and it can promote the card — and only
-the first is obvious from reading a config.
+**Height is card-wide; content is per chip.** These were the same thing until v1.10.0, and
+conflating them was a bug rather than a simplification: `bandFor` picked one mode and
+`_renderChip` drew _every_ chip in it, so a `content: icon` chip sitting beside a `value` one
+was not icon-only at all — it drew the reading too, and there was no way to have a bare glyph in
+mixed company. Worse, a chip whose value was empty still got an empty `<span class="value">`,
+which is a flex item, so the pill reserved a text-sized gap after the glyph for text that was
+never there.
+
+Now the band decides only `--cw-chip-row`, the height every pill shares, and each chip draws
+what its own `content` says inside it. An icon-only chip in a labeled row is a full-height pill
+containing one glyph: aligned with its neighbours, the band intact, showing exactly what was
+asked for. An empty reading draws no element at all rather than an empty one.
 
 The caption in `labeled` is the chip's name: the entity's `friendly_name` unless a per-chip
 `name` overrides it, the same resolution every other card gets. The other two modes carry that
 name in the accessible name and the tooltip only, never on screen.
+
+### 2a. Saying which chips share a row
+
+By default the row wraps where the dashboard's width says it must, and that is usually the right
+answer. `break: true` on a chip overrides it: **that chip starts a new row.**
+
+```yaml
+entities:
+  - entity: sensor.wifi
+  - entity: sensor.unavailable # flows beside it
+
+  - entity: sensor.temperature
+    break: true # starts row 2
+  - entity: sensor.energy # flows beside it
+```
+
+Three rules worth stating, because each is a decision rather than a consequence:
+
+- **A break says where a row starts, not that it fits.** A forced row too wide for the dashboard
+  still wraps onto extra lines rather than clipping — §6's promise is not something `break` is
+  allowed to take away, and the floor arithmetic prices each row's own wrapping so the card asks
+  for the height it actually needs.
+- **A break on the first chip is ignored.** Every chip starts a row when it is the first one, so
+  the flag says nothing there, and honouring it would draw a leading empty row — 44 units of
+  unexplained gap. Reachable by dragging a chip that carries the flag to the top, so it is a
+  case the code handles rather than a case that cannot happen. The editor hides the switch on
+  the first chip for the same reason.
+- **It is not templatable.** Where a row begins is a layout fact the floor needs before `hass`
+  exists; a value arriving asynchronously would change the card's height a tick after it was
+  measured.
+
+The card renders one flex container per row rather than the usual zero-height full-width spacer
+trick, which would be a flex item of its own and so collect the container's gap on both sides —
+every forced row sitting 8 units further from its neighbour than an organic wrap does. A config
+with no `break` anywhere produces exactly one container holding everything, which is the same
+DOM this drew before rows existed.
 
 ## 3. The colour: this card opts out of identity
 

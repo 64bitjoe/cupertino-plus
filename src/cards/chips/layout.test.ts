@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bandFor, floorsFor, rowHeightFor, ROW_LABELED, ROW_SINGLE } from './layout'
+import { bandFor, floorsFor, groupRows, rowHeightFor, ROW_LABELED, ROW_SINGLE } from './layout'
 import { rowsToPx } from '../../core/size'
 import type { ChipView } from './model'
 
@@ -13,6 +13,7 @@ const chip = (content: ChipView['content']): ChipView => ({
   unavailable: false,
   color: undefined,
   visible: true,
+  break: false,
   spacer: false,
   action: { action: 'more-info' },
 })
@@ -81,5 +82,59 @@ describe('floorsFor', () => {
   it('still lets a long row reach it, so nothing is clipped', () => {
     const twelve = floorsFor(Array.from({ length: 12 }, () => chip('value')))
     expect(twelve.min_rows).toBeGreaterThanOrEqual(4)
+  })
+})
+
+/**
+ * Which chips share a row. The card renders one flex container per group and `floorsFor`
+ * prices each group's own wrapping, so these two have to agree about the count or a card with
+ * forced rows is handed a box too short and clips the difference.
+ */
+describe('groupRows', () => {
+  const at = (content: ChipView['content'], brk = false) => ({ ...chip(content), break: brk })
+
+  it('keeps everything on one row when nothing asks otherwise', () => {
+    const rows = groupRows([at('value'), at('value'), at('value')])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveLength(3)
+  })
+
+  it('starts a new row at a chip that asks for one', () => {
+    const rows = groupRows([at('value'), at('value'), at('value', true), at('value')])
+    expect(rows.map(row => row.length)).toEqual([2, 2])
+  })
+
+  /**
+   * Every chip starts a row when it is the first one, so the flag says nothing there — and
+   * honouring it would draw a leading empty row, which is 44 units of unexplained gap above
+   * the card's content. Reachable by dragging a chip that has the flag to the top.
+   */
+  it('ignores a break on the first chip rather than opening with an empty row', () => {
+    const rows = groupRows([at('value', true), at('value')])
+    expect(rows.map(row => row.length)).toEqual([2])
+  })
+
+  it('allows consecutive breaks, one chip to a row', () => {
+    const rows = groupRows([at('value'), at('value', true), at('value', true)])
+    expect(rows.map(row => row.length)).toEqual([1, 1, 1])
+  })
+
+  it('answers nothing for nothing', () => {
+    expect(groupRows([])).toEqual([])
+  })
+})
+
+describe('floorsFor with forced rows', () => {
+  const at = (brk = false) => ({ ...chip('value'), break: brk })
+
+  /**
+   * Three chips fit one line on their own; split across two rows they need two. Counting the
+   * list as a single run would under-report by a line, and an under-reported floor is exactly
+   * the clipping this module exists to prevent.
+   */
+  it('asks for the height the forced rows actually need', () => {
+    const flowing = floorsFor([at(), at(), at()])
+    const split = floorsFor([at(), at(true), at()])
+    expect(split.min_rows).toBeGreaterThan(flowing.min_rows)
   })
 })

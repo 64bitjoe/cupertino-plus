@@ -29,6 +29,31 @@ import { DEFAULT_CONTENT, type ChipContent } from './model'
  */
 export interface ChipBand {
   content: ChipContent
+  /** True for a chip that starts a new row. See `groupRows`. */
+  break?: boolean
+}
+
+/**
+ * The chips split into the rows they were asked to be drawn on.
+ *
+ * A chip carrying `break` starts a new row; everything else joins the row before it. The card
+ * renders one flex container per group and the floor below prices each group's own wrapping,
+ * so the two agree about how many lines there are — which they must, or a card with forced
+ * rows would be handed a box too short and clip the difference.
+ *
+ * A `break` on the very first chip is ignored rather than honoured into a leading empty row:
+ * every chip starts a row when it is the first one, so the flag says nothing there. That
+ * matters more than it sounds, because dragging a chip to the top is how a config acquires
+ * one, and an empty row would be 44 units of unexplained gap above the card's content.
+ */
+export const groupRows = <T extends ChipBand>(chips: readonly T[]): T[][] => {
+  const rows: T[][] = []
+  for (const chip of chips) {
+    if (chip.break === true && rows.length > 0) rows.push([chip])
+    else if (rows.length === 0) rows.push([chip])
+    else (rows[rows.length - 1] as T[]).push(chip)
+  }
+  return rows
 }
 
 /** Must match `--cw-inset`, the padding inside the card. */
@@ -124,7 +149,11 @@ export const floorsFor = (chips: readonly ChipBand[]): Floors => {
 
   const usable = Math.max(width, gridColumnsToPx(min_columns) - 2 * INSET)
   const perLine = Math.max(1, Math.floor((usable + GAP) / (width + GAP)))
-  const lines = Math.ceil(chips.length / perLine)
+  // Each configured row wraps on its own, so the lines are the sum of each row's own wrapping
+  // rather than of the whole list's. Counting the list as one run would under-report the height
+  // of any card using `break` — three chips split one-and-two is two lines, not one — and an
+  // under-reported floor is the clipping this whole module exists to prevent.
+  const lines = groupRows(chips).reduce((total, row) => total + Math.ceil(row.length / perLine), 0)
   const content = lines * rowHeightFor(band) + (lines - 1) * GAP + 2 * INSET
 
   return { min_columns, min_rows: Math.max(1, rowsFor(content)) }

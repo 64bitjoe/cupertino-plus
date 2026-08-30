@@ -70,6 +70,12 @@ export interface ChipConfig {
   value?: string
   /** Whether the chip is drawn at all. Hidden until it resolves; see `truthy`. */
   show?: string
+  /**
+   * Start a new row at this chip. Not a template: where a row begins is a layout decision the
+   * floor arithmetic has to know before `hass` exists, and a value that arrived asynchronously
+   * would change the card's height a tick after it was measured.
+   */
+  break?: boolean
   tap_action?: ActionConfig
 }
 
@@ -88,6 +94,8 @@ export interface ChipView {
   color: string | undefined
   /** False only for a chip whose `show` template says so, or has not answered yet. */
   visible: boolean
+  /** Carried from the config: this chip starts a new row. See `layout.ts`'s `groupRows`. */
+  break: boolean
   /**
    * True for an entity-less chip whose name, icon and value all resolved to nothing: an
    * intentional gap, drawn by `chips-card.ts` as one — no pill, no glyph, not a button. Always
@@ -311,6 +319,7 @@ export const readChip = (
       unavailable: false,
       color,
       visible,
+      break: row.break === true,
       // A field mid-resolution reads exactly like an absent one (this function's own `field`
       // contract), so a chip that will have content once its template answers draws as a
       // spacer until then — the same "hidden until it answers" rule `show` already keeps,
@@ -334,6 +343,7 @@ export const readChip = (
       // A chip that cannot be read is dimmed to say so; a dimmed orange chip says two things.
       color: undefined,
       visible,
+      break: row.break === true,
       spacer: false,
       action,
     }
@@ -354,6 +364,7 @@ export const readChip = (
       ? undefined
       : colorValue(field(row.color, row.entity) ?? field(defaults.color, undefined)),
     visible,
+    break: row.break === true,
     spacer: false,
     action,
   }
@@ -530,6 +541,7 @@ export const chipToForm = (config: ChipConfig): Record<string, unknown> => ({
   color: config.color,
   value: config.value,
   show: config.show,
+  break: config.break === true,
   action:
     config.tap_action?.action ?? (config.entity === undefined ? 'none' : DEFAULT_ACTION.action),
   navigation_path: config.tap_action?.navigation_path,
@@ -576,6 +588,11 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
 
   const show = text(data.show)
   if (show !== undefined) next.show = show
+
+  // A boolean rather than a string, so `text` is the wrong reader: `ha-form`'s boolean selector
+  // reports a real `false` for an off switch, and only `true` is worth writing — `break: false`
+  // in a config says exactly what its absence says.
+  if (data.break === true) next.break = true
 
   // `readAction`'s own real default: `none` for a row this edit leaves with no entity, so a
   // chip left at "Nothing" in the dropdown does not sprout an explicit `tap_action` the moment

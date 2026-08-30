@@ -13,7 +13,7 @@ import { withFloors, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
-import { bandFor, floorsFor, rowHeightFor, type ChipBand } from './layout'
+import { bandFor, floorsFor, groupRows, rowHeightFor, type ChipBand } from './layout'
 import {
   chipConfigs,
   chipTemplates,
@@ -69,12 +69,24 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         box-shadow: none;
       }
 
+      /* The stack of rows. A card with no break configured has exactly one of them, so this
+         renders identically to the single wrapping flex line it was before rows existed. */
       .chips {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: var(--cw-space-2);
         padding: var(--cw-inset);
         align-content: flex-start;
+        min-width: 0;
+      }
+
+      /* One row, wrapping on its own. A break says where a row STARTS; it does not promise the
+         row fits, so a row too wide for the dashboard wraps rather than clipping -- see the
+         rules doc's "never scrolls, never truncates". */
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--cw-space-2);
         min-width: 0;
       }
 
@@ -332,9 +344,12 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     if (!this.hass) {
       return chipConfigs(this._config?.entities).map(row => ({
         content: row.content ?? defaultContent,
+        break: row.break === true,
       }))
     }
-    return this._chips.filter(chip => chip.visible).map(chip => ({ content: chip.content }))
+    return this._chips
+      .filter(chip => chip.visible)
+      .map(chip => ({ content: chip.content, break: chip.break }))
   }
 
   /**
@@ -450,18 +465,33 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     const readable = chip.unavailable ? 'unavailable' : chip.value
     const label = [chip.name, readable].filter(part => part !== '').join(', ') || 'Chip'
 
+    // **The chip's own content, not the card's band.** These were the same thing until now, and
+    // conflating them was a bug rather than a simplification: `bandFor` answers the tallest mode
+    // in the card, so one chip set to `value` dragged every other chip's reading onto the screen
+    // with it, and a chip set to `icon` had no way to be icon-only in mixed company. The band
+    // still decides the row HEIGHT (`--cw-chip-row` on the card, below), which is what §2 of the
+    // rules is actually defending — every pill the same height, the row reading as one band —
+    // and that survives a chip drawing less inside it.
+    const content = chip.content
+
+    // An empty string is not a reading, and rendering it as one is visible: the span is still a
+    // flex item, so `.pill`'s 6px gap reserves a text-sized space after the glyph for text that
+    // was never there. That is the trailing gap an icon-with-no-value chip used to draw.
+    const value = chip.value !== '' ? html`<span class="value">${chip.value}</span>` : nothing
+    const caption = chip.name !== '' ? html`<span class="caption">${chip.name}</span>` : nothing
+
     const body =
-      band === 'labeled'
-        ? html`<span class="stack"
-            ><span class="caption">${chip.name}</span><span class="value">${chip.value}</span></span
-          >`
-        : band === 'value'
-          ? html`<span class="value">${chip.value}</span>`
+      content === 'labeled'
+        ? html`<span class="stack">${caption}${value}</span>`
+        : content === 'value'
+          ? value
           : nothing
 
     return html`
       <div
-        class="chip ${band} ${chip.unavailable ? 'unknown' : ''} ${pressable ? 'cw-pressable' : ''}"
+        class="chip ${content} ${chip.unavailable ? 'unknown' : ''} ${
+          pressable ? 'cw-pressable' : ''
+        }"
         role=${pressable ? 'button' : nothing}
         tabindex=${pressable ? 0 : nothing}
         aria-label=${pressable ? label : nothing}
@@ -493,13 +523,27 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     }
 
     const band = bandFor(chips)
+    // Real row containers rather than the usual zero-height full-width spacer trick for
+    // breaking a flex line. The spacer would be a flex item of its own, so the container's 8px
+    // `gap` would land on both sides of it and every forced row would sit 8px further from its
+    // neighbour than an organic wrap does. Nested flex costs one element per row and gets the
+    // spacing right by construction, and each row keeps `flex-wrap` of its own — a row too wide
+    // for the dashboard still wraps rather than clipping, which is §6's promise and not
+    // something `break` is allowed to take away.
+    //
+    // A config with no `break` anywhere produces exactly one row holding everything, which is
+    // the same DOM this drew before rows existed.
     return html`
       <ha-card
         class=${klass}
         style=${`--cw-chip-row:${rowHeightFor(band)}`}
         aria-label=${`${chips.length} chips`}
       >
-        <div class="chips">${chips.map(chip => this._renderChip(chip, band))}</div>
+        <div class="chips">
+          ${groupRows(chips).map(
+            row => html`<div class="row">${row.map(chip => this._renderChip(chip, band))}</div>`,
+          )}
+        </div>
       </ha-card>
     `
   }

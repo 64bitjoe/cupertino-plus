@@ -42,7 +42,7 @@
  * that causes it to arrive.
  */
 
-import { mdiDrag, mdiTrashCanOutline } from '@mdi/js'
+import { mdiContentCopy, mdiDrag, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
 import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import { repeat } from 'lit/directives/repeat.js'
@@ -174,6 +174,7 @@ const chipSchema = (
   config: ChipConfig,
   data: Record<string, unknown>,
   templating: boolean,
+  first: boolean,
 ): readonly HaFormSchema[] => {
   const rows: HaFormSchema[] = [
     { name: 'entity', selector: ANY_ENTITY },
@@ -188,6 +189,7 @@ const chipSchema = (
       ? { name: 'icon', selector: { text: {} } }
       : { name: 'icon', selector: iconSelector(inheritedIcon(hass, config.entity)) },
     { name: 'name', selector: textSelector(inheritedName(hass, config.entity)) },
+    ...(first ? [] : [{ name: 'break', selector: { boolean: {} } as const }]),
     { name: 'action', selector: ACTION_SELECTOR },
   ]
 
@@ -236,6 +238,7 @@ const LABELS: Record<string, string> = {
   navigation_path: 'Path',
   service: 'Service',
   templating: 'Use templates',
+  break: 'Start a new row',
   value: 'Reading',
   show: 'Show when',
 }
@@ -256,6 +259,7 @@ const HELPERS: Record<string, string> = {
   service: 'As domain.service. Its data and target stay in YAML.',
   templating:
     'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
+  break: 'This chip begins a new row. A row still wraps on its own if it runs out of width.',
   value: 'Replaces what the chip prints. Falls back to the entity own reading if it is empty.',
   show: 'The chip is drawn only while this is true. Hidden until it answers.',
 }
@@ -337,22 +341,39 @@ class CupertinoChipsList extends LitElement {
     /* A plain element rather than an HA custom one: unlike ha-entity-picker, whose fallback
        while undefined is documented at the top of this file, nothing else here needs this
        button to exist before it can be pressed, so there is no reason to risk it rendering as
-       nothing during the same window ha-entity-picker sometimes does. */
+       nothing during the same window ha-entity-picker sometimes does.
+
+       Drawn as a real outlined button on its own line rather than the bare text link this was
+       first shipped as. Sitting inline beside the picker's own solid button, a borderless link
+       read as that button's caption rather than as the second of two ways to add a chip, and
+       the feature was reported missing twice by somebody looking straight at it. Outlined
+       rather than solid keeps the ordinary path visually primary. */
     .blank {
-      display: inline-block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
       margin-top: 8px;
-      padding: 0;
-      border: none;
+      padding: 0 16px;
+      height: 40px;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.4));
+      border-radius: 9999px;
       background: none;
       color: var(--primary-color);
       font: inherit;
       font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
     }
 
-    .blank:hover,
+    .blank:hover {
+      background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    }
+
     .blank:focus-visible {
-      text-decoration: underline;
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
 
     /* The add control's own line rather than the helper of whichever of the two controls is
@@ -525,6 +546,35 @@ class CupertinoChipsList extends LitElement {
     this._emit(next)
   }
 
+  /**
+   * A copy of one chip, inserted directly below it.
+   *
+   * Deliberately allowed to produce two chips pointing at one entity, which is the one thing
+   * the add picker refuses: that refusal is about a picker offering a candidate it would then
+   * reject, not about the config being invalid. `chipKeys` has always keyed the second
+   * occurrence positionally, and the rules doc has always said such a config draws both chips
+   * and is fully editable — this is the button that makes it reachable without the YAML tab.
+   *
+   * The clone is deep enough for the one nested object a chip has (`tap_action`), so editing
+   * the copy's action cannot reach back and rewrite the original's.
+   */
+  private readonly _duplicate = (event: Event, index: number): void => {
+    // `ha-expansion-panel` opens on any click in its summary that has not been defaulted away
+    // -- the same reason `_remove` starts with these two lines.
+    event.preventDefault()
+    event.stopPropagation()
+
+    const source = this.chips[index]
+    if (!source) return
+
+    const copy: ChipConfig = { ...source }
+    if (source.tap_action) copy.tap_action = { ...source.tap_action }
+
+    const next = [...this.chips]
+    next.splice(index + 1, 0, copy)
+    this._emit(next)
+  }
+
   private readonly _moved = (event: CustomEvent<{ oldIndex: number; newIndex: number }>): void => {
     event.stopPropagation()
     this._emit(moveRow(this.chips, event.detail.oldIndex, event.detail.newIndex))
@@ -649,6 +699,13 @@ class CupertinoChipsList extends LitElement {
           <ha-icon-button
             slot="icons"
             class="remove"
+            .path=${mdiContentCopy}
+            .label=${`Duplicate ${header}`}
+            @click=${(event: Event) => this._duplicate(event, index)}
+          ></ha-icon-button>
+          <ha-icon-button
+            slot="icons"
+            class="remove"
             .path=${mdiTrashCanOutline}
             .label=${`Remove ${header}`}
             @click=${(event: Event) => this._remove(event, index, key)}
@@ -657,7 +714,7 @@ class CupertinoChipsList extends LitElement {
             class="fields"
             .hass=${this.hass}
             .data=${data}
-            .schema=${chipSchema(this.hass, config, data, templating)}
+            .schema=${chipSchema(this.hass, config, data, templating, index === 0)}
             .computeLabel=${this._computeLabel}
             .computeHelper=${this._computeHelper}
             @value-changed=${(event: CustomEvent<{ value: Record<string, unknown> }>) =>
@@ -724,7 +781,9 @@ class CupertinoChipsList extends LitElement {
                 ></ha-form>
               `
         }
-        <button type="button" class="blank" @click=${this._addBlank}>${ADD_BLANK_LABEL}</button>
+        <button type="button" class="blank" @click=${this._addBlank}>
+          <ha-svg-icon .path=${mdiPlus}></ha-svg-icon>${ADD_BLANK_LABEL}
+        </button>
         <p class="hint">${ADD_HELPER}</p>
       </div>
     `

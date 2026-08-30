@@ -23,9 +23,22 @@
 
 ---
 
-## Task 1: Verify the `render_template` message shape
+## Task 1: Verify the `render_template` message shape — DONE (2026-08-29)
 
-**Run this task in the main session, not in a dispatched subagent.** It needs the Home Assistant MCP connection, which subagents do not have. Everything after it builds on the answer.
+**Run this task in the main session, not in a dispatched subagent.**
+
+**Outcome.** The guessed message shape was correct in every key. Verified not by the two routes
+below — `ha_eval_template` failed at the proxy for every input including `{{ 1 + 1 }}`, and
+`docker` is not running on this machine — but against the handler itself,
+`homeassistant/components/websocket_api/commands.py` on `home-assistant/core@dev`, which is
+better evidence than either: it is the schema rather than a caller's use of it. Written up in
+`docs/ha-api-notes.md` under `## Template rendering`.
+
+**It changed two things in Task 2 and Task 4, already applied below.** `result` is a _parsed_
+native type, so a boolean renders as JSON `true`/`false` and `{{ none }}` as `null`. A pool that
+did `String(push.result)` would turn a null into the word `"null"`, which no falsy-word list
+contains — a `show: "{{ none }}"` chip would have shown. `null` now collapses to absent in the
+pool, and `'null'` and lower-case `'false'` are both in the model's falsy set.
 
 Spec §8 records the outgoing message as a guess: `subscribeMessage`'s machinery is proven by the calendar's subscription, but the literal keys of `render_template` are carried over by analogy, the same gap `weather/source.ts` admits to in its own header.
 
@@ -300,6 +313,11 @@ describe('TemplatePool', () => {
     vi.restoreAllMocks()
   })
 
+  /**
+   * Home Assistant parses a render's output before sending it, so `result` is a native JSON
+   * type — a real boolean for `{{ is_state(…) }}`, a real null for `{{ none }}`. Verified
+   * against the handler; `docs/ha-api-notes.md` has the table.
+   */
   it('renders a non-string result as a string', async () => {
     const { hass, opened } = fakeHass()
     const pool = new TemplatePool(() => {})
@@ -307,8 +325,23 @@ describe('TemplatePool', () => {
     pool.sync(hass, [{ template: 'T' }])
     await flush()
     opened[0]?.push({ result: 42 })
-
     expect(pool.read(requestKey({ template: 'T' }))).toBe('42')
+
+    opened[0]?.push({ result: false })
+    expect(pool.read(requestKey({ template: 'T' }))).toBe('false')
+  })
+
+  it('treats a null result as no result, not as the word null', () => {
+    return (async () => {
+      const { hass, opened } = fakeHass()
+      const pool = new TemplatePool(() => {})
+
+      pool.sync(hass, [{ template: 'T' }])
+      await flush()
+      opened[0]?.push({ result: null })
+
+      expect(pool.read(requestKey({ template: 'T' }))).toBeUndefined()
+    })()
   })
 })
 ```
@@ -493,7 +526,13 @@ export class TemplatePool {
       return
     }
 
-    const result = push?.result === undefined ? undefined : String(push.result)
+    // `null` collapses to absent alongside `undefined`, and that is not tidiness: HA parses a
+    // render's output, so `{{ none }}` arrives as a JSON null and `String(null)` is the word
+    // "null" — a name that would print as `null` and a `show` that would read as true, because
+    // no falsy-word list contains it. Verified against the handler; see
+    // `docs/ha-api-notes.md`'s "The result is a native type, not a string".
+    const raw = push?.result
+    const result = raw === undefined || raw === null ? undefined : String(raw)
     if (slot.result === result) return
     slot.result = result
     this._onResult()
@@ -801,7 +840,20 @@ describe('chipTemplates', () => {
  */
 describe('truthy', () => {
   it('reads the falsy set as false', () => {
-    for (const no of ['', 'false', 'False', 'False ', 'None', 'none', '0', 'off', 'unavailable']) {
+    // `false` lower-case is what `String(false)` gives for the boolean HA actually sends;
+    // `False` is what a `| string` filter gives. Both arrive in practice, so both are here.
+    for (const no of [
+      '',
+      'false',
+      'False',
+      'False ',
+      'None',
+      'none',
+      'null',
+      '0',
+      'off',
+      'unavailable',
+    ]) {
       expect(truthy(no)).toBe(false)
     }
   })
@@ -1034,7 +1086,7 @@ export const chipTemplates = (entities: unknown, defaults: ChipDefaults): Templa
  * false, which is the "hidden until it answers" rule: a chip that flashes *in* reads as a
  * dashboard loading, a chip that flashes *out* reads as a bug.
  */
-const FALSY = new Set(['', 'false', 'none', '0', 'off', 'unavailable', 'unknown'])
+const FALSY = new Set(['', 'false', 'none', 'null', '0', 'off', 'unavailable', 'unknown'])
 
 export const truthy = (result: string | undefined): boolean =>
   result !== undefined && !FALSY.has(result.trim().toLowerCase())

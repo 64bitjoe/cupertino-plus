@@ -13,30 +13,19 @@
  * this update. A tint that moved with the number would be a second opinion dressed up
  * as decoration, and on a dashboard of a dozen complications it would turn a glance
  * into a colour-by-numbers puzzle.
+ *
+ * The palette moved to `core/` when the chips card became its second consumer; re-exported
+ * rather than relocated in every caller, because `TINTS` is this card's `color:` option and
+ * every complication file that names it is naming that option, not the shared palette.
  */
 
 import type { HassEntity } from '../../core/types/ha'
 
-/**
- * The closed palette a complication's `color:` option chooses from, and the only
- * colours `tintFor` may return. Ten names because that is what `tokens.ts` carries
- * under `--cw-*`: nine of Apple's system colours plus `accent`, which is the theme's
- * own primary rather than a fixed hue, for the entity that fits none of the nine.
- */
-export const TINTS = [
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'teal',
-  'blue',
-  'indigo',
-  'purple',
-  'pink',
-  'accent',
-] as const
-
-export type TintName = (typeof TINTS)[number]
+// The palette moved to `core/` when the chips card became its second consumer; re-exported
+// rather than relocated in every caller, because `TINTS` is this card's `color:` option and
+// every complication file that names it is naming that option, not the shared palette.
+export { TINTS, tintVar, type TintName } from '../../core/tint'
+import type { TintName } from '../../core/tint'
 
 /**
  * `device_class` to tint, for the entities that carry one. Grouped by what the class
@@ -105,16 +94,6 @@ export const tintFor = (entity: HassEntity): TintName => {
   const domain = entity.entity_id.split('.')[0] ?? ''
   return BY_DOMAIN[domain] ?? 'accent'
 }
-
-/**
- * The tint as a `--cw-*` reference, never a literal.
- *
- * A card that resolved this to a hex value at read time would bake in whichever
- * theme happened to be active when it ran; keeping it a `var()` means the colour
- * keeps tracking `tokens.ts`, and by extension the user's theme, for the whole time
- * the complication sits on the dashboard rather than only at the moment it was drawn.
- */
-export const tintVar = (tint: TintName): string => `var(--cw-${tint})`
 
 /**
  * White text over the tint, except where the tint is too light for white to sit on.

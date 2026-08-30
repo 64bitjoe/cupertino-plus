@@ -47,6 +47,8 @@ import { repeat } from 'lit/directives/repeat.js'
 import { ACTION_NAMES } from '../../core/actions'
 import { moveRow } from '../../core/entities-form'
 import { defineElement } from '../../core/register'
+import { isTemplate } from '../../core/templates'
+import { TINTS } from '../../core/tint'
 import type { HaFormSchema, HomeAssistant } from '../../core/types/ha'
 import {
   chipFromForm,
@@ -54,6 +56,8 @@ import {
   chipRows,
   chipToForm,
   CHIP_CONTENTS,
+  COLOR_CUSTOM,
+  COLOR_SELECTOR,
   CONTENT_INHERIT,
   inheritedIcon,
   inheritedName,
@@ -133,16 +137,31 @@ const ACTION_SELECTOR = {
  * The last row is the argument the chosen action takes, and there is at most one: an action
  * that needs nothing gets no field, and a `navigation_path` is never shown beside a `toggle`
  * because a control offering an argument that will be ignored is a control that lies.
+ *
+ * `templating` swaps the Icon and Colour pickers — neither of which a template can be typed
+ * into — for plain text boxes, hides the Colour dropdown's own `color_custom` field (moot once
+ * `color` is text already), and appends Reading and Show when, which only ever make sense as
+ * templates. The switch itself is drawn last, by the element, because it is not a fact about
+ * a chip's config at all; see `_templating` on the element.
  */
 const chipSchema = (
   hass: HomeAssistant | undefined,
   config: ChipConfig,
   data: Record<string, unknown>,
+  templating: boolean,
 ): readonly HaFormSchema[] => {
   const rows: HaFormSchema[] = [
     { name: 'entity', required: true, selector: ANY_ENTITY },
     { name: 'content', selector: CONTENT_SELECTOR },
-    { name: 'icon', selector: { icon: { placeholder: inheritedIcon(hass, config.entity) } } },
+    templating
+      ? { name: 'color', selector: { text: {} } }
+      : { name: 'color', selector: COLOR_SELECTOR },
+    ...(!templating && data.color === COLOR_CUSTOM
+      ? [{ name: 'color_custom', selector: { text: { placeholder: '#ff8800' } } }]
+      : []),
+    templating
+      ? { name: 'icon', selector: { text: {} } }
+      : { name: 'icon', selector: { icon: { placeholder: inheritedIcon(hass, config.entity) } } },
     { name: 'name', selector: { text: { placeholder: inheritedName(hass, config.entity) } } },
     { name: 'action', selector: ACTION_SELECTOR },
   ]
@@ -153,6 +172,16 @@ const chipSchema = (
   if (data.action === 'call-service') {
     rows.push({ name: 'service', selector: { text: { placeholder: 'script.goodnight' } } })
   }
+
+  if (templating) {
+    rows.push({ name: 'value', selector: { text: { placeholder: "{{ states('sensor.a') }}" } } })
+    rows.push({
+      name: 'show',
+      selector: { text: { placeholder: "{{ is_state('light.a','on') }}" } },
+    })
+  }
+
+  rows.push({ name: 'templating', selector: { boolean: {} } })
 
   return rows
 }
@@ -171,11 +200,16 @@ const addSchema = (taken: readonly string[]): readonly HaFormSchema[] => [
 const LABELS: Record<string, string> = {
   entity: 'Entity',
   content: 'Content',
+  color: 'Colour',
+  color_custom: 'Custom colour',
   icon: 'Icon',
   name: 'Name',
   action: 'When pressed',
   navigation_path: 'Path',
   service: 'Service',
+  templating: 'Use templates',
+  value: 'Reading',
+  show: 'Show when',
 }
 
 /**
@@ -184,11 +218,17 @@ const LABELS: Record<string, string> = {
  */
 const HELPERS: Record<string, string> = {
   content: 'Overrides the card for this one chip. Every chip still draws at the same height.',
+  color: 'Tints the glyph only. The reading and the pill stay one ink.',
+  color_custom: 'Any CSS colour: a hex value, an rgb(), or a var() from your theme.',
   icon: "Overrides the entity's own glyph.",
   name: 'The caption in the third content mode, and the screen-reader label in all of them.',
   action: 'A chip set to Nothing is not drawn as a button at all: no tab stop, no pressed state.',
   navigation_path: 'A dashboard path, as the URL bar shows it.',
   service: 'As domain.service. Its data and target stay in YAML.',
+  templating:
+    'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
+  value: 'Replaces what the chip prints. Falls back to the entity own reading if it is empty.',
+  show: 'The chip is drawn only while this is true. Hidden until it answers.',
 }
 
 const ADD_LABEL = 'Add a chip'
@@ -299,6 +339,36 @@ class CupertinoChipsList extends LitElement {
    */
   private readonly _open = new Set<string>()
 
+  /**
+   * Which chips are showing their template fields, by row key.
+   *
+   * A view of a row rather than a property of one, so it writes no config key — the same
+   * arrangement `_open` already uses for which panels are expanded. `icon` is an icon picker
+   * and `color` is a dropdown, and a template cannot be typed into either; this switch swaps
+   * both for plain text boxes and reveals the two fields that only make sense as templates.
+   */
+  private readonly _templating = new Set<string>()
+
+  /**
+   * On by default for a chip whose config already holds a template, so a config written in
+   * YAML opens showing what it actually says rather than a picker that cannot represent it.
+   */
+  private _isTemplating(config: ChipConfig, key: string): boolean {
+    if (this._templating.has(key)) return true
+    return [config.name, config.icon, config.color, config.value, config.show].some(isTemplate)
+  }
+
+  /**
+   * Which chips are showing the custom-colour text box, by row key.
+   *
+   * A view of a row, exactly like `_templating` above: selecting "Custom…" from the Colour
+   * dropdown has nothing to write into the config until a value is typed into the field beside
+   * it. Without holding that choice somewhere of its own, the very re-render the dropdown's own
+   * change causes would find `color` still unset, decide the row was never in custom mode, and
+   * the field the user just asked for would never appear.
+   */
+  private readonly _colorCustom = new Set<string>()
+
   private readonly _computeLabel = (schema: HaFormSchema): string =>
     LABELS[schema.name] ?? schema.name
 
@@ -342,7 +412,28 @@ class CupertinoChipsList extends LitElement {
     const prior = this.chips[index]
     if (!prior) return
 
-    const row = chipFromForm(prior, event.detail.value)
+    // The switch is a view of the row, not a fact about its config: read it into `_templating`
+    // and then remove it, so it never reaches `chipFromForm` or the config beyond it.
+    const value = { ...event.detail.value }
+    if (typeof value.templating === 'boolean') {
+      if (value.templating) this._templating.add(key)
+      else this._templating.delete(key)
+    }
+    delete value.templating
+
+    // Remembered the same way as the switch above, and for the same reason: the dropdown
+    // reporting `COLOR_CUSTOM` is the only moment this editor learns the row wants the text
+    // box, and nothing about a still-empty `color_custom` belongs in the config.
+    if (value.color === COLOR_CUSTOM) this._colorCustom.add(key)
+    else this._colorCustom.delete(key)
+
+    // The dropdown and its custom field are two controls for one key. Folded here rather than
+    // in `chipFromForm`, which is a rule about the config and should not know that the editor
+    // draws this as two things.
+    if (value.color === COLOR_CUSTOM) value.color = value.color_custom
+    delete value.color_custom
+
+    const row = chipFromForm(prior, value)
     const next = [...this.chips]
 
     if (row === undefined) {
@@ -428,7 +519,27 @@ class CupertinoChipsList extends LitElement {
     // Name and glyph as the card is drawing them right now, overrides included, so a row is
     // recognisable in the editor by the same two things it has on the dashboard.
     const chip = readChip(this.hass, config)
+    const templating = this._isTemplating(config, key)
     const data = chipToForm(config)
+
+    // Split on the way in, undone in `_rowChanged`: the dropdown holds a palette name, `''`,
+    // or the `COLOR_CUSTOM` sentinel, and `color_custom` holds the literal. Moot in templating
+    // mode, where `color` is already a plain text box showing the config's raw value.
+    //
+    // `_colorCustom.has(key)` alone carries a row that has just been switched into custom mode
+    // but has nothing typed into it yet — the config has no colour to show, so the value-based
+    // check below cannot see it.
+    if (!templating) {
+      const configured = typeof data.color === 'string' ? data.color : ''
+      if (
+        this._colorCustom.has(key) ||
+        (configured && !(TINTS as readonly string[]).includes(configured))
+      ) {
+        data.color = COLOR_CUSTOM
+        data.color_custom = configured
+      }
+    }
+    data.templating = templating
 
     return html`
       <div class="chip">
@@ -455,7 +566,7 @@ class CupertinoChipsList extends LitElement {
             class="fields"
             .hass=${this.hass}
             .data=${data}
-            .schema=${chipSchema(this.hass, config, data)}
+            .schema=${chipSchema(this.hass, config, data, templating)}
             .computeLabel=${this._computeLabel}
             .computeHelper=${this._computeHelper}
             @value-changed=${(event: CustomEvent<{ value: Record<string, unknown> }>) =>

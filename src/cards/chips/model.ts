@@ -27,7 +27,7 @@ import {
   type EntityRow,
 } from '../../core/entity-view'
 import { isTemplate, type TemplateRequest } from '../../core/templates'
-import { colorValue } from '../../core/tint'
+import { colorValue, TINTS } from '../../core/tint'
 import type { HomeAssistant } from '../../core/types/ha'
 
 /**
@@ -343,6 +343,41 @@ const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined
 
 /**
+ * The sentinel the colour dropdown uses for "type a CSS colour instead". Never a config value:
+ * `chipFromForm` and `CupertinoChipsCardEditor.fromForm` both fold it away into `color_custom`
+ * before a config is ever written.
+ *
+ * Declared here, alongside `TINT_LABELS`, `titleCase` and `COLOR_SELECTOR` below, rather than
+ * inside either editor, because both the chip panel and the card-level form need the same
+ * dropdown: one editor's copy and another's would drift the moment a tint was renamed. The same
+ * reason `DEFAULT_CONTAINER` lives here rather than in `chips-card.ts`.
+ */
+export const COLOR_CUSTOM = 'custom'
+
+/** `accent` reads as a word rather than a colour, so it is spelt out rather than capitalised. */
+export const TINT_LABELS: Record<string, string> = {
+  accent: 'Accent — your theme own',
+}
+
+export const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
+
+/**
+ * The Colour dropdown both editors draw: the closed palette, plus "none" and "type your own".
+ * `color_custom`, a sibling text row shown only when this reads `COLOR_CUSTOM`, is where the
+ * literal actually lives; see the note on `COLOR_CUSTOM` above.
+ */
+export const COLOR_SELECTOR = {
+  select: {
+    mode: 'dropdown' as const,
+    options: [
+      { value: '', label: 'None — the row default' },
+      ...TINTS.map(value => ({ value, label: TINT_LABELS[value] ?? titleCase(value) })),
+      { value: COLOR_CUSTOM, label: 'Custom…' },
+    ],
+  },
+}
+
+/**
  * One chip as its panel's `ha-form` wants it: flat.
  *
  * The nesting is the whole reason this exists. A chip's config carries `tap_action` as an
@@ -362,6 +397,9 @@ export const chipToForm = (config: ChipConfig): Record<string, unknown> => ({
   name: config.name,
   icon: config.icon,
   content: config.content ?? CONTENT_INHERIT,
+  color: config.color,
+  value: config.value,
+  show: config.show,
   action: config.tap_action?.action ?? DEFAULT_ACTION.action,
   navigation_path: config.tap_action?.navigation_path,
   service: config.tap_action?.service,
@@ -398,6 +436,15 @@ export const chipFromForm = (
   if (content !== undefined && (CHIP_CONTENTS as readonly string[]).includes(content)) {
     next.content = content as ChipContent
   }
+
+  const color = text(data.color)
+  if (color !== undefined) next.color = color
+
+  const value = text(data.value)
+  if (value !== undefined) next.value = value
+
+  const show = text(data.show)
+  if (show !== undefined) next.show = show
 
   const tapAction = actionFromForm(prior.tap_action, data)
   if (tapAction !== undefined) next.tap_action = tapAction

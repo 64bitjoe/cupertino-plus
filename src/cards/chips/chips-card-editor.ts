@@ -2,13 +2,21 @@ import { html, nothing, type TemplateResult } from 'lit'
 
 import { CupertinoCardEditor } from '../../core/card-editor'
 import { defineElement } from '../../core/register'
+import { isTint } from '../../core/tint'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { ChipsCardConfig } from './chips-card'
 // Imported for the side effect as well as the type: the list element has to be defined by the
 // time this editor renders it, and this is the only thing that reaches it.
 import './chip-list-editor'
 import type { ChipsChangedDetail } from './chip-list-editor'
-import { chipConfigs, CHIP_CONTENTS, DEFAULT_CONTAINER, DEFAULT_CONTENT } from './model'
+import {
+  chipConfigs,
+  CHIP_CONTENTS,
+  COLOR_CUSTOM,
+  COLOR_SELECTOR,
+  DEFAULT_CONTAINER,
+  DEFAULT_CONTENT,
+} from './model'
 
 export const CHIPS_EDITOR_TAG = 'cupertino-plus-chips-editor'
 
@@ -23,17 +31,28 @@ const CONTAINER_LABELS: Record<string, string> = {
   card: 'Card — draws its own surface',
 }
 
-const FIELDS: readonly HaFormSchema[] = [
-  {
-    name: 'content',
-    selector: {
-      select: {
-        mode: 'dropdown',
-        options: CHIP_CONTENTS.map(value => ({ value, label: CONTENT_LABELS[value] ?? value })),
+/**
+ * The card-level fields, as a function of the current form data rather than a constant list:
+ * `color_custom` is conditional on `color` reading `COLOR_CUSTOM`, exactly as the per-chip
+ * panel's own custom field is — see `fields()` below for how the two stay in agreement.
+ */
+const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
+  const rows: HaFormSchema[] = [
+    {
+      name: 'content',
+      selector: {
+        select: {
+          mode: 'dropdown',
+          options: CHIP_CONTENTS.map(value => ({ value, label: CONTENT_LABELS[value] ?? value })),
+        },
       },
     },
-  },
-  {
+    { name: 'color', selector: COLOR_SELECTOR },
+  ]
+  if (data.color === COLOR_CUSTOM) {
+    rows.push({ name: 'color_custom', selector: { text: { placeholder: '#ff8800' } } })
+  }
+  rows.push({
     name: 'container',
     selector: {
       select: {
@@ -44,16 +63,21 @@ const FIELDS: readonly HaFormSchema[] = [
         })),
       },
     },
-  },
-]
+  })
+  return rows
+}
 
 const LABELS: Record<string, string> = {
   content: 'Chip content',
+  color: 'Row colour',
+  color_custom: 'Custom colour',
   container: 'Background',
 }
 
 const HELPERS: Record<string, string> = {
   content: 'The default for every chip. A chip can say otherwise in its own panel above.',
+  color: 'Tints every glyph in the row. A chip can say otherwise in its own panel above.',
+  color_custom: 'Any CSS colour: a hex value, an rgb(), or a var() from your theme.',
   container:
     'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
 }
@@ -81,8 +105,25 @@ const HELPERS: Record<string, string> = {
  * which is why its helper points upwards.
  */
 class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
+  /**
+   * Whether the card-level Colour is showing its custom text box.
+   *
+   * A view of the form rather than a fact about the config, for the same reason the per-chip
+   * panel's own `_colorCustom` set is: selecting "Custom…" from the dropdown has nothing to
+   * write into `color` until a value is typed beside it, and without holding that choice here
+   * the field would vanish the instant the dropdown's own change re-rendered the form against a
+   * config that still says nothing.
+   */
+  private _colorCustom = false
+
+  /**
+   * `fields()` takes no argument, so it cannot branch on the form's own report the way
+   * `chipSchema` does. It reads `this._config` through `toForm` instead — the same data
+   * `render()` is about to hand `ha-form` — so the schema and the data agree about whether
+   * `color_custom` is showing.
+   */
   protected override fields(): readonly HaFormSchema[] {
-    return FIELDS
+    return fields(this._config ? this.toForm(this._config) : {})
   }
 
   /** Shown rather than blank: an unset dropdown reads as broken, not as a default. */
@@ -96,6 +137,41 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
 
   protected override helper(schema: HaFormSchema): string | undefined {
     return HELPERS[schema.name] ?? super.helper(schema)
+  }
+
+  /**
+   * The dropdown holds a palette name, `''`, or the `COLOR_CUSTOM` sentinel; `color_custom`
+   * holds the literal when it does. Split here rather than have `fromForm` guess: this is the
+   * one place that knows both the config's `color` and the sentinel at once.
+   */
+  protected override toForm(config: ChipsCardConfig): Record<string, unknown> {
+    const data: Record<string, unknown> = { ...config }
+    const configured = typeof config.color === 'string' ? config.color : ''
+    if (this._colorCustom || (configured && !isTint(configured))) {
+      data.color = COLOR_CUSTOM
+      data.color_custom = configured
+    }
+    return data
+  }
+
+  /**
+   * The two controls folded back into the one `color` key, before `applyFormData` — by way of
+   * `super.fromForm` — writes it through. `chipFromForm`'s own note explains why this is a
+   * rule about the config kept out of the row-level translation; the same reasoning holds here.
+   */
+  protected override fromForm(
+    config: ChipsCardConfig,
+    data: Record<string, unknown>,
+    formFields: readonly string[],
+  ): ChipsCardConfig {
+    const folded = { ...data }
+    // Remembered the same way `toForm` reads it back, and for the same reason: this is the
+    // only moment the editor learns the dropdown wants the text box, and nothing about a still
+    // empty `color_custom` belongs in the config.
+    this._colorCustom = folded.color === COLOR_CUSTOM
+    if (folded.color === COLOR_CUSTOM) folded.color = folded.color_custom
+    delete folded.color_custom
+    return super.fromForm(config, folded, formFields)
   }
 
   /**

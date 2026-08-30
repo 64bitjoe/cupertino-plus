@@ -196,6 +196,23 @@ describe('chipFromForm', () => {
     })
   })
 
+  it('round-trips the three new fields', () => {
+    const prior: ChipConfig = {
+      entity: 'light.hall',
+      color: 'red',
+      value: '{{ v }}',
+      show: '{{ s }}',
+    }
+    expect(chipFromForm(prior, chipToForm(prior))).toEqual(prior)
+  })
+
+  it('drops a colour that has been cleared', () => {
+    const prior: ChipConfig = { entity: 'light.hall', color: 'red' }
+    expect(chipFromForm(prior, { ...chipToForm(prior), color: '' })).toEqual({
+      entity: 'light.hall',
+    })
+  })
+
   it('gathers an argument back up, for the action that owns it', () => {
     expect(
       chipFromForm(bare, { ...chipToForm(bare), action: 'navigate', navigation_path: '/l/0' }),

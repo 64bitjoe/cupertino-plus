@@ -379,9 +379,28 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * The floors, recomputed on every call: both halves depend on a config — and, past the
    * first tick, on live visibility — that changes under the card, exactly as the complication
    * card's own `getGridOptions` does.
+   *
+   * **`rows` is this card's own content height, not the library's shared footprint**, and that
+   * is the whole difference between this override and every other card's. `core/size.ts`'s
+   * `gridOptions()` answers a flat `rows: 4` — the 2:1 shape Apple's medium widget has, right
+   * for the four cards that draw a square-ish panel — and `withFloors` only ever *raises* it,
+   * because its job is to stop a card being handed a box too short for its content.
+   *
+   * A chips card is a strip, not a panel. Three chips need one 44-unit line inside a 16-unit
+   * inset: 76px, which quantises to two grid rows. Left to the shared default it would be
+   * handed four rows — 248px — and the difference is drawn as empty dashboard, which in
+   * `glass` mode is not even a visible card, just a gap nobody asked for. So `rows` is set to
+   * the same number the floor is, rather than to the larger of the two.
+   *
+   * This is not the same thing as the visibility work `_floorBand` and `_floorFor` do above,
+   * and fixing one did not fix the other: those decide *how much content there is to price*,
+   * this decides *what to do with the price*. A card asking for exactly its content's height
+   * is still free to be dragged taller — Home Assistant writes that into the card's own
+   * `grid_options`, which `hui-card.getGridOptions()` spreads over this answer and wins with.
    */
   public override getGridOptions(): LovelaceGridOptions {
-    return withFloors(super.getGridOptions(), this._floorFor(this._floorBand))
+    const floors = this._floorFor(this._floorBand)
+    return { ...withFloors(super.getGridOptions(), floors), rows: floors.min_rows }
   }
 
   /**

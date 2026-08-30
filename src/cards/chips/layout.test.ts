@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { bandFor, floorsFor, rowHeightFor, ROW_LABELED, ROW_SINGLE } from './layout'
+import { rowsToPx } from '../../core/size'
 import type { ChipView } from './model'
 
 const chip = (content: ChipView['content']): ChipView => ({
@@ -59,5 +60,26 @@ describe('floorsFor', () => {
 
   it('never asks for less than the library minimum, even with no chips', () => {
     expect(floorsFor([])).toEqual({ min_columns: 4, min_rows: 1 })
+  })
+
+  /**
+   * The number `chips-card.ts` renders at, not just the one it floors at.
+   *
+   * `core/size.ts` hands every card a flat `rows: 4` — the 2:1 panel the other four cards
+   * draw — and `withFloors` only ever raises it. A chips card that took that default was
+   * handed 248px for a single 44-unit line of content and drew the difference as empty
+   * dashboard, which in `glass` mode is not even a visible card. So this pins the shape of
+   * the answer rather than one magic number: a short row must price well under the shared
+   * four-row footprint, and a long one must still be allowed to reach it.
+   */
+  it('prices a short row well under the four-row footprint every other card takes', () => {
+    const three = floorsFor(Array.from({ length: 3 }, () => chip('value')))
+    expect(three.min_rows).toBeLessThan(4)
+    expect(rowsToPx(three.min_rows)).toBeLessThan(rowsToPx(4))
+  })
+
+  it('still lets a long row reach it, so nothing is clipped', () => {
+    const twelve = floorsFor(Array.from({ length: 12 }, () => chip('value')))
+    expect(twelve.min_rows).toBeGreaterThanOrEqual(4)
   })
 })

@@ -143,11 +143,22 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
    * The dropdown holds a palette name, `''`, or the `COLOR_CUSTOM` sentinel; `color_custom`
    * holds the literal when it does. Split here rather than have `fromForm` guess: this is the
    * one place that knows both the config's `color` and the sentinel at once.
+   *
+   * A config naming a real palette colour clears `_colorCustom` before it is read, however
+   * that config arrived — including a YAML edit, which reaches this editor only through
+   * `setConfig` and never through `fromForm`. Left unclear, a card switched to `Custom…` and
+   * back to a plain `color: red` in YAML would still show "Custom…" here with "red" pre-filled
+   * into the text box: a valid palette name misrepresented as a custom one. So a genuine tint
+   * always wins and clears the flag; only then does the flag get to speak for an otherwise
+   * empty colour, which is what lets picking "Custom…" and typing nothing yet still show the
+   * text box.
    */
   protected override toForm(config: ChipsCardConfig): Record<string, unknown> {
     const data: Record<string, unknown> = { ...config }
     const configured = typeof config.color === 'string' ? config.color : ''
-    if (this._colorCustom || (configured && !isTint(configured))) {
+    if (configured && isTint(configured)) {
+      this._colorCustom = false
+    } else if (this._colorCustom || configured) {
       data.color = COLOR_CUSTOM
       data.color_custom = configured
     }

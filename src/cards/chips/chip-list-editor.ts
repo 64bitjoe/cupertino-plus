@@ -528,13 +528,18 @@ class CupertinoChipsList extends LitElement {
     //
     // `_colorCustom.has(key)` alone carries a row that has just been switched into custom mode
     // but has nothing typed into it yet — the config has no colour to show, so the value-based
-    // check below cannot see it.
+    // check below cannot see it. But a config that now names a real palette colour is never
+    // "type your own" mode, however it got there: `setConfig` is called again for every later
+    // change, including one made in the YAML tab that never goes through `_rowChanged` at all.
+    // Left uncleared, a chip switched to `Custom…` and back to a plain `color: red` in YAML
+    // would still show "Custom…" here with "red" pre-filled into the text box — a valid
+    // palette name misrepresented as a custom one. So a genuine tint always wins and clears
+    // the flag; only then does the flag get to speak for an otherwise-empty colour.
     if (!templating) {
       const configured = typeof data.color === 'string' ? data.color : ''
-      if (
-        this._colorCustom.has(key) ||
-        (configured && !(TINTS as readonly string[]).includes(configured))
-      ) {
+      if (configured && (TINTS as readonly string[]).includes(configured)) {
+        this._colorCustom.delete(key)
+      } else if (this._colorCustom.has(key) || configured) {
         data.color = COLOR_CUSTOM
         data.color_custom = configured
       }

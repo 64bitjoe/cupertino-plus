@@ -123,11 +123,35 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       /* One ink for the whole row: this card has no per-entity colour at all, which is
          §3 of its rules and the whole difference between a Lock Screen accessory and the
          Home Screen widget the complication card draws. */
+      /* The scrim is a gradient rather than a flat wash, which is how both iOS glass and
+         Material surfaces are actually lit: denser at the bottom, with a bright hairline along
+         the top edge for the specular line. It is a BACKGROUND layer, so it composites over
+         backdrop-filter rather than replacing it — the blur still samples the dashboard — and
+         it stays low-alpha for exactly that reason: a dense scrim is a translucent pill that
+         has stopped being translucent. */
       .glass .pill {
         color: var(--cw-label);
-        background: color-mix(in srgb, var(--cw-label) 14%, transparent);
+        background: linear-gradient(
+          to bottom,
+          color-mix(in srgb, var(--cw-label) 10%, transparent),
+          color-mix(in srgb, var(--cw-label) 18%, transparent)
+        );
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-label) 8%, transparent);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
         backdrop-filter: blur(24px) saturate(180%);
+      }
+
+      /* Not the same gradient inverted. The light still comes from above, but the surface is
+         dark: the top edge gets BRIGHTER relative to the body and the body gets LESS dense,
+         where the light-mode version gets denser downward. Flipping one gradient would light
+         the pill from underneath. */
+      :host([dark]) .glass .pill {
+        background: linear-gradient(
+          to bottom,
+          color-mix(in srgb, var(--cw-label) 16%, transparent),
+          color-mix(in srgb, var(--cw-label) 9%, transparent)
+        );
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-label) 20%, transparent);
       }
 
       /* No blur in card mode: blurring against an opaque surface samples the surface. */

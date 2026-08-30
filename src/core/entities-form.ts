@@ -1,5 +1,8 @@
 /**
- * The one piece of the editor's `entities` round trip that is not an identity function.
+ * What an editor does to a list of entities on its way back into a config.
+ *
+ * Two functions, and neither of them is the identity: `mergeEntities` for the list that went
+ * through a picker, `moveRow` for the one that was dragged.
  *
  * `ha-entities-picker` (what the `multiple: true` entity selector renders) can only ever
  * report a bare `string[]` of ids — see `EntitySelector` in `core/types/ha.ts` — but a row
@@ -63,4 +66,25 @@ export const mergeEntities = <T extends EntityRow = EntityRow>(
     const row = queues.get(id)?.shift()
     return row && Object.keys(row).length > 1 ? row : id
   })
+}
+
+/**
+ * A row moved from one place in the list to another: everything about a drag except the
+ * dragging, which is `ha-sortable`'s and reaches an editor as a pair of indices.
+ *
+ * It lived in `battery/model.ts` until the chips card grew a list control of its own, with a
+ * note saying it would move the day a second card wanted one. This is that day, and here is
+ * where it belongs: there is nothing about a battery or a chip in it, and this module is
+ * already the place the library keeps what an editor does to a list of entities on its way
+ * back into a config.
+ *
+ * Out-of-range indices are a no-op rather than a throw. `ha-sortable` reports what it dragged
+ * and is not the only thing that could ever call this; a list editor is not a place to find
+ * out about an off-by-one by having the dialog go blank.
+ */
+export const moveRow = <T>(rows: readonly T[], from: number, to: number): T[] => {
+  const next = [...rows]
+  const [moved] = next.splice(from, 1)
+  if (moved !== undefined) next.splice(to, 0, moved)
+  return next
 }

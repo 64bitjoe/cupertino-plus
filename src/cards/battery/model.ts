@@ -148,21 +148,6 @@ export const deviceRows = (rows: readonly unknown[]): (string | BatteryDeviceCon
 }
 
 /**
- * A row moved from one place in the list to another: everything about a drag except the
- * dragging, which is `ha-sortable`'s and reaches the editor as a pair of indices.
- *
- * Written over any list rather than over devices, because there is nothing about a battery
- * in it. It stays here until a second card wants one, which is the point at which where it
- * belongs becomes a question worth answering.
- */
-export const moveRow = <T>(rows: readonly T[], from: number, to: number): T[] => {
-  const next = [...rows]
-  const [moved] = next.splice(from, 1)
-  if (moved !== undefined) next.splice(to, 0, moved)
-  return next
-}
-
-/**
  * Every entity id the card's rendering depends on.
  *
  * This is what `watchedEntities()` answers with, and getting it short would be the quiet

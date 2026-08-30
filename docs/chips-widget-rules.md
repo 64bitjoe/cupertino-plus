@@ -261,20 +261,27 @@ to this same config shape; none of them changes anything above if they arrive la
 
 Decided rather than known, each one edit away from being decided differently.
 
-- **The per-chip editor.** `name`, `icon`, `content` and `tap_action` are per chip in the
-  config and **YAML-only** in the visual editor, which offers the entity list plus card-level
-  defaults for content and container. That is a reduction taken deliberately: the per-chip form
-  needs two frontend APIs this environment cannot verify (below), the complication card already
-  ships the same arrangement for its own five per-row overrides, and `mergeEntities`
-  (`core/entities-form.ts`) is what guarantees hand-written rows survive a trip through the
-  form rather than being flattened back to a bare id list by the entity picker. The YAML written
-  today keeps working the day the form arrives.
-- **`ha-form`'s `expandable` node** — assumed to exist and to render, unverified here. It is
-  what a per-chip section would be built out of. Fallback if it does not: a flat form with
-  prefixed field names.
-- **HA's `ui_action` selector** — same status. It is what would draw a tap-action picker without
-  this card reimplementing one. Fallback: a plain select plus conditional fields, using only
-  selectors already proven in this repo. Both are §11 of the design spec, and both need a
-  running frontend to check against rather than an argument.
+- **What the editor draws it with.** `name`, `icon`, `content` and `tap_action` are all
+  reachable from the visual editor: `chip-list-editor.ts` is a sortable list of
+  `ha-expansion-panel`s, one per chip, on the model the battery card set. They were YAML-only
+  in v1.6.0, deferred on the grounds that a per-chip form needed two frontend APIs that could
+  not be checked here. It needs neither. `ha-form`'s `expandable` node is not used, because a
+  panel this card owns is one it can hang a drag handle and a delete button off, and nothing in
+  `ha-form` can do that. Home Assistant's `ui_action` selector is not used either, and that one
+  is a live trade: it would draw the whole tap-action control in a single row, it is very
+  likely present in the 2026.7 frontend this card requires, and "very likely" is what got the
+  per-chip form deferred once already. Instead the action is spread across a `select` and one
+  conditional `text` field, all of them selectors `docs/ha-api-notes.md` records as checked.
+  Swapping `ui_action` in later touches that one file: the config shape is Home Assistant's
+  either way.
+- **Three tap-action keys stay in YAML**, on purpose rather than pending: a `call-service`'s
+  `data` and `target`, and the `entity` override (§7). They are structured values a text field
+  cannot honestly ask for, and each is rare enough that a form row for it would cost every user
+  a field to skip. `chipFromForm` carries all three through untouched, so a chip that has them
+  can still have its name edited in the dialog without losing them.
+- **A config may name the same entity twice**, and the card draws both chips. The editor
+  renders both and refuses to _add_ a duplicate: its rows are keyed by entity id, so the second
+  occurrence is keyed positionally (`chipKeys`) and a drag past its twin closes both panels.
+  The second chip is writable in YAML and fully editable once it is there.
 - **Per-chip colour, in any form.** Out of scope on purpose (§3). If it turns out to be wanted,
   it is a change to that section and deserves the argument, not a config key added quietly.

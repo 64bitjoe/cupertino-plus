@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { readChips } from './model'
+import {
+  chipFromForm,
+  chipKeys,
+  chipRows,
+  chipToForm,
+  CONTENT_INHERIT,
+  inheritedIcon,
+  inheritedName,
+  readChip,
+  readChips,
+  type ChipConfig,
+} from './model'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 
 const entity = (over: Partial<HassEntity> & { entity_id: string }): HassEntity =>
@@ -92,5 +103,189 @@ describe('readChips', () => {
       'toggle',
       'more-info',
     ])
+  })
+})
+
+/**
+ * The editor reads a chip before Home Assistant has necessarily handed it a `hass`, which the
+ * card never has to. It should read like a chip whose entity is missing, because that is what
+ * it is.
+ */
+describe('readChip without hass', () => {
+  it('falls back to the configured identity and the placeholder glyph', () => {
+    expect(readChip(undefined, { entity: 'sensor.hall' })).toMatchObject({
+      name: 'sensor.hall',
+      icon: 'mdi:eye',
+      value: '—',
+      unavailable: true,
+    })
+  })
+})
+
+/**
+ * The two values the editor greys into its Icon and Name fields. A placeholder is a promise
+ * about what happens when a field is left empty, so these have to be `readChip`'s own
+ * fallbacks rather than a second guess at them.
+ */
+describe('the inherited placeholders', () => {
+  it('answer what the card would draw for an entity it can see', () => {
+    const hass = hassWith(HALL)
+    expect(inheritedName(hass, 'sensor.hall')).toBe('Hall')
+    expect(inheritedIcon(hass, 'sensor.hall')).toBe('mdi:thermometer')
+  })
+
+  it('answer what the card would draw for one it cannot', () => {
+    expect(inheritedName(undefined, 'sensor.gone')).toBe('sensor.gone')
+    expect(inheritedIcon(hassWith(), 'sensor.gone')).toBe('mdi:eye')
+  })
+})
+
+/**
+ * A chip's config carries `tap_action` as an object and an `ha-form` row reads one key of one
+ * flat object, so these two are the whole of the translation. They are a pair: whatever one
+ * spreads out the other has to gather up, and a key neither of them mentions has to survive
+ * the trip regardless.
+ */
+describe('chipToForm', () => {
+  it('flattens the action and shows the sentinel for a row with no content override', () => {
+    expect(chipToForm({ entity: 'light.hall' })).toEqual({
+      entity: 'light.hall',
+      name: undefined,
+      icon: undefined,
+      content: CONTENT_INHERIT,
+      action: 'more-info',
+      navigation_path: undefined,
+      service: undefined,
+    })
+  })
+
+  it('spreads an action argument into its own field', () => {
+    expect(
+      chipToForm({
+        entity: 'person.joe',
+        content: 'labeled',
+        tap_action: { action: 'navigate', navigation_path: '/lovelace/people' },
+      }),
+    ).toMatchObject({ content: 'labeled', action: 'navigate', navigation_path: '/lovelace/people' })
+  })
+})
+
+describe('chipFromForm', () => {
+  const bare: ChipConfig = { entity: 'light.hall' }
+
+  it('round-trips a row nobody has overridden back to just its entity', () => {
+    expect(chipFromForm(bare, chipToForm(bare))).toEqual(bare)
+  })
+
+  it('writes no tap_action for a bare more-info, because that is what no tap_action means', () => {
+    expect(chipFromForm(bare, { ...chipToForm(bare), name: 'Hall lamp' })).toEqual({
+      entity: 'light.hall',
+      name: 'Hall lamp',
+    })
+  })
+
+  it('drops the content key for the sentinel and keeps a real override', () => {
+    expect(chipFromForm(bare, { ...chipToForm(bare), content: CONTENT_INHERIT })).toEqual(bare)
+    expect(chipFromForm(bare, { ...chipToForm(bare), content: 'icon' })).toEqual({
+      ...bare,
+      content: 'icon',
+    })
+  })
+
+  it('gathers an argument back up, for the action that owns it', () => {
+    expect(
+      chipFromForm(bare, { ...chipToForm(bare), action: 'navigate', navigation_path: '/l/0' }),
+    ).toEqual({ entity: 'light.hall', tap_action: { action: 'navigate', navigation_path: '/l/0' } })
+  })
+
+  /**
+   * The argument fields are read only for the action that owns them. A path left over from a
+   * row that used to navigate must not ride along inside a toggle: a config carrying an
+   * argument its action cannot use reads as a bug the next time somebody opens the YAML tab.
+   */
+  it('leaves another action argument behind when the action changes', () => {
+    const prior: ChipConfig = {
+      entity: 'light.hall',
+      tap_action: { action: 'navigate', navigation_path: '/l/0' },
+    }
+    expect(chipFromForm(prior, { ...chipToForm(prior), action: 'toggle' })).toEqual({
+      entity: 'light.hall',
+      tap_action: { action: 'toggle' },
+    })
+  })
+
+  /**
+   * The three keys the form deliberately does not draw (§7 of the rules). Losing them the
+   * moment somebody renamed the chip beside them would be exactly the data loss `mergeEntities`
+   * exists to prevent on the cards whose lists still go through a picker.
+   */
+  it('carries the YAML-only action keys through an unrelated edit', () => {
+    const prior: ChipConfig = {
+      entity: 'binary_sensor.kettle',
+      tap_action: {
+        action: 'call-service',
+        service: 'switch.turn_on',
+        target: { entity_id: 'switch.kettle' },
+        data: { transition: 2 },
+        entity: 'switch.kettle',
+      },
+    }
+    expect(chipFromForm(prior, { ...chipToForm(prior), name: 'Kettle' })).toEqual({
+      ...prior,
+      name: 'Kettle',
+    })
+  })
+
+  it('keeps an entity override even on an action that would otherwise be written away', () => {
+    const prior: ChipConfig = {
+      entity: 'sensor.hall',
+      tap_action: { action: 'more-info', entity: 'climate.hall' },
+    }
+    expect(chipFromForm(prior, chipToForm(prior))).toEqual(prior)
+  })
+
+  it('answers nothing for a row whose entity has been cleared', () => {
+    expect(chipFromForm(bare, { ...chipToForm(bare), entity: '' })).toBeUndefined()
+  })
+
+  it('falls back to the default action for a value that is not one', () => {
+    expect(chipFromForm(bare, { ...chipToForm(bare), action: 'explode' })).toEqual(bare)
+  })
+})
+
+/**
+ * The list on its way back into the config. A row with nothing but an entity in it goes back
+ * as a bare string, so a config hand-written as a plain id list does not sprout objects just
+ * because somebody opened a panel and closed it again.
+ */
+describe('chipRows', () => {
+  it('flattens a row that says nothing more than its own id', () => {
+    expect(chipRows([{ entity: 'sensor.a' }, { entity: 'light.b', content: 'icon' }])).toEqual([
+      'sensor.a',
+      { entity: 'light.b', content: 'icon' },
+    ])
+  })
+
+  it('drops a row with no entity at all', () => {
+    expect(chipRows([{ entity: '' }, { entity: 'sensor.a' }])).toEqual(['sensor.a'])
+  })
+})
+
+/**
+ * `repeat` cannot be handed two rows with one key, and this card's config may legally name the
+ * same entity twice — `readChips` draws both, so the editor has to render both.
+ */
+describe('chipKeys', () => {
+  it('keys an ordinary list by entity id and nothing else', () => {
+    expect(chipKeys([{ entity: 'sensor.a' }, { entity: 'light.b' }])).toEqual([
+      'sensor.a',
+      'light.b',
+    ])
+  })
+
+  it('suffixes the later occurrences of a repeated entity', () => {
+    expect(
+      chipKeys([{ entity: 'sensor.a' }, { entity: 'light.b' }, { entity: 'sensor.a' }]),
+    ).toEqual(['sensor.a', 'light.b', 'sensor.a#1'])
   })
 })

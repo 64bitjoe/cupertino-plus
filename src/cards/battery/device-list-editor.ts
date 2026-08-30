@@ -46,13 +46,13 @@ import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResul
 import { property, state } from 'lit/decorators.js'
 import { repeat } from 'lit/directives/repeat.js'
 
+import { moveRow } from '../../core/entities-form'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema, HomeAssistant } from '../../core/types/ha'
 import {
   deviceRows,
   inheritedIcon,
   inheritedName,
-  moveRow,
   readDevice,
   type BatteryDeviceConfig,
 } from './model'

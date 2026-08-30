@@ -20,7 +20,19 @@
 import { cwNavigate } from './navigate'
 import type { HomeAssistant } from './types/ha'
 
-export type ActionName = 'more-info' | 'toggle' | 'navigate' | 'call-service' | 'none'
+/**
+ * Every action a press can be configured as, in the order an editor should offer them:
+ * the two that need nothing said about them first, then the two that take an argument, then
+ * the one that switches the whole affordance off.
+ *
+ * A list rather than a bare union because the chips editor draws a dropdown from it, and a
+ * union that only exists at the type level cannot be iterated: the version of this that had
+ * both would be two lists to keep in step, and the one the compiler checks is not the one the
+ * user sees.
+ */
+export const ACTION_NAMES = ['more-info', 'toggle', 'navigate', 'call-service', 'none'] as const
+
+export type ActionName = (typeof ACTION_NAMES)[number]
 
 /**
  * One action, in Home Assistant's own vocabulary. Every field past `action` belongs to exactly

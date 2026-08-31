@@ -14,6 +14,7 @@ const chip = (content: ChipView['content']): ChipView => ({
   color: undefined,
   visible: true,
   break: false,
+  fill: false,
   spacer: false,
   action: { action: 'more-info' },
 })
@@ -165,5 +166,31 @@ describe('floorsFor with forced rows', () => {
     const flowing = floorsFor([at(), at(), at()])
     const split = floorsFor([at(), at(true), at()])
     expect(split.min_rows).toBeGreaterThan(flowing.min_rows)
+  })
+})
+
+describe('floorsFor with a filling spacer', () => {
+  /**
+   * A filling chip is elastic — it takes the leftover and collapses when there is none — so it
+   * can never be the thing that pushes a line onto the next one. Charging it a nominal width
+   * would invent a line the browser will not draw, which is an empty grid row the user sees.
+   */
+  it('costs nothing in the line arithmetic', () => {
+    const four = Array.from({ length: 4 }, () => chip('value'))
+    const withFill = [...four.slice(0, 2), { ...chip('value'), fill: true }, ...four.slice(2)]
+    expect(floorsFor(withFill, 420).min_rows).toBe(floorsFor(four, 420).min_rows)
+  })
+})
+
+describe('floorsFor and the container inset', () => {
+  /**
+   * Glass paints no surface and so insets by nothing. 32 units of vertical padding is exactly
+   * the difference between one row of chips fitting a single grid row (44 of 56) and needing
+   * two (76) — the padding was buying an entire empty row inside a box nobody can see.
+   */
+  it('fits one row of chips in one grid row when nothing is inset', () => {
+    const three = Array.from({ length: 3 }, () => chip('value'))
+    expect(floorsFor(three, 640, 0).min_rows).toBe(1)
+    expect(floorsFor(three, 640, 16).min_rows).toBe(2)
   })
 })

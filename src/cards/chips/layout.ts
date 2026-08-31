@@ -31,6 +31,8 @@ export interface ChipBand {
   content: ChipContent
   /** True for a chip that starts a new row. See `groupRows`. */
   break?: boolean
+  /** True for a chip that absorbs the row's leftover width rather than claiming a width. */
+  fill?: boolean
 }
 
 /**
@@ -56,8 +58,15 @@ export const groupRows = <T extends ChipBand>(chips: readonly T[]): T[][] => {
   return rows
 }
 
-/** Must match `--cw-inset`, the padding inside the card. */
-const INSET = 16
+/**
+ * Must match `--cw-inset`, the padding inside the card — in `card` mode.
+ *
+ * `glass` paints no surface, so it insets by nothing at all and passes `0` here: there is no
+ * edge for the content to be held away from, and the 32 units this would otherwise add
+ * vertically are the difference between a single row of chips fitting in one grid row (44 of
+ * 56) and needing two (76). A card padded away from a box nobody can see is just a taller card.
+ */
+export const INSET = 16
 
 /** The gap between one chip and the next, both across and down. Must match `--cw-space-2`. */
 const GAP = 8
@@ -151,17 +160,21 @@ const FLOOR_CHIPS_ACROSS = 3
  * recomputes. That window is one frame of a deliberate resize. The window it replaces was
  * permanent, visible on first paint, and is what somebody actually reported.
  */
-export const floorsFor = (chips: readonly ChipBand[], measured?: number): Floors => {
+export const floorsFor = (
+  chips: readonly ChipBand[],
+  measured?: number,
+  inset: number = INSET,
+): Floors => {
   const band = bandFor(chips)
 
   const across = Math.min(Math.max(chips.length, 1), FLOOR_CHIPS_ACROSS)
-  const min_columns = columnsFor(across * NOMINAL_WIDTH[band] + (across - 1) * GAP + 2 * INSET)
+  const min_columns = columnsFor(across * NOMINAL_WIDTH[band] + (across - 1) * GAP + 2 * inset)
 
   if (chips.length === 0) return { min_columns, min_rows: 1 }
 
   const usable = Math.max(
     NOMINAL_WIDTH.icon,
-    (measured ?? gridColumnsToPx(min_columns)) - 2 * INSET,
+    (measured ?? gridColumnsToPx(min_columns)) - 2 * inset,
   )
 
   // Each configured row wraps on its own, so the lines are the sum of each row's own wrapping
@@ -176,6 +189,10 @@ export const floorsFor = (chips: readonly ChipBand[], measured?: number): Floors
     let used = 0
     let rowLines = 1
     for (const chip of row) {
+      // A filling chip is elastic: it takes what is left over and collapses when there is
+      // nothing to take, so it can never be the thing that pushes a line onto the next one.
+      // Charging it a nominal width would invent a line the browser will not draw.
+      if (chip.fill === true) continue
       const width = NOMINAL_WIDTH[chip.content]
       const need = used === 0 ? width : used + GAP + width
       if (need > usable && used > 0) {
@@ -188,7 +205,7 @@ export const floorsFor = (chips: readonly ChipBand[], measured?: number): Floors
     return total + rowLines
   }, 0)
 
-  const content = lines * rowHeightFor(band) + (lines - 1) * GAP + 2 * INSET
+  const content = lines * rowHeightFor(band) + (lines - 1) * GAP + 2 * inset
 
   return { min_columns, min_rows: Math.max(1, rowsFor(content)) }
 }

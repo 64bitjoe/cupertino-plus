@@ -76,6 +76,12 @@ export interface ChipConfig {
    * would change the card's height a tick after it was measured.
    */
   break?: boolean
+  /**
+   * Expand to absorb whatever width the row has left, pushing everything after it to the far
+   * edge. Meant for a spacer — a chip with content would simply be drawn stretched — and not a
+   * template, for the same reason `break` is not.
+   */
+  fill?: boolean
   tap_action?: ActionConfig
 }
 
@@ -96,6 +102,8 @@ export interface ChipView {
   visible: boolean
   /** Carried from the config: this chip starts a new row. See `layout.ts`'s `groupRows`. */
   break: boolean
+  /** Carried from the config: this chip absorbs the row's leftover width. */
+  fill: boolean
   /**
    * True for an entity-less chip whose name, icon and value all resolved to nothing: an
    * intentional gap, drawn by `chips-card.ts` as one — no pill, no glyph, not a button. Always
@@ -320,6 +328,7 @@ export const readChip = (
       color,
       visible,
       break: row.break === true,
+      fill: row.fill === true,
       // A field mid-resolution reads exactly like an absent one (this function's own `field`
       // contract), so a chip that will have content once its template answers draws as a
       // spacer until then — the same "hidden until it answers" rule `show` already keeps,
@@ -344,6 +353,7 @@ export const readChip = (
       color: undefined,
       visible,
       break: row.break === true,
+      fill: row.fill === true,
       spacer: false,
       action,
     }
@@ -365,6 +375,7 @@ export const readChip = (
       : colorValue(field(row.color, row.entity) ?? field(defaults.color, undefined)),
     visible,
     break: row.break === true,
+    fill: row.fill === true,
     spacer: false,
     action,
   }
@@ -542,6 +553,7 @@ export const chipToForm = (config: ChipConfig): Record<string, unknown> => ({
   value: config.value,
   show: config.show,
   break: config.break === true,
+  fill: config.fill === true,
   action:
     config.tap_action?.action ?? (config.entity === undefined ? 'none' : DEFAULT_ACTION.action),
   navigation_path: config.tap_action?.navigation_path,
@@ -593,6 +605,7 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
   // reports a real `false` for an off switch, and only `true` is worth writing — `break: false`
   // in a config says exactly what its absence says.
   if (data.break === true) next.break = true
+  if (data.fill === true) next.fill = true
 
   // `readAction`'s own real default: `none` for a row this edit leaves with no entity, so a
   // chip left at "Nothing" in the dropdown does not sprout an explicit `tap_action` the moment

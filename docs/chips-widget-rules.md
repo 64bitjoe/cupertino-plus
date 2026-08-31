@@ -77,6 +77,12 @@ rather than opening a more-info dialog for an entity that does not exist. An exp
 still toggle or show more-info for something specific — is honoured exactly as it would be on
 any other chip.
 
+A spacer takes one chip's width by default. Set **`fill: true`** on it instead and it takes
+whatever the row has left over, pushing every chip after it to the far edge — the layout where a
+couple of status chips sit left and a settings button sits hard right. A filling chip is elastic:
+it grows from nothing and collapses to nothing when the row is full, so it can never be the
+reason a real chip wraps, and `floorsFor` skips it in the line arithmetic for that reason.
+
 The editor's **Add a blank chip** button creates one directly, opened straight into its
 per-chip **Use templates** mode. Clearing a chip's Entity field does the same thing to an
 existing row — it does not delete it, the way it used to; the trash icon is the only thing that
@@ -105,6 +111,13 @@ was not icon-only at all — it drew the reading too, and there was no way to ha
 mixed company. Worse, a chip whose value was empty still got an empty `<span class="value">`,
 which is a flex item, so the pill reserved a text-sized gap after the glyph for text that was
 never there.
+
+Nothing is inset in `glass`, in either direction. There is no surface for padding to be inside
+of, and it cost twice: across, it started the row 16 units right of every other card in the
+column, reading as misalignment rather than as padding; down, 32 units is exactly the difference
+between one row of chips fitting a single grid row (44 of 56) and needing two (76), so the
+padding bought an entire empty row. `card` mode keeps both, where the content genuinely is
+inside a surface.
 
 Now the band decides only `--cw-chip-row`, the height every pill shares, and each chip draws
 what its own `content` says inside it. An icon-only chip in a labeled row is a full-height pill

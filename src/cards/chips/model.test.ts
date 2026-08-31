@@ -55,6 +55,7 @@ describe('readChips', () => {
       color: undefined,
       visible: true,
       break: false,
+      fill: false,
       spacer: false,
       action: { action: 'more-info' },
     })
@@ -162,6 +163,7 @@ describe('chipToForm', () => {
       icon: undefined,
       content: CONTENT_INHERIT,
       break: false,
+      fill: false,
       action: 'more-info',
       navigation_path: undefined,
       service: undefined,

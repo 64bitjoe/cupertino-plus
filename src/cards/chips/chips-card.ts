@@ -13,7 +13,7 @@ import { withFloors, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
-import { bandFor, floorsFor, groupRows, rowHeightFor, type ChipBand } from './layout'
+import { bandFor, floorsFor, groupRows, INSET, rowHeightFor, type ChipBand } from './layout'
 import {
   chipConfigs,
   chipTemplates,
@@ -80,18 +80,17 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         min-width: 0;
       }
 
-      /* Glass paints no surface, so a horizontal inset is padding inside a box nobody can see.
-         All it does is start the row 16 units right of every other card in the column, which
-         reads as the chips being misaligned rather than as the card being padded -- and on a
-         Lock Screen accessory, lining up with its neighbours is most of the effect. The
-         vertical inset stays: that one separates the row from the cards above and below, which
-         is a gap you can actually see.
+      /* Glass paints no surface, so an inset is padding inside a box nobody can see. Across, it
+         started the row 16 units right of every other card in the column, which reads as the
+         chips being misaligned rather than as the card being padded. Down, it was worse than
+         cosmetic: 32 units is the difference between one row of chips fitting in a single grid
+         row (44 of 56) and needing two (76), so the padding was buying an entire empty row.
 
          Card mode keeps both. There the content genuinely is inside a surface, and an inset is
-         what stops it touching the edge. */
+         what stops it touching the edge. The floor in layout.ts is told which of the two it is
+         priced against -- see the inset argument to floorsFor. */
       .glass .chips {
-        padding-left: 0;
-        padding-right: 0;
+        padding: 0;
       }
 
       /* One row, wrapping on its own. A break says where a row STARTS; it does not promise the
@@ -123,6 +122,16 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         border-radius: var(--cw-radius-pill);
       }
 
+      /* Absorbs whatever the row has left, pushing every chip after it to the far edge -- the
+         one thing a fixed-width spacer cannot do. Basis 0 rather than auto, and the 44-unit
+         min-width overridden back to 0, so it grows from nothing and collapses to nothing when
+         the row is full: a spacer must never be the reason a real chip wraps. layout.ts skips
+         it in the line arithmetic for the same reason. */
+      .chip.fill {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+
       .pill {
         display: inline-flex;
         align-items: center;
@@ -139,7 +148,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         align-items: center;
       }
 
-      .stack {
+      .pill .stack {
         display: flex;
         flex-direction: column;
         gap: calc(2px * var(--cw-scale));
@@ -200,7 +209,12 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         color: var(--cw-chip-tint, inherit);
       }
 
-      .value {
+      /* Scoped under .pill, and that scoping is load-bearing rather than tidy: a chip element
+         carries its content mode as a class ("chip value"), so an unscoped .value matched the
+         CHIP as well as the reading span inside it -- capping the whole chip at the 140 units
+         meant for one line of text. Invisible on an ordinary chip, which is narrower than that
+         anyway, and very visible on a filling spacer, which stopped growing at exactly 140. */
+      .pill .value {
         font: var(--cw-text-footnote);
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
@@ -209,7 +223,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         max-width: calc(140px * var(--cw-scale));
       }
 
-      .caption {
+      .pill .caption {
         font: var(--cw-text-caption-2);
         text-transform: uppercase;
         letter-spacing: 0.04em;
@@ -400,9 +414,18 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     return this.isMeasured ? this.boxWidth / this.scaleFactor : undefined
   }
 
+  /**
+   * What the card actually pads by, which the floor has to price against rather than assume:
+   * `glass` insets by nothing (see the stylesheet's note), `card` by the shared inset.
+   */
+  private get _floorInset(): number {
+    return (this._config?.container ?? DEFAULT_CONTAINER) === 'glass' ? 0 : INSET
+  }
+
   private _floorFor(band: ChipBand[]): Floors {
     const width = this._floorWidth
-    const floors = floorsFor(band, width)
+    const inset = this._floorInset
+    const floors = floorsFor(band, width, inset)
     // The measured width is part of the identity, not just an input. Without it here the
     // high-water mark below would hold the pre-measurement estimate — the very over-count this
     // is meant to correct — and the card would never shrink to the width it actually got.
@@ -410,6 +433,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       this._config?.entities ?? null,
       this._config?.content ?? null,
       width === undefined ? null : Math.round(width),
+      inset,
     ])
 
     if (!this._floorMax || this._floorMax.key !== key) {
@@ -489,7 +513,9 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * what makes it a gap the width of one chip rather than nothing at all.
    */
   private _renderChip(chip: ChipView, band: ChipContent): TemplateResult {
-    if (chip.spacer) return html`<div class="chip ${band}" aria-hidden="true"></div>`
+    if (chip.spacer) {
+      return html`<div class="chip ${band} ${chip.fill ? 'fill' : ''}" aria-hidden="true"></div>`
+    }
 
     const pressable = isPressable(chip.action)
     // Ordinary entity-bearing chips always have both a name and a reading, so this produces
@@ -524,7 +550,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
 
     return html`
       <div
-        class="chip ${content} ${chip.unavailable ? 'unknown' : ''} ${
+        class="chip ${content} ${chip.fill ? 'fill' : ''} ${chip.unavailable ? 'unknown' : ''} ${
           pressable ? 'cw-pressable' : ''
         }"
         role=${pressable ? 'button' : nothing}

@@ -190,6 +190,7 @@ const chipSchema = (
       : { name: 'icon', selector: iconSelector(inheritedIcon(hass, config.entity)) },
     { name: 'name', selector: textSelector(inheritedName(hass, config.entity)) },
     ...(first ? [] : [{ name: 'break', selector: { boolean: {} } as const }]),
+    { name: 'fill', selector: { boolean: {} } },
     { name: 'action', selector: ACTION_SELECTOR },
   ]
 
@@ -239,6 +240,7 @@ const LABELS: Record<string, string> = {
   service: 'Service',
   templating: 'Use templates',
   break: 'Start a new row',
+  fill: 'Push the rest to the far edge',
   value: 'Reading',
   show: 'Show when',
 }
@@ -260,6 +262,9 @@ const HELPERS: Record<string, string> = {
   templating:
     'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
   break: 'This chip begins a new row. A row still wraps on its own if it runs out of width.',
+  fill:
+    'This chip stretches to take whatever width is left, pushing every chip after it to the ' +
+    'right-hand edge. Usually wanted on a blank chip.',
   value: 'Replaces what the chip prints. Falls back to the entity own reading if it is empty.',
   show: 'The chip is drawn only while this is true. Hidden until it answers.',
 }

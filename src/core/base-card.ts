@@ -137,6 +137,22 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
   }
 
   /**
+   * Whether the ResizeObserver has reported yet — whether `boxWidth` and `boxHeight` are a
+   * measurement or the default footprint standing in for one.
+   *
+   * `boxWidth` deliberately cannot answer this: it hands back `DEFAULT_WIDTH` before the first
+   * measurement, which is indistinguishable from a card genuinely measured at 500px. Most
+   * callers are right not to care — a guess that matches the box the card is about to be
+   * measured in is the whole point of that default. A caller that must know is one choosing
+   * between a conservative assumption and the truth, and the chips card's floor is exactly
+   * that: pricing its rows against an assumed section width where it could price them against
+   * the real one costs the user an empty grid row per line it guessed wrong.
+   */
+  protected get isMeasured(): boolean {
+    return this._measuredWidth > 0
+  }
+
+  /**
    * `config.scale` as a multiplier, ready to divide a measured box by.
    *
    * The CSS side of it is set on the element by `_applyScale`; this is the same number for

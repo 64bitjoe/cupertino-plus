@@ -80,6 +80,20 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         min-width: 0;
       }
 
+      /* Glass paints no surface, so a horizontal inset is padding inside a box nobody can see.
+         All it does is start the row 16 units right of every other card in the column, which
+         reads as the chips being misaligned rather than as the card being padded -- and on a
+         Lock Screen accessory, lining up with its neighbours is most of the effect. The
+         vertical inset stays: that one separates the row from the cards above and below, which
+         is a gap you can actually see.
+
+         Card mode keeps both. There the content genuinely is inside a surface, and an inset is
+         what stops it touching the edge. */
+      .glass .chips {
+        padding-left: 0;
+        padding-right: 0;
+      }
+
       /* One row, wrapping on its own. A break says where a row STARTS; it does not promise the
          row fits, so a row too wide for the dashboard wraps rather than clipping -- see the
          rules doc's "never scrolls, never truncates". */
@@ -373,9 +387,30 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    */
   private _floorMax: { key: string; floors: Floors } | undefined
 
+  /**
+   * The card's own width in design units, once it has actually been measured.
+   *
+   * `undefined` before then, which `floorsFor` reads as "assume the narrow case" — `boxWidth`
+   * cannot say so itself, since it answers `DEFAULT_WIDTH` before the first measurement and a
+   * real 500px card answers the same thing. Divided by the scale because the floor arithmetic
+   * is all design units: a card at `scale: 95` has more design units of room than its pixels
+   * suggest, and pricing its lines in pixels would invent a line back.
+   */
+  private get _floorWidth(): number | undefined {
+    return this.isMeasured ? this.boxWidth / this.scaleFactor : undefined
+  }
+
   private _floorFor(band: ChipBand[]): Floors {
-    const floors = floorsFor(band)
-    const key = JSON.stringify([this._config?.entities ?? null, this._config?.content ?? null])
+    const width = this._floorWidth
+    const floors = floorsFor(band, width)
+    // The measured width is part of the identity, not just an input. Without it here the
+    // high-water mark below would hold the pre-measurement estimate — the very over-count this
+    // is meant to correct — and the card would never shrink to the width it actually got.
+    const key = JSON.stringify([
+      this._config?.entities ?? null,
+      this._config?.content ?? null,
+      width === undefined ? null : Math.round(width),
+    ])
 
     if (!this._floorMax || this._floorMax.key !== key) {
       this._floorMax = { key, floors }

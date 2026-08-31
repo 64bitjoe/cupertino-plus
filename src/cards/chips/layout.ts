@@ -136,24 +136,58 @@ const FLOOR_CHIPS_ACROSS = 3
 
 /**
  * The floor: wide enough that the chips cannot be crushed into a column, and tall enough for
- * every line they wrap onto at exactly that width.
+ * every line they wrap onto.
+ *
+ * `measured` is the card's own rendered width in design units, once the ResizeObserver has
+ * reported one. Passing it is what stops this from over-reporting, and the difference is not
+ * marginal: without it the lines are counted against `ASSUMED_SECTION_WIDTH`'s idea of the box
+ * — a 9-column card in a 500px section, 341 units of usable width — and a card sitting in a
+ * genuinely wider section is handed an empty grid row for every line that estimate invented.
+ * Five chips that visibly share one line were being priced at two.
+ *
+ * The trade this accepts, stated plainly because the previous version accepted the opposite
+ * one: pricing against the real width means a card dragged NARROWER than it was measured at
+ * wraps onto more lines than the floor allowed, and clips until the observer reports and this
+ * recomputes. That window is one frame of a deliberate resize. The window it replaces was
+ * permanent, visible on first paint, and is what somebody actually reported.
  */
-export const floorsFor = (chips: readonly ChipBand[]): Floors => {
+export const floorsFor = (chips: readonly ChipBand[], measured?: number): Floors => {
   const band = bandFor(chips)
-  const width = NOMINAL_WIDTH[band]
 
   const across = Math.min(Math.max(chips.length, 1), FLOOR_CHIPS_ACROSS)
-  const min_columns = columnsFor(across * width + (across - 1) * GAP + 2 * INSET)
+  const min_columns = columnsFor(across * NOMINAL_WIDTH[band] + (across - 1) * GAP + 2 * INSET)
 
   if (chips.length === 0) return { min_columns, min_rows: 1 }
 
-  const usable = Math.max(width, gridColumnsToPx(min_columns) - 2 * INSET)
-  const perLine = Math.max(1, Math.floor((usable + GAP) / (width + GAP)))
+  const usable = Math.max(
+    NOMINAL_WIDTH.icon,
+    (measured ?? gridColumnsToPx(min_columns)) - 2 * INSET,
+  )
+
   // Each configured row wraps on its own, so the lines are the sum of each row's own wrapping
-  // rather than of the whole list's. Counting the list as one run would under-report the height
-  // of any card using `break` — three chips split one-and-two is two lines, not one — and an
-  // under-reported floor is the clipping this whole module exists to prevent.
-  const lines = groupRows(chips).reduce((total, row) => total + Math.ceil(row.length / perLine), 0)
+  // rather than of the whole list's — a card using `break` split one-and-two is two lines, not
+  // one, and an under-reported floor is the clipping this module exists to prevent.
+  //
+  // Within a row the chips are packed at their OWN nominal widths rather than all at the
+  // band's. The band is the tallest mode present, so pricing every chip at it charged an
+  // icon-only chip 96 units for the 52 it takes — and now that a chip actually draws its own
+  // content (rather than the band's, which was a bug), that overcharge has no excuse left.
+  const lines = groupRows(chips).reduce((total, row) => {
+    let used = 0
+    let rowLines = 1
+    for (const chip of row) {
+      const width = NOMINAL_WIDTH[chip.content]
+      const need = used === 0 ? width : used + GAP + width
+      if (need > usable && used > 0) {
+        rowLines += 1
+        used = width
+      } else {
+        used = need
+      }
+    }
+    return total + rowLines
+  }, 0)
+
   const content = lines * rowHeightFor(band) + (lines - 1) * GAP + 2 * INSET
 
   return { min_columns, min_rows: Math.max(1, rowsFor(content)) }

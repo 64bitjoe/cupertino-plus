@@ -47,10 +47,39 @@ describe('floorsFor', () => {
     expect(twelve.min_rows).toBeGreaterThan(four.min_rows)
   })
 
-  it('asks for more height for a labeled band than for a plain one', () => {
-    const plain = floorsFor(Array.from({ length: 7 }, () => chip('value')))
-    const labeled = floorsFor([...Array.from({ length: 6 }, () => chip('value')), chip('labeled')])
+  /**
+   * Both priced against the SAME width, which is the only way to ask this question now that
+   * chips are packed at their own nominal widths: a labeled card also floors WIDER
+   * (`min_columns` 11 against 9, since the band's nominal chip is 128 units), and left to
+   * choose their own widths the extra room buys back the extra height and the two land on the
+   * same row count. The invariant is about the taller row, not about the wider card.
+   */
+  it('asks for more height for a labeled band than for a plain one at the same width', () => {
+    const plain = floorsFor(
+      Array.from({ length: 7 }, () => chip('value')),
+      373,
+    )
+    const labeled = floorsFor(
+      [...Array.from({ length: 6 }, () => chip('value')), chip('labeled')],
+      373,
+    )
     expect(labeled.min_rows).toBeGreaterThan(plain.min_rows)
+  })
+
+  /**
+   * The over-report this width argument exists to stop. Five chips that share one line in a
+   * real 640-unit card were being counted as two lines against the assumed 341, and every
+   * invented line is an empty grid row the user sees as a gap.
+   */
+  it('counts the lines the real width allows, not the assumed one', () => {
+    const five = Array.from({ length: 5 }, () => chip('value'))
+    expect(floorsFor(five, 640).min_rows).toBeLessThan(floorsFor(five).min_rows)
+  })
+
+  it('prices an icon-only chip at its own width rather than the band, so more share a line', () => {
+    const wide = [chip('value'), chip('value'), chip('value'), chip('value')]
+    const narrow = [chip('value'), chip('icon'), chip('icon'), chip('icon')]
+    expect(floorsFor(narrow, 400).min_rows).toBeLessThanOrEqual(floorsFor(wide, 400).min_rows)
   })
 
   it('fits more icon-only chips on a line than labeled ones', () => {

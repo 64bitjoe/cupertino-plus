@@ -243,6 +243,15 @@ lands on which line, against text metrics no module running in node can see. Gue
 and then rendering with `flex-wrap` anyway would produce two answers that disagree, and the one
 the user sees would be the CSS.
 
+A chip is priced from the text it actually draws, not from a constant per content mode. That
+was the last and worst of the sizing bugs: a flat 96 units for anything with a reading charged
+`79` the same as a long sensor name, and charged 96 to a chip printing nothing at all — a bare
+icon chip, which is 44. A row of five such chips was priced at 408 units and drawn at about 260,
+so the floor concluded it wrapped and bought a grid row nobody could see anything in.
+`widthOf` estimates from the character count instead, which is an estimate of the right thing;
+the flat constant survives only for `getGridOptions()` before `hass`, where no reading has
+resolved and there is genuinely nothing to measure.
+
 What cannot be given away is the floor. `getGridOptions()` is answered before anything is
 measured, and if it under-reports, Home Assistant hands the card a box too short for its content
 and `ha-card` clips the overflow. So the floor is priced against a nominal chip width per band
@@ -360,6 +369,13 @@ and its reading — `Hall, 21.4°C` — never the glyph.
 to this same config shape; none of them changes anything above if they arrive later.
 
 ## 8. Degradation
+
+An entity that publishes an `entity_picture` — a person, a media player, a camera — draws that
+picture in the glyph's place, round and cropped, which is Home Assistant's own precedence
+everywhere else in the frontend. A configured `icon` still beats it, since that one was typed on
+purpose, and an unavailable entity keeps its glyph: the dimming is the signal that a chip is not
+reporting, and a crisp portrait undercuts it. A picture is never tinted — §3's colour applies to
+a glyph, and a photograph is not one.
 
 - **Entity missing from `hass.states`** — the chip still draws, dashed, from its configured
   identity (§1).

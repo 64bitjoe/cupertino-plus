@@ -158,6 +158,26 @@ export const iconFor = (entity: HassEntity): string => {
 }
 
 /**
+ * The image standing in for an entity, when it has one: a person's photo, a media player's
+ * album art, a camera's snapshot.
+ *
+ * Separate from `iconFor` rather than folded into it, and the split is the point. An icon is an
+ * `mdi:` name a card hands to `<ha-icon>`; a picture is a URL a card hands to `<img>`. They are
+ * two different elements with two different failure modes, so a function answering "either one,
+ * you work out which" would push that decision onto every caller anyway — and a caller that
+ * forgot would render a URL as an icon name and draw nothing.
+ *
+ * Home Assistant's own precedence is that a picture beats the domain glyph, which is why
+ * `person.joe` shows a face rather than `mdi:account` everywhere else in the frontend. A card
+ * following that rule reads the picture first and falls back to `iconFor`; a card that cannot
+ * draw an image ignores this and loses nothing but fidelity.
+ */
+export const pictureFor = (entity: HassEntity): string | undefined => {
+  const picture = entity.attributes.entity_picture
+  return typeof picture === 'string' && picture !== '' ? picture : undefined
+}
+
+/**
  * The units that sit tight against the numeral rather than a space away from it.
  *
  * The frontend's own rule, and it is about the glyph rather than about the dimension: `%` and

@@ -1,14 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
-import { bandFor, floorsFor, groupRows, rowHeightFor, ROW_LABELED, ROW_SINGLE } from './layout'
+import {
+  bandFor,
+  floorsFor,
+  groupRows,
+  rowHeightFor,
+  widthOf,
+  ROW_LABELED,
+  ROW_SINGLE,
+} from './layout'
 import { rowsToPx } from '../../core/size'
 import type { ChipView } from './model'
 
+/**
+ * A realistically-sized chip, and the sizes matter now: `widthOf` prices a chip from the text
+ * it actually draws, so a helper printing `1` would make every chip 56 units wide and quietly
+ * stop these wrapping assertions from testing anything. A six-character reading and a longer
+ * name put `icon` (44), `value` (94) and `labeled` (153) far enough apart to tell apart.
+ */
 const chip = (content: ChipView['content']): ChipView => ({
   entityId: 'sensor.a',
-  name: 'A',
+  name: 'Hall Temperature',
   icon: 'mdi:eye',
-  value: '1',
+  picture: undefined,
+  value: '21.4°C',
   content,
   unavailable: false,
   color: undefined,
@@ -192,5 +207,66 @@ describe('floorsFor and the container inset', () => {
     const three = Array.from({ length: 3 }, () => chip('value'))
     expect(floorsFor(three, 640, 0).min_rows).toBe(1)
     expect(floorsFor(three, 640, 16).min_rows).toBe(2)
+  })
+})
+
+/**
+ * The pricing that made a real card buy an empty grid row.
+ *
+ * `NOMINAL_WIDTH` charged every reading-bearing chip a flat 96 units whatever it printed, so a
+ * row drawing `79`, `43`, `0 kWh` and a bare gear was priced at 408 and drawn at about 260. The
+ * floor concluded it wrapped, asked for a third grid row, and the user saw the difference as
+ * empty dashboard under their chips.
+ */
+describe('widthOf', () => {
+  it('prices a short reading well under a flat per-mode guess', () => {
+    expect(widthOf({ content: 'value', value: '79', name: 'Alpine' })).toBeLessThan(96)
+  })
+
+  it('prices a longer reading wider than a shorter one', () => {
+    const short = widthOf({ content: 'value', value: '79', name: 'A' })
+    const long = widthOf({ content: 'value', value: '1234.5 kWh', name: 'A' })
+    expect(long).toBeGreaterThan(short)
+  })
+
+  /** A chip with an icon and no reading -- an entity-less nav chip -- draws only its glyph. */
+  it('charges a chip printing nothing only for its glyph and tap target', () => {
+    expect(widthOf({ content: 'value', value: '', name: '' })).toBe(ROW_SINGLE)
+  })
+
+  it('costs nothing for a filling chip, which is elastic', () => {
+    expect(widthOf({ content: 'value', value: '79', name: 'A', fill: true })).toBe(0)
+  })
+
+  /** Before `hass` there is no resolved text, and the per-mode guess is the only option. */
+  it('falls back to the per-mode guess when nothing has resolved yet', () => {
+    expect(widthOf({ content: 'value' })).toBe(96)
+    expect(widthOf({ content: 'labeled' })).toBe(128)
+  })
+
+  it('caps a very long reading where the stylesheet caps it', () => {
+    const huge = widthOf({ content: 'value', value: 'x'.repeat(400), name: 'A' })
+    expect(huge).toBeLessThanOrEqual(13 + 17 + 13 + 6 + 140)
+  })
+})
+
+describe('the card that surfaced all of this', () => {
+  /**
+   * Seven entries as configured: four readings, a filling spacer, a bare gear, and two labeled
+   * person chips on a forced second row. Two rows of chips is two rows of chips — 2 * 48 plus
+   * one 8-unit gap, which fits two grid rows and must not ask for three.
+   */
+  it('asks for two grid rows, not three', () => {
+    const row = [
+      { content: 'value' as const, value: '79', name: 'Alpine' },
+      { content: 'value' as const, value: '43', name: 'Unavailable' },
+      { content: 'value' as const, fill: true },
+      { content: 'value' as const, value: '0 kWh', name: 'Solar' },
+      { content: 'value' as const, value: '', name: '' },
+      { content: 'labeled' as const, value: 'Home', name: 'Joe', break: true },
+      { content: 'labeled' as const, value: 'Home', name: 'Cody' },
+    ]
+    // His card: about 415 CSS px at scale 95, glass so nothing is inset.
+    expect(floorsFor(row, 415 / 0.95, 0).min_rows).toBe(2)
   })
 })

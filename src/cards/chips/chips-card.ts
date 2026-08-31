@@ -200,6 +200,18 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         flex: none;
       }
 
+      /* An entity picture where the glyph would be: a person's face, album art, a camera frame.
+         Round and cropped to fill, which is how the rest of the frontend draws one, and sized a
+         little larger than the 17-unit glyph because a photograph reads smaller than a solid
+         mark at the same box. object-fit keeps a non-square source from stretching -- most of
+         these are square, and the one that is not should be cropped rather than distorted. */
+      .portrait {
+        width: calc(20px * var(--cw-scale));
+        height: calc(20px * var(--cw-scale));
+        border-radius: 50%;
+        object-fit: cover;
+      }
+
       /* The tint paints the glyph and nothing else: the reading, the caption and the pill stay
          one ink, so a row of six chips still reads as one band rather than as six competing
          highlights. §4 of the spec has the argument, and core/ring.ts has the older version of
@@ -370,14 +382,26 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   private get _floorBand(): ChipBand[] {
     const defaultContent = this._config?.content ?? DEFAULT_CONTENT
     if (!this.hass) {
+      // No readings resolved yet, so `widthOf` has nothing to price from and falls back to the
+      // per-mode guess. That is the one branch where guessing is the only option.
       return chipConfigs(this._config?.entities).map(row => ({
         content: row.content ?? defaultContent,
         break: row.break === true,
+        fill: row.fill === true,
       }))
     }
+    // `value` and `name` are what let the floor price a chip from what it actually draws rather
+    // than from a flat per-mode constant -- see `widthOf`. They exist only on this branch,
+    // which is exactly the branch that has `hass`.
     return this._chips
       .filter(chip => chip.visible)
-      .map(chip => ({ content: chip.content, break: chip.break }))
+      .map(chip => ({
+        content: chip.content,
+        break: chip.break,
+        fill: chip.fill,
+        value: chip.value,
+        name: chip.name,
+      }))
   }
 
   /**
@@ -561,11 +585,20 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         @keydown=${this._key(chip)}
       >
         <span class="pill">
-          <ha-icon
-            class="glyph"
-            style=${chip.color ? `--cw-chip-tint:${chip.color}` : nothing}
-            .icon=${chip.icon}
-          ></ha-icon>
+          ${
+            chip.picture
+              ? // A photograph cannot be tinted, so it deliberately carries no `--cw-chip-tint`:
+                // a colour set on a chip that turns out to have a picture is simply not applied,
+                // rather than washed over the face. `alt` is empty because the chip's own
+                // aria-label already names it -- a screen reader should hear "Joe, home", not
+                // "Joe, home, Joe".
+                html`<img class="glyph portrait" src=${chip.picture} alt="" />`
+              : html`<ha-icon
+                  class="glyph"
+                  style=${chip.color ? `--cw-chip-tint:${chip.color}` : nothing}
+                  .icon=${chip.icon}
+                ></ha-icon>`
+          }
           ${body}
         </span>
       </div>

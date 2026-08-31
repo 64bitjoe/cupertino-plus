@@ -17,7 +17,14 @@ import {
   type ActionConfig,
   type ActionName,
 } from '../../core/actions'
-import { formatValue, iconFor, isUnavailable, nameFor, VALUE_DASH } from '../../core/entity-view'
+import {
+  formatValue,
+  iconFor,
+  isUnavailable,
+  nameFor,
+  pictureFor,
+  VALUE_DASH,
+} from '../../core/entity-view'
 import { isTemplate, type TemplateRequest } from '../../core/templates'
 import { colorValue, TINTS } from '../../core/tint'
 import type { HomeAssistant } from '../../core/types/ha'
@@ -92,6 +99,12 @@ export interface ChipView {
   name: string
   /** An `mdi:` name for `ha-icon` — never a raw path; see the card's own note. */
   icon: string
+  /**
+   * A URL to draw in the glyph's place: a person's photo, album art, a camera frame. Home
+   * Assistant's own precedence — a picture beats the domain glyph — but a configured `icon`
+   * beats both, since that one was typed on purpose.
+   */
+  picture: string | undefined
   /** Formatted with its unit, or the dash when there is nothing to read. */
   value: string
   content: ChipContent
@@ -322,6 +335,7 @@ export const readChip = (
       entityId: undefined,
       name: name ?? '',
       icon: icon ?? '',
+      picture: undefined,
       value: value ?? '',
       content,
       unavailable: false,
@@ -346,6 +360,7 @@ export const readChip = (
       entityId: row.entity,
       name: name ?? row.entity,
       icon: icon ?? FALLBACK_ICON,
+      picture: undefined,
       value: VALUE_DASH,
       content,
       unavailable: true,
@@ -364,6 +379,11 @@ export const readChip = (
     entityId: row.entity,
     name: name ?? nameFor(entity),
     icon: icon ?? iconFor(entity),
+    // Only when the row did not name an icon of its own: an `icon:` in the config was typed on
+    // purpose and outranks whatever the entity happens to publish. An unavailable entity keeps
+    // its glyph rather than its photo, for the reason its colour is dropped — the dimming is
+    // the signal, and a crisp portrait undercuts it.
+    picture: icon === undefined && !unavailable ? pictureFor(entity) : undefined,
     value: unavailable ? VALUE_DASH : (field(row.value, row.entity) ?? formatValue(hass, entity)),
     content,
     unavailable,

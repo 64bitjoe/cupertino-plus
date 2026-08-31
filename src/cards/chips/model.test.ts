@@ -49,6 +49,7 @@ describe('readChips', () => {
       entityId: 'sensor.hall',
       name: 'Hall',
       icon: 'mdi:thermometer',
+      picture: undefined,
       value: '21.4°C',
       content: 'value',
       unavailable: false,
@@ -678,5 +679,51 @@ describe('chipWatchedIds', () => {
       'sensor.a',
       'sensor.b',
     ])
+  })
+})
+
+/**
+ * Home Assistant's own precedence: an entity that publishes a picture shows the picture rather
+ * than its domain glyph, which is why a person reads as a face everywhere else in the frontend.
+ */
+describe('entity pictures', () => {
+  const JOE = entity({
+    entity_id: 'person.joe',
+    state: 'home',
+    attributes: { friendly_name: 'Joe', entity_picture: '/api/image/serve/abc/512x512' },
+  })
+
+  it('draws the picture, and keeps the glyph as the fallback beneath it', () => {
+    const [chip] = readChips(hassWith(JOE), ['person.joe'], {})
+    expect(chip).toMatchObject({
+      picture: '/api/image/serve/abc/512x512',
+      icon: 'mdi:account',
+    })
+  })
+
+  it('lets a configured icon beat the picture, since that one was typed on purpose', () => {
+    const [chip] = readChips(hassWith(JOE), [{ entity: 'person.joe', icon: 'mdi:walk' }], {})
+    expect(chip).toMatchObject({ icon: 'mdi:walk', picture: undefined })
+  })
+
+  it('has none for an entity that publishes none', () => {
+    expect(readChips(hassWith(HALL), ['sensor.hall'], {})[0]?.picture).toBeUndefined()
+  })
+
+  /** The dim is the signal that a chip is not reporting; a crisp portrait undercuts it. */
+  it('drops the picture of an entity that is not reporting', () => {
+    const gone = entity({
+      entity_id: 'person.joe',
+      state: 'unavailable',
+      attributes: { friendly_name: 'Joe', entity_picture: '/api/image/serve/abc/512x512' },
+    })
+    expect(readChips(hassWith(gone), ['person.joe'], {})[0]).toMatchObject({
+      unavailable: true,
+      picture: undefined,
+    })
+  })
+
+  it('has none for a chip with no entity at all', () => {
+    expect(readChips(hassWith(), [{ name: 'Goodnight' }], {})[0]?.picture).toBeUndefined()
   })
 })

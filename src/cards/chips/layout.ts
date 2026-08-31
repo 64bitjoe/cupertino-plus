@@ -33,6 +33,16 @@ export interface ChipBand {
   break?: boolean
   /** True for a chip that absorbs the row's leftover width rather than claiming a width. */
   fill?: boolean
+  /**
+   * What the chip is actually going to print, when that is known.
+   *
+   * Absent before `hass` arrives, where the card has a config and nothing else; present from
+   * every render after it, because `readChips` has already resolved both. `widthOf` prices a
+   * chip from these when it has them and from `NOMINAL_WIDTH` when it does not, which is the
+   * whole difference between a floor that fits and one that buys an empty row — see its note.
+   */
+  value?: string
+  name?: string
 }
 
 /**
@@ -102,6 +112,63 @@ const NOMINAL_WIDTH: Record<ChipContent, number> = {
   icon: 52,
   value: 96,
   labeled: 128,
+}
+
+/** The pill's own horizontal padding (13 either side) plus the glyph it always draws. */
+const PILL_CHROME = 13 + 17 + 13
+
+/** The gap `.pill` puts between the glyph and the text beside it. */
+const TEXT_GAP = 6
+
+/**
+ * Rough advance width of one character, in design units, at each of the two type sizes a chip
+ * draws: the reading at footnote, the caption at caption-2 and uppercased.
+ *
+ * Estimates, and unavoidably so — a real advance depends on the font, the glyphs and the
+ * locale, none of which a module running in node can measure. But they are estimates of the
+ * right THING, which the flat `NOMINAL_WIDTH` was not: a chip printing `79` and a chip printing
+ * `0 kWh` are not the same width, and charging both 96 units is what made a row that visibly
+ * fits get priced as two lines.
+ */
+const VALUE_CHAR = 7.5
+const CAPTION_CHAR = 6.5
+
+/** `.value`/`.caption` cap their text at 140 units, so no chip is wider than chrome plus that. */
+const TEXT_MAX = 140
+
+/**
+ * What one chip takes across, priced from what it actually draws when that is known.
+ *
+ * This is the number the whole floor rests on, and the flat-per-mode version of it was wrong in
+ * both directions at once. It charged a chip printing `79` the same 96 units as one printing a
+ * long sensor name, and — worse — charged 96 to a chip printing nothing at all, which is what a
+ * bare icon chip with no entity is. A row of five such chips was priced at 408 units and drawn
+ * at 257, so the floor bought a second line the browser never used and the user saw an empty
+ * grid row under their chips.
+ *
+ * A chip with no text is its chrome, floored at the 44-unit tap target `.chip` enforces. A chip
+ * with text is its chrome plus the gap plus the text, capped where the stylesheet caps it.
+ * `NOMINAL_WIDTH` survives for the one case that genuinely cannot be known: `getGridOptions()`
+ * before `hass`, where there is a config and no resolved reading anywhere.
+ */
+export const widthOf = (chip: ChipBand): number => {
+  // Elastic: it takes the leftover and collapses when there is none, so it can never be the
+  // thing that pushes a line onto the next one.
+  if (chip.fill === true) return 0
+
+  const bare = Math.max(PILL_CHROME, ROW_SINGLE)
+  if (chip.content === 'icon') return bare
+
+  // Nothing resolved yet: the config is all there is, so fall back to the per-mode guess.
+  if (chip.value === undefined && chip.name === undefined) return NOMINAL_WIDTH[chip.content]
+
+  const value = chip.value ?? ''
+  const text =
+    chip.content === 'labeled'
+      ? Math.max(value.length * VALUE_CHAR, (chip.name ?? '').length * CAPTION_CHAR)
+      : value.length * VALUE_CHAR
+
+  return text === 0 ? bare : PILL_CHROME + TEXT_GAP + Math.min(text, TEXT_MAX)
 }
 
 /**
@@ -189,11 +256,10 @@ export const floorsFor = (
     let used = 0
     let rowLines = 1
     for (const chip of row) {
-      // A filling chip is elastic: it takes what is left over and collapses when there is
-      // nothing to take, so it can never be the thing that pushes a line onto the next one.
-      // Charging it a nominal width would invent a line the browser will not draw.
-      if (chip.fill === true) continue
-      const width = NOMINAL_WIDTH[chip.content]
+      const width = widthOf(chip)
+      // Elastic, so it never pushes a line: `widthOf` prices it at nothing and it is skipped
+      // outright rather than contributing a gap of its own.
+      if (width === 0) continue
       const need = used === 0 ? width : used + GAP + width
       if (need > usable && used > 0) {
         rowLines += 1

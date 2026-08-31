@@ -9,6 +9,13 @@
 export interface HassEntityAttributes {
   friendly_name?: string
   icon?: string
+  /**
+   * A URL to an image standing in for this entity — a person's photo, a media player's album
+   * art, a camera's snapshot. Relative to the Home Assistant origin (`/api/image/serve/…`),
+   * signed and time-limited for the ones that need it, so it is passed through to `src`
+   * verbatim rather than resolved or cached anywhere.
+   */
+  entity_picture?: string
   device_class?: string
   supported_features?: number
   [key: string]: unknown

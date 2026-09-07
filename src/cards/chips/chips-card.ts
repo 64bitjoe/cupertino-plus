@@ -195,6 +195,42 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         background: var(--cw-track);
       }
 
+      /* A tinted chip washes its pill in its own colour rather than only marking the glyph.
+         The rules doc argued for glyph-only on the grounds that a row of six competing
+         highlights stops reading as one band -- which is true of a SATURATED pill and not of a
+         wash this light. At a fifth of the colour the pill still reads as the same translucent
+         family as its untinted neighbours; what changes is which family member it is.
+
+         The text stays one ink deliberately. A coloured reading would be the second, blurrier
+         opinion about a number the chip has already printed, which is the argument core/ring.ts
+         makes and the one part of the original rule worth keeping. */
+      .glass .chip.tinted .pill {
+        background: linear-gradient(
+          to bottom,
+          color-mix(in srgb, var(--cw-chip-tint) 16%, transparent),
+          color-mix(in srgb, var(--cw-chip-tint) 24%, transparent)
+        );
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-chip-tint) 22%, transparent);
+      }
+
+      /* Denser against a dark ground, where a 16% wash of a mid-tone colour disappears into
+         the wallpaper, and lit from the top edge the way the untinted dark pill is. */
+      :host([dark]) .glass .chip.tinted .pill {
+        background: linear-gradient(
+          to bottom,
+          color-mix(in srgb, var(--cw-chip-tint) 30%, transparent),
+          color-mix(in srgb, var(--cw-chip-tint) 20%, transparent)
+        );
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-chip-tint) 38%, transparent);
+      }
+
+      /* Card mode has an opaque surface under it, so the wash is mixed into that surface's own
+         track rather than left translucent: a transparent tint over an opaque card would read
+         as a different colour depending on the theme behind it. */
+      .surface .chip.tinted .pill {
+        background: color-mix(in srgb, var(--cw-chip-tint) 22%, var(--cw-track));
+      }
+
       .glyph {
         --mdc-icon-size: calc(17px * var(--cw-scale));
         flex: none;
@@ -574,9 +610,10 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
 
     return html`
       <div
-        class="chip ${content} ${chip.fill ? 'fill' : ''} ${chip.unavailable ? 'unknown' : ''} ${
-          pressable ? 'cw-pressable' : ''
-        }"
+        class="chip ${content} ${chip.fill ? 'fill' : ''} ${chip.color ? 'tinted' : ''} ${
+          chip.unavailable ? 'unknown' : ''
+        } ${pressable ? 'cw-pressable' : ''}"
+        style=${chip.color ? `--cw-chip-tint:${chip.color}` : nothing}
         role=${pressable ? 'button' : nothing}
         tabindex=${pressable ? 0 : nothing}
         aria-label=${pressable ? label : nothing}
@@ -587,17 +624,10 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         <span class="pill">
           ${
             chip.picture
-              ? // A photograph cannot be tinted, so it deliberately carries no `--cw-chip-tint`:
-                // a colour set on a chip that turns out to have a picture is simply not applied,
-                // rather than washed over the face. `alt` is empty because the chip's own
-                // aria-label already names it -- a screen reader should hear "Joe, home", not
-                // "Joe, home, Joe".
+              ? // `alt` is empty because the chip's own aria-label already names it -- a screen
+                // reader should hear "Joe, home", not "Joe, home, Joe".
                 html`<img class="glyph portrait" src=${chip.picture} alt="" />`
-              : html`<ha-icon
-                  class="glyph"
-                  style=${chip.color ? `--cw-chip-tint:${chip.color}` : nothing}
-                  .icon=${chip.icon}
-                ></ha-icon>`
+              : html`<ha-icon class="glyph" .icon=${chip.icon}></ha-icon>`
           }
           ${body}
         </span>

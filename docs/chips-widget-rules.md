@@ -166,6 +166,14 @@ DOM this drew before rows existed.
 
 ## 3. The colour: this card opts out of identity
 
+> **Revised in v1.13.0.** A tinted chip now washes its whole pill in its colour rather than
+> marking only the glyph. The original rule argued that six coloured chips stop reading as one
+> band, which is true of a saturated pill and not of a wash at a fifth of the colour: the pill
+> stays in the same translucent family as its untinted neighbours, it just becomes a different
+> member of it. The half of the rule worth keeping is kept — the reading and the caption are
+> still one ink, because a coloured number is a second, blurrier opinion about a number the
+> chip has already printed.
+
 The complication card's §2 says the colour comes from what the entity measures and then holds
 still — orange for a thermometer at 40°F and at 90°F, because the colour is "what kind of thing
 is this" rather than "how is this reading doing". **Chips have no per-entity colour at all**,

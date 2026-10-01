@@ -943,8 +943,8 @@ return html`
   <ha-card class=${klass} aria-label=${`${tiles.length} tiles`}>
     <div class="tiles">
       ${groupRows(tiles).map(
-            row => html`<div class="row">${row.map(tile => this._renderTile(tile))}</div>`,
-          )}
+        row => html`<div class="row">${row.map(tile => this._renderTile(tile))}</div>`,
+      )}
     </div>
   </ha-card>
 `

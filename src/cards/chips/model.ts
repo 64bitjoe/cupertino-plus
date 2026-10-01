@@ -403,7 +403,7 @@ export const readChip = (
 
 /** A chip with nothing to act on defaults to doing nothing, rather than opening a more-info
  *  dialog — or, worse, a service call — against an entity that was never configured. */
-const NO_TARGET_ACTION: ActionConfig = { action: 'none' }
+export const NO_TARGET_ACTION: ActionConfig = { action: 'none' }
 
 /**
  * The action, with its one argument resolved if it was a template.
@@ -416,7 +416,7 @@ const NO_TARGET_ACTION: ActionConfig = { action: 'none' }
  * an entity-bearing chip, exactly as before, and `NO_TARGET_ACTION` (none) for an entity-less
  * one, whose default press would otherwise open a more-info dialog for nothing.
  */
-const readAction = (
+export const readAction = (
   action: ActionConfig | undefined,
   field: (raw: string | undefined, entity: string | undefined) => string | undefined,
   entity: string | undefined,
@@ -507,7 +507,7 @@ export const chipRows = (rows: readonly ChipConfig[]): (string | ChipConfig)[] =
 export const CONTENT_INHERIT = 'inherit'
 
 /** Not exported: `chipFromForm` is the only thing that should ever read a form's report. */
-const text = (value: unknown): string | undefined =>
+export const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined
 
 /**
@@ -664,7 +664,7 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
  * writing it through on the first unrelated edit — would put a `tap_action` on every chip in a
  * config the moment its owner touched one name.
  */
-const actionFromForm = (
+export const actionFromForm = (
   prior: ActionConfig | undefined,
   data: Record<string, unknown>,
   bareDefault: ActionName,

@@ -21,8 +21,10 @@ import {
   tileConfigs,
   tileTemplates,
   tileWatchedIds,
+  washFor,
   type TilesDefaults,
   type TileView,
+  type TileWash,
 } from './model'
 
 export const TILES_CARD_TAG = 'cupertino-plus-tiles'
@@ -31,6 +33,7 @@ export interface TilesCardConfig extends CupertinoCardConfig {
   tiles?: unknown
   color?: string
   container?: ChipsContainer
+  wash?: TileWash
 }
 
 const NO_TILES = 'No Tiles'
@@ -126,17 +129,52 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
          dark), because a ring is drawn four times as long and reads that much heavier. */
       .glass .tile {
         color: var(--cw-label);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        backdrop-filter: blur(24px) saturate(180%);
+      }
+
+      .surface .tile {
+        color: var(--cw-label);
+      }
+
+      /* Two layers under the content rather than one background, so the wash can fade. A
+         gradient is not interpolable, so swapping the tile's own background on hover would
+         snap; two stacked layers crossfading their opacity animate in any engine. The tile
+         isolates so the layers' negative z-index stays inside it, and the layers inherit the
+         radius so the ring follows the corner. Neither layer is blurred: the tile's own
+         backdrop-filter still does that, and the layers composite over it as a background
+         would. ::before is the plain tile, ::after the wash; at rest only ::before shows, so a
+         tinted tile at rest is the plain tile with its glyph coloured. */
+      .tile {
+        position: relative;
+        isolation: isolate;
+      }
+
+      .tile::before,
+      .tile::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        pointer-events: none;
+        transition: opacity var(--cw-duration-fast) var(--cw-ease);
+      }
+
+      .tile::after {
+        opacity: 0;
+      }
+
+      .glass .tile::before {
         background: linear-gradient(
           to bottom,
           color-mix(in srgb, var(--cw-label) 10%, transparent),
           color-mix(in srgb, var(--cw-label) 18%, transparent)
         );
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-label) 6%, transparent);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
-        backdrop-filter: blur(24px) saturate(180%);
       }
 
-      :host([dark]) .glass .tile {
+      :host([dark]) .glass .tile::before {
         background: linear-gradient(
           to bottom,
           color-mix(in srgb, var(--cw-label) 16%, transparent),
@@ -145,17 +183,16 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-label) 12%, transparent);
       }
 
-      .surface .tile {
-        color: var(--cw-label);
+      .surface .tile::before {
         background: var(--cw-track);
       }
 
-      /* A tinted tile washes itself in the tinted chip's three cases, but lighter. The chip's
-         weights were tuned for a small pill, and at a tile's six times the area they made a
-         grid of eight a wall of pastel in light and of brown and olive slabs in dark, with the
-         ground competing with the glyph for the colour. About two thirds of the chip's alpha
-         keeps every tile identifiable at a glance and leaves the glyph to carry the hue. */
-      .glass .tile.tinted {
+      /* The wash, in the tinted chip's three cases but lighter. The chip's weights were tuned
+         for a small pill, and at a tile's six times the area they made a grid of eight a wall
+         of pastel in light and of brown and olive slabs in dark, with the ground competing
+         with the glyph for the colour. About two thirds of the chip's alpha keeps every tile
+         identifiable at a glance and leaves the glyph to carry the hue. */
+      .glass .tile.tinted::after {
         background: linear-gradient(
           to bottom,
           color-mix(in srgb, var(--cw-tile-tint) 11%, transparent),
@@ -164,7 +201,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-tile-tint) 12%, transparent);
       }
 
-      :host([dark]) .glass .tile.tinted {
+      :host([dark]) .glass .tile.tinted::after {
         background: linear-gradient(
           to bottom,
           color-mix(in srgb, var(--cw-tile-tint) 22%, transparent),
@@ -173,8 +210,38 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-tile-tint) 20%, transparent);
       }
 
-      .surface .tile.tinted {
+      .surface .tile.tinted::after {
         background: color-mix(in srgb, var(--cw-tile-tint) 16%, var(--cw-track));
+      }
+
+      /* When the wash shows. wash: always is v1.13.0's tile, washed at rest. wash: hover, the
+         default, washes a tile while it is pressed or keyboard-focused, and while a pointer is
+         over it, but only where the device can hover: on a touch screen a tap leaves :hover
+         stuck on the last tile touched until the next tap lands somewhere else. Pressed and
+         hovered both need cw-pressable, because a tile whose action is none is not a button
+         and should not answer a pointer as if it were; a focus-visible tile is a button by
+         definition, since nothing else has a tab stop. An unavailable tile never has a colour
+         to wash with (model.ts drops it), so none of these can reach one. */
+      .wash-always .tile.tinted::after,
+      .tile.tinted.cw-pressable:active::after,
+      .tile.tinted:focus-visible::after {
+        opacity: 1;
+      }
+
+      .wash-always .tile.tinted::before,
+      .tile.tinted.cw-pressable:active::before,
+      .tile.tinted:focus-visible::before {
+        opacity: 0;
+      }
+
+      @media (hover: hover) {
+        .tile.tinted.cw-pressable:hover::after {
+          opacity: 1;
+        }
+
+        .tile.tinted.cw-pressable:hover::before {
+          opacity: 0;
+        }
       }
 
       .glyph {
@@ -226,7 +293,9 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .tile {
+        .tile,
+        .tile::before,
+        .tile::after {
           transition: none;
         }
       }
@@ -415,7 +484,10 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     const columns = Math.max(...rows.map(row => row.length))
     return html`
       <ha-card class=${klass} aria-label=${`${tiles.length} tiles`}>
-        <div class="tiles" style=${`--cw-tile-columns:${columns}`}>
+        <div
+          class="tiles wash-${washFor(this._config.wash)}"
+          style=${`--cw-tile-columns:${columns}`}
+        >
           ${rows.map(
             row => html`<div class="row">${row.map(tile => this._renderTile(tile))}</div>`,
           )}

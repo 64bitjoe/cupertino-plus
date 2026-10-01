@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_WASH,
   readTile,
   readTiles,
   tileConfigs,
@@ -10,6 +11,7 @@ import {
   tileTemplates,
   tileToForm,
   tileWatchedIds,
+  washFor,
   type TileConfig,
 } from './model'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
@@ -295,5 +297,26 @@ describe('tileRows', () => {
       'cover.a',
       { entity: 'cover.b', name: 'B' },
     ])
+  })
+})
+
+describe('washFor', () => {
+  it('defaults to washing on hover or press, the choice the first live dashboard made', () => {
+    expect(DEFAULT_WASH).toBe('hover')
+    expect(washFor(undefined)).toBe('hover')
+  })
+
+  it('reads the two values it knows', () => {
+    expect(washFor('hover')).toBe('hover')
+    expect(washFor('always')).toBe('always')
+  })
+
+  /** A typo or a stray YAML type draws the default rather than an unwashed or broken card. */
+  it('falls back to the default for anything else', () => {
+    expect(washFor('Always')).toBe('hover')
+    expect(washFor('never')).toBe('hover')
+    expect(washFor('')).toBe('hover')
+    expect(washFor(true)).toBe('hover')
+    expect(washFor(null)).toBe('hover')
   })
 })

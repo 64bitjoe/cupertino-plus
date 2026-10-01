@@ -37,6 +37,7 @@ import {
   STYLE_LABELS,
   type ComplicationStyle,
 } from '../../src/cards/complication/style'
+import { DEFAULT_WASH, washFor } from '../../src/cards/tiles/model'
 import {
   BATTERY_CARD_TAG,
   CALENDAR_CARD_TAG,
@@ -527,17 +528,32 @@ const tiles: Widget = {
       ],
       initial: DEFAULT_CONTAINER,
     },
+    {
+      kind: 'select',
+      name: 'wash',
+      label: 'Colour wash',
+      description:
+        'When a tile fills with its colour: on hover or press, or always. Hover a tile to see it.',
+      group: 'card',
+      options: [
+        { value: 'hover', label: 'On hover or press' },
+        { value: 'always', label: 'Always' },
+      ],
+      initial: DEFAULT_WASH,
+    },
   ],
 
   /**
    * The chips entry's reasoning, unchanged: no fixtures, so the YAML printed above the controls
    * is the config that drew the card, the shortcuts set's `navigate` rows included; and
-   * `container` is written at its default too, so the pane never changes height under a select.
+   * `container` and `wash` are written at their defaults too, so the pane never changes height
+   * under a select.
    */
   toConfig(args) {
     return {
       tiles: [...tileSet(readString(args, 'set', DEFAULT_TILE_SET))],
       container: readString(args, 'container', DEFAULT_CONTAINER) as ChipsContainer,
+      wash: washFor(readString(args, 'wash', DEFAULT_WASH)),
     }
   },
 

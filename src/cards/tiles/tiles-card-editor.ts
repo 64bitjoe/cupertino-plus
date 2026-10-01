@@ -10,13 +10,18 @@ import { COLOR_CUSTOM, COLOR_SELECTOR, DEFAULT_CONTAINER } from '../chips/model'
 // time this editor renders it, and this is the only thing that reaches it.
 import './tile-list-editor'
 import type { TilesChangedDetail } from './tile-list-editor'
-import { tileConfigs } from './model'
+import { DEFAULT_WASH, TILE_WASHES, tileConfigs } from './model'
 
 export const TILES_EDITOR_TAG = 'cupertino-plus-tiles-editor'
 
 const CONTAINER_LABELS: Record<string, string> = {
   glass: 'Glass — floats on the dashboard',
   card: 'Card — draws its own surface',
+}
+
+const WASH_LABELS: Record<string, string> = {
+  hover: 'On hover or press',
+  always: 'Always',
 }
 
 /**
@@ -41,6 +46,17 @@ const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
       },
     },
   })
+  // Directly under Background, because the two are one question in practice: how much a tile
+  // paints behind its content.
+  rows.push({
+    name: 'wash',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: TILE_WASHES.map(value => ({ value, label: WASH_LABELS[value] ?? value })),
+      },
+    },
+  })
   return rows
 }
 
@@ -48,6 +64,7 @@ const LABELS: Record<string, string> = {
   color: 'Tile colour',
   color_custom: 'Custom colour',
   container: 'Background',
+  wash: 'Colour wash',
 }
 
 const HELPERS: Record<string, string> = {
@@ -55,10 +72,11 @@ const HELPERS: Record<string, string> = {
   color_custom: 'Any CSS colour: a hex value, an rgb(), or a var() from your theme.',
   container:
     'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
+  wash: 'When a tile fills with its colour. Its glyph always carries the colour either way.',
 }
 
 /**
- * The tiles card's visual editor: the tile list, then the two card-level questions, then the
+ * The tiles card's visual editor: the tile list, then the three card-level questions, then the
  * **Scale** every card shares.
  *
  * The chips card's editor, adapted: the list is a control of its own (`tile-list-editor.ts`)
@@ -89,9 +107,12 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
     return fields(this._config ? this.toForm(this._config) : {})
   }
 
-  /** Shown rather than blank: an unset dropdown reads as broken, not as a default. */
+  /**
+   * Shown rather than blank: an unset dropdown reads as broken, not as a default. Both written
+   * through on the first edit, as Home Assistant's own editors do with theirs.
+   */
   protected override defaults(): Partial<TilesCardConfig> {
-    return { container: DEFAULT_CONTAINER }
+    return { container: DEFAULT_CONTAINER, wash: DEFAULT_WASH }
   }
 
   protected override label(schema: HaFormSchema): string {

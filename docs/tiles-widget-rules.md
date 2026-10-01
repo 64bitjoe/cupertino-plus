@@ -29,7 +29,7 @@ where the two disagree, this document describes what shipped.
   icon: string,         // an `mdi:` name; `mdi:apps` when nothing says otherwise
   picture: string | undefined, // an entity_picture, drawn in the glyph's place
   value: string,        // the state line; an em dash for nothing to read
-  color: string | undefined,   // a resolved CSS value: the glyph, and a wash behind it
+  color: string | undefined,   // a resolved CSS value: the glyph, and a wash (§3a)
   unavailable: boolean,
   visible: boolean,     // whether the tile is drawn at all
   break: boolean,       // this tile starts a new row
@@ -115,10 +115,10 @@ and why nobody configured them that way one at a time.
 The order is: the tile's own `color`, then the card's `color`, then `tintFor` in
 `core/tint.ts`: temperature orange, lock red, light yellow, the rest by device class and domain,
 as the complication card has always done. Chips never call it, and that is what keeps them
-monochrome. The colour paints the glyph and a wash behind it, in the chips card's three cases:
-light glass, dark glass lit from the top edge, and card mode mixed into the opaque track. The
-name and the state line stay one ink, for the reason the complication card gives about colour
-that moves with a value.
+monochrome. The colour always paints the glyph, and paints a wash behind it when §3a says so,
+in the chips card's three cases: light glass, dark glass, and card mode mixed into the opaque
+track. The name and the state line stay one ink, for the reason the complication card gives
+about colour that moves with a value.
 
 Two things differ from a tinted chip, both found in the first render rather than argued in
 advance:
@@ -134,6 +134,29 @@ advance:
   a shortcut grid, and the Scenes card this replaces was purple. The override is a small table
   in the tiles model; `core/tint.ts`'s shared one is unchanged, so the complication card still
   draws a scene as it did.
+
+### 3a. When the wash shows: `wash: hover | always`
+
+**By default a tile washes only while it is hovered, pressed or keyboard-focused** (`wash:
+hover`). At rest it is the plain glass or surface tile, and only its glyph carries the colour.
+`wash: always` is v1.13.0's tile, washed at rest, exactly as it was.
+
+The default is the first live dashboard's choice. What it buys is a resting grid that reads as
+one family of plain tiles, told apart by their glyphs, with the colour arriving as the answer to
+a pointer or a finger, where it says "this is a button".
+
+- **Hover only where the device can hover** (`@media (hover: hover)`). On a touch screen a tap
+  leaves `:hover` stuck on the last tile touched, which would leave one tile washed for no
+  reason until the next tap.
+- **A tile whose press is `none` does not wash on hover or press.** It is not a button, and
+  answering a pointer as if it were is the lie §6 refuses. Focus cannot reach it either, since
+  it has no tab stop.
+- **The wash fades** over the library's short duration, and not at all under
+  `prefers-reduced-motion`. A gradient cannot be animated, so the plain tile and the wash are
+  two layers under the content that crossfade their opacity.
+- **An unavailable tile never washes**, because it never has a colour (below).
+- **A value other than `hover` or `always` reads as `hover`**, silently, as an unknown
+  `container` does.
 
 **An unavailable tile drops its colour**, like every other card here. The dimming is the signal,
 and a crisp tint undercuts it.

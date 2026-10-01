@@ -83,6 +83,32 @@ const TILE_BY_DOMAIN: Record<string, TintName> = {
 const tileTintFor = (entity: HassEntity): TintName =>
   TILE_BY_DOMAIN[entity.entity_id.split('.')[0] ?? ''] ?? tintFor(entity)
 
+/**
+ * When a tinted tile washes its background in its colour: only while it is hovered, pressed or
+ * focused (`hover`), or all the time (`always`, which is how v1.13.0 drew every tinted tile).
+ *
+ * `hover` is the default because the user of the first live dashboard chose it. What it buys:
+ * a resting grid is one family of plain glass with the glyph alone carrying each tile's
+ * identity, and the colour arrives as the answer to a pointer or a finger, where it says "this
+ * is a button" rather than decorating a grid nobody is touching.
+ */
+export const TILE_WASHES = ['hover', 'always'] as const
+
+export type TileWash = (typeof TILE_WASHES)[number]
+
+export const DEFAULT_WASH: TileWash = 'hover'
+
+/**
+ * The card's `wash`, or the default for anything that is not exactly one of the two.
+ *
+ * Silent, as `container` is: a card handed `container: cards` draws its fallback without a
+ * word, and a second enum on the same card that warned where the first did not would be the
+ * odd one out. The fallback is also harmless in a way a failed press is not: the tiles still
+ * draw and still wash, just on hover.
+ */
+export const washFor = (value: unknown): TileWash =>
+  (TILE_WASHES as readonly unknown[]).includes(value) ? (value as TileWash) : DEFAULT_WASH
+
 /** A tile with no icon is a shortcut, not an unreadable sensor, so it is not an eye. */
 export const TILE_FALLBACK_ICON = 'mdi:apps'
 

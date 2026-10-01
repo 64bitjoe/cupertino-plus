@@ -204,7 +204,7 @@ const HELPERS: Record<string, string> = {
   templating:
     'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
   break: 'This tile begins a new row. A row still wraps on its own if it runs out of width.',
-  value: 'Replaces what the tile prints. Falls back to the entity own reading if it is empty.',
+  value: "Replaces what the tile prints. Falls back to the entity's own reading if it is empty.",
   show: 'The tile is drawn only while this is true. Hidden until it answers.',
 }
 
@@ -338,7 +338,7 @@ class CupertinoTilesList extends LitElement {
 
   @property({ attribute: false }) public hass?: HomeAssistant
 
-  /** Normalised by the editor, so every row here is known to have an entity in it. */
+  /** Normalised by the editor into config objects. A row may have no entity: a blank tile is a navigation shortcut. */
   @property({ attribute: false }) public tiles: readonly TileConfig[] = []
 
   /**

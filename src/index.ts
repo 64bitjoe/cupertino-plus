@@ -9,8 +9,8 @@ import { printBanner } from './core/register'
 import './cards/battery/battery-card'
 import './cards/calendar/calendar-card'
 import './cards/chips/chips-card'
-import './cards/tiles/tiles-card'
 import './cards/complication/complication-card'
+import './cards/tiles/tiles-card'
 import './cards/weather/weather-card'
 
 printBanner()
@@ -18,7 +18,7 @@ printBanner()
 export { BATTERY_CARD_TAG } from './cards/battery/battery-card'
 export { CALENDAR_CARD_TAG } from './cards/calendar/calendar-card'
 export { CHIPS_CARD_TAG } from './cards/chips/chips-card'
-export { TILES_CARD_TAG } from './cards/tiles/tiles-card'
 export { COMPLICATION_CARD_TAG } from './cards/complication/complication-card'
+export { TILES_CARD_TAG } from './cards/tiles/tiles-card'
 export { WEATHER_CARD_TAG } from './cards/weather/weather-card'
 export type { WidgetLayout } from './core/size'

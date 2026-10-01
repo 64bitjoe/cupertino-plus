@@ -149,8 +149,8 @@ A wrapping grid of small rounded tiles, one per shortcut, each a glyph, a name a
 state. This is the Home Screen family where the chips are the Lock Screen one: a tile is a
 coloured object rather than a mark in one ink, so it tints itself from what its entity is (a
 thermometer orange, a lock red, a scene purple) and a `color` of your own overrides that. Tiles
-are a fixed size and the grid wraps to the width it is given, three across a phone and four
-across a wide section, so there is no column count to keep in step with a box you can drag.
+are a fixed size and the grid wraps to the width it is given, four across a wide glass section, and three
+or two on a phone (two in card mode at about 360px), so there is no column count to keep in step with a box you can drag.
 
 <p align="center">
   <img src="docs/images/tiles-glass.png" width="420"
@@ -159,7 +159,8 @@ across a wide section, so there is no column count to keep in step with a box yo
 
 A tile does not need an entity: with a name, an icon and a `navigate` press it is a shortcut
 to another view, and draws a dash where the state would be. Name, icon, colour, state and
-visibility can each be a template. A press opens more-info by default, and per tile can
+visibility can each be a template. A press opens more-info by default on a tile with an
+entity (one without defaults to no action), and per tile can
 toggle, navigate, call a service, or do nothing.
 
 The rules, including why tiles carry a colour where chips refuse one, are in

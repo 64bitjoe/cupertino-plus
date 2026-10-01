@@ -45,7 +45,7 @@ const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
 }
 
 const LABELS: Record<string, string> = {
-  color: 'Row colour',
+  color: 'Tile colour',
   color_custom: 'Custom colour',
   container: 'Background',
 }
@@ -64,7 +64,7 @@ const HELPERS: Record<string, string> = {
  * The chips card's editor, adapted: the list is a control of its own (`tile-list-editor.ts`)
  * rather than an `ha-form` row, so `tiles` is not in `fields()` and the list reports through
  * `emitConfig` directly. There is no content row, because a tile always draws icon, name and
- * state. **Row colour** is what a tile inherits when its own panel leaves Colour empty, which
+ * state. **Tile colour** is what a tile inherits when its own panel leaves Colour empty, which
  * is why its helper points upwards.
  */
 class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {

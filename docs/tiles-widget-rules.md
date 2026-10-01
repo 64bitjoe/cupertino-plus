@@ -50,8 +50,8 @@ one ink on a wallpaper; a tile is a coloured thing with a name on it, sitting am
 
 ## 2. The grid, and why it wraps
 
-**Tiles are a fixed size and wrap.** As many fit on a line as the section allows: three across
-a phone, four across a wide section, reflowing rather than cramping. There is no `columns:`
+**Tiles are a fixed size and wrap.** As many fit on a line as the section allows: four across
+a wide section, three on a phone on glass and two in card mode at about 360px, reflowing rather than cramping. There is no `columns:`
 setting.
 
 That is not the obvious choice, since Home Assistant's own grid card takes a column count, so it
@@ -187,6 +187,9 @@ pressed state.
 - **`container: card` fits three across a 500px section, not four.** The 16-unit inset on each
   side leaves 468 of 500 and four tiles need 472: four pixels short. Glass fits four. Unresolved;
   it is one constant if it matters.
+- **Tiles borrow chips' helpers.** `tiles/model.ts` imports the row-reading, template, action-form
+  and container helpers from `chips/model.ts`; a future `core/rows.ts` would remove that
+  dependency.
 - **A `scene` tile's state line is its raw last-activated timestamp.** That formatting is
   `core/entity-view.ts`'s, which every card reads, so fixing it for tiles means fixing it
   for all of them.

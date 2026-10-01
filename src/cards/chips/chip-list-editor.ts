@@ -265,7 +265,7 @@ const HELPERS: Record<string, string> = {
   fill:
     'This chip stretches to take whatever width is left, pushing every chip after it to the ' +
     'right-hand edge. Usually wanted on a blank chip.',
-  value: 'Replaces what the chip prints. Falls back to the entity own reading if it is empty.',
+  value: "Replaces what the chip prints. Falls back to the entity's own reading if it is empty.",
   show: 'The chip is drawn only while this is true. Hidden until it answers.',
 }
 

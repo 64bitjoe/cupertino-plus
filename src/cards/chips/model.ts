@@ -506,7 +506,7 @@ export const chipRows = (rows: readonly ChipConfig[]): (string | ChipConfig)[] =
  */
 export const CONTENT_INHERIT = 'inherit'
 
-/** Not exported: `chipFromForm` is the only thing that should ever read a form's report. */
+/** An empty form field reports as an empty string; this reads it as absent. Shared with the tiles model. */
 export const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined
 

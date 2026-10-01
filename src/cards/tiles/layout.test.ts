@@ -6,10 +6,24 @@ const tiles = (n: number, at?: number) =>
   Array.from({ length: n }, (_, i) => (i === at ? { break: true } : {}))
 
 describe('the tile size', () => {
-  it('is the shape the spec picked, wider than tall', () => {
+  it('is the shape the first render settled on, wider than tall', () => {
     expect(TILE_WIDTH).toBe(112)
-    expect(TILE_HEIGHT).toBe(96)
+    expect(TILE_HEIGHT).toBe(88)
     expect(TILE_WIDTH).toBeGreaterThan(TILE_HEIGHT)
+  })
+})
+
+/**
+ * Why the height is 88: it is the tallest tile for which the two commonest grids land exactly
+ * on Home Assistant's rows rather than one row over.
+ */
+describe('the tile height against the sections grid', () => {
+  it('fits two lines of glass tiles in three rows', () => {
+    expect(floorsFor([{}, {}, {}, {}], 2 * TILE_WIDTH + 8, 0).min_rows).toBe(3)
+  })
+
+  it('fits one line of tiles inside the card container in two rows', () => {
+    expect(floorsFor([{}, {}], 500, 16).min_rows).toBe(2)
   })
 })
 

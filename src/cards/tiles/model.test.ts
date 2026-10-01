@@ -56,6 +56,22 @@ describe('readTiles', () => {
     expect(tile?.color).toBe('var(--cw-indigo)')
   })
 
+  /**
+   * The one place the tiles card overrides the shared table, settled against a render: `accent`
+   * is the theme's primary, which under Home Assistant's default theme is a light blue that sits
+   * beside a person's or a humidity sensor's `blue` as another blue tile. A scene is the
+   * commonest occupant of a shortcut grid, so it gets a colour of its own.
+   */
+  it('tints a scene purple rather than the accent a complication would give it', () => {
+    const scene = entity({ entity_id: 'scene.movie_night', attributes: {} })
+    expect(readTiles(hassWith(scene), ['scene.movie_night'], {})[0]?.color).toBe('var(--cw-purple)')
+  })
+
+  it('still tints a domain neither table knows with the accent', () => {
+    const plain = entity({ entity_id: 'switch.kettle', state: 'off', attributes: {} })
+    expect(readTiles(hassWith(plain), ['switch.kettle'], {})[0]?.color).toBe('var(--cw-accent)')
+  })
+
   it('lets a configured colour beat the automatic one', () => {
     const [tile] = readTiles(hassWith(GARAGE), [{ entity: 'cover.garage', color: 'green' }], {})
     expect(tile?.color).toBe('var(--cw-green)')

@@ -19,6 +19,7 @@ import {
   mdiFormatListChecks,
   mdiGaugeLow,
   mdiRhombusOutline,
+  mdiViewGridOutline,
   mdiWeatherPartlyCloudy,
 } from '@mdi/js'
 
@@ -41,11 +42,13 @@ import {
   CALENDAR_CARD_TAG,
   CHIPS_CARD_TAG,
   COMPLICATION_CARD_TAG,
+  TILES_CARD_TAG,
   WEATHER_CARD_TAG,
 } from '../../src/index'
 import { DEFAULT_DEVICE_SET, DEVICE_SETS, deviceSet } from '../battery-devices'
 import { CHIP_SETS, DEFAULT_CHIP_SET, chipSet } from '../chip-fixtures'
 import { DEFAULT_ENTITY_SET, ENTITY_SETS, entitySet } from '../complication-entities'
+import { DEFAULT_TILE_SET, TILE_SETS, tileSet } from '../tile-fixtures'
 import { DEFAULT_WEATHER_SET, WEATHER_SETS, weatherEntity } from '../weather-fixtures'
 import {
   DEFAULT_SCALE,
@@ -480,7 +483,70 @@ const chips: Widget = {
   },
 }
 
-export const WIDGETS: readonly Widget[] = [calendar, battery, complication, weather, chips]
+/** Readable names for the tile sets, by the same rule as `CHIP_SET_LABELS`. */
+const TILE_SET_LABELS: Record<string, string> = {
+  shortcuts: 'Shortcuts: the four cards this replaces',
+  entities: 'Entities: every tint automatic',
+  unavailable: 'Not reporting',
+}
+
+const tiles: Widget = {
+  id: 'tiles',
+  name: 'Tiles',
+  tagline: 'A grid of shortcuts, each one coloured for what it is.',
+  icon: mdiViewGridOutline,
+  tag: TILES_CARD_TAG,
+
+  /**
+   * The chips entry's props less its `content` select: a tile always draws a glyph, a name and
+   * a state line, so there is no card-level content mode to choose. The shared scale joins
+   * these from `CARD_OPTIONS`, as it does for every card.
+   */
+  props: [
+    {
+      kind: 'select',
+      name: 'set',
+      label: 'Tiles',
+      description: 'A mock set: the shortcuts being replaced, plain entities, or a dead sensor.',
+      group: 'card',
+      options: Object.keys(TILE_SETS).map(value => ({
+        value,
+        label: TILE_SET_LABELS[value] ?? titleCase(value),
+      })),
+      initial: DEFAULT_TILE_SET,
+    },
+    {
+      kind: 'select',
+      name: 'container',
+      label: 'Background',
+      description: 'Glass floats on the dashboard; card draws its own surface.',
+      group: 'card',
+      options: [
+        { value: 'glass', label: 'Glass' },
+        { value: 'card', label: 'Card' },
+      ],
+      initial: DEFAULT_CONTAINER,
+    },
+  ],
+
+  /**
+   * The chips entry's reasoning, unchanged: no fixtures, so the YAML printed above the controls
+   * is the config that drew the card, the shortcuts set's `navigate` rows included; and
+   * `container` is written at its default too, so the pane never changes height under a select.
+   */
+  toConfig(args) {
+    return {
+      tiles: [...tileSet(readString(args, 'set', DEFAULT_TILE_SET))],
+      container: readString(args, 'container', DEFAULT_CONTAINER) as ChipsContainer,
+    }
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+export const WIDGETS: readonly Widget[] = [calendar, battery, complication, weather, chips, tiles]
 
 export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => w.id === id)
 

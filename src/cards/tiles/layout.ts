@@ -19,12 +19,26 @@ export { groupRows, INSET }
  *
  * A tile does NOT size to its content, which is the one place this card and the chips card
  * genuinely disagree about layout rather than about numbers: a chip is a label and wants to be
- * as wide as its label, and a grid of ragged-width tiles is not a grid. 112 x 96 is wide enough
- * for a two-word name at footnote size and close to the shape of the cards this replaces.
- * Flagged in §9 of the spec as chosen rather than measured — one constant to change.
+ * as wide as its label, and a grid of ragged-width tiles is not a grid.
+ *
+ * Spec §9 chose 112 x 96 and asked the first render to settle it. It settled the height at 88.
+ *
+ * The width holds. It is pinned from both sides: four across must fit a 500px section on glass
+ * (4 x 112 + 3 gaps = 472), and three across a phone's section of about 360 (352). It fits every
+ * two-word name of up to about thirteen characters at footnote size ("Kitchen Lights", "Office
+ * Heater"); "Bedroom Lamp" misses by three pixels and ellipsizes, with the full name in the
+ * tooltip. Widening to 116 would rescue it and cost the phone its third column, which is the
+ * worse trade.
+ *
+ * The height comes from the sections grid rather than from taste. A grid row is 56 with an 8
+ * gap, so two lines of 88-tall tiles are 184, exactly three rows, and one line inside the card
+ * container's two 16 insets is 120, exactly two. At 96 both cases spilled into one more row: a
+ * glass card of two lines asked for four rows and left 48px of dashboard empty under it, and
+ * a one-line card asked for three. The render shows 88 is not cramped: the glyph still clears
+ * the name by nine pixels, and the glyph-top, text-bottom split reads as two groups.
  */
 export const TILE_WIDTH = 112
-export const TILE_HEIGHT = 96
+export const TILE_HEIGHT = 88
 
 /** The gap between tiles, across and down. Must match `--cw-space-2`. */
 export const GAP = 8

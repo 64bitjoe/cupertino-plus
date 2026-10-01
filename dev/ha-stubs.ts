@@ -12,17 +12,21 @@ import {
   mdiAccount,
   mdiBattery,
   mdiBatteryUnknown,
+  mdiCat,
   mdiCellphone,
   mdiDoorbellVideo,
   mdiEye,
   mdiFlash,
+  mdiGarage,
   mdiGauge,
   mdiHeadphones,
   mdiHelpCircleOutline,
   mdiLaptop,
   mdiLightbulb,
   mdiLock,
+  mdiPartyPopper,
   mdiRayVertex,
+  mdiSnowflake,
   mdiTablet,
   mdiThermometer,
   mdiWashingMachine,
@@ -184,8 +188,8 @@ const HA_FORM_CSS = `
  * into the showcase that GitHub Pages then serves to every visitor, for the sake of icons only
  * this file's own mock devices ever ask for.
  *
- * So: add an entry when `battery-devices.ts`, `complication-entities.ts` or
- * `chip-fixtures.ts` grows one. A name with no entry draws the question mark rather than
+ * So: add an entry when `battery-devices.ts`, `complication-entities.ts`, `chip-fixtures.ts`
+ * or `tile-fixtures.ts` grows one. A name with no entry draws the question mark rather than
  * nothing, on the same grounds as the `ha-form` stub's unsupported row: a silently blank icon
  * reads as a broken card, and the cards are what this page is for.
  *
@@ -222,6 +226,12 @@ const ICONS: Record<string, string> = {
   'mdi:lock': mdiLock,
   'mdi:lightbulb': mdiLightbulb,
   'mdi:account': mdiAccount,
+  // The tiles card's shortcuts set, each named in its config rather than resolved: the four
+  // cards it reproduces chose their own glyphs.
+  'mdi:garage': mdiGarage,
+  'mdi:snowflake': mdiSnowflake,
+  'mdi:party-popper': mdiPartyPopper,
+  'mdi:cat': mdiCat,
 }
 
 /**

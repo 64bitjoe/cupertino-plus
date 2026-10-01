@@ -8,8 +8,8 @@ import {
   VALUE_DASH,
 } from '../../core/entity-view'
 import { isTemplate, type TemplateRequest } from '../../core/templates'
-import { colorValue, tintFor, tintVar } from '../../core/tint'
-import type { HomeAssistant } from '../../core/types/ha'
+import { colorValue, tintFor, tintVar, type TintName } from '../../core/tint'
+import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 import {
   actionFromForm,
   chipConfigs,
@@ -64,6 +64,24 @@ export interface TileView {
 export interface TilesDefaults {
   color?: string
 }
+
+/**
+ * Where a tile's automatic tint departs from the complication card's, which is in one place.
+ *
+ * `tintFor` answers `accent` for a scene, and in a complication, alone on its own square, that
+ * is fine. In a grid it is not: `accent` is the theme's primary, which under Home Assistant's
+ * default theme is a light blue, and the first render put a scene tile next to a person's and a
+ * climate shortcut's `blue` as a third blue tile. A scene is also the commonest thing in a
+ * shortcut grid, and the hand-coloured Scenes card this card replaces was purple. Kept here
+ * rather than in `core/tint.ts` because the complication card shares that table and has no
+ * business drawing a scene.
+ */
+const TILE_BY_DOMAIN: Record<string, TintName> = {
+  scene: 'purple',
+}
+
+const tileTintFor = (entity: HassEntity): TintName =>
+  TILE_BY_DOMAIN[entity.entity_id.split('.')[0] ?? ''] ?? tintFor(entity)
 
 /** A tile with no icon is a shortcut, not an unreadable sensor, so it is not an eye. */
 export const TILE_FALLBACK_ICON = 'mdi:apps'
@@ -151,7 +169,7 @@ export const readTile = (
     value: unavailable ? VALUE_DASH : (field(row.value, row.entity) ?? formatValue(hass, entity)),
     // Configured, then card default, then what the entity is. The dim is the signal that a tile
     // is not reporting, so an unavailable tile gets no tint at all.
-    color: unavailable ? undefined : (configured() ?? tintVar(tintFor(entity))),
+    color: unavailable ? undefined : (configured() ?? tintVar(tileTintFor(entity))),
     unavailable,
     visible,
     break: row.break === true,

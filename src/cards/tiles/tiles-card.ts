@@ -72,13 +72,13 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         min-width: 0;
       }
 
-      /* 112 and 96 must match TILE_WIDTH and TILE_HEIGHT in layout.ts: CSS cannot read them. */
+      /* 112 and 88 must match TILE_WIDTH and TILE_HEIGHT in layout.ts: CSS cannot read them. */
       .tile {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         width: calc(112px * var(--cw-scale));
-        height: calc(96px * var(--cw-scale));
+        height: calc(88px * var(--cw-scale));
         padding: calc(12px * var(--cw-scale));
         border-radius: calc(20px * var(--cw-scale));
         box-sizing: border-box;
@@ -111,27 +111,31 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         background: var(--cw-track);
       }
 
-      /* A tinted tile washes itself, at the weights a tinted chip uses. */
+      /* A tinted tile washes itself in the tinted chip's three cases, but lighter. The chip's
+         weights were tuned for a small pill, and at a tile's six times the area they made a
+         grid of eight a wall of pastel in light and of brown and olive slabs in dark, with the
+         ground competing with the glyph for the colour. About two thirds of the chip's alpha
+         keeps every tile identifiable at a glance and leaves the glyph to carry the hue. */
       .glass .tile.tinted {
         background: linear-gradient(
           to bottom,
-          color-mix(in srgb, var(--cw-tile-tint) 16%, transparent),
-          color-mix(in srgb, var(--cw-tile-tint) 24%, transparent)
+          color-mix(in srgb, var(--cw-tile-tint) 11%, transparent),
+          color-mix(in srgb, var(--cw-tile-tint) 17%, transparent)
         );
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-tile-tint) 22%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-tile-tint) 18%, transparent);
       }
 
       :host([dark]) .glass .tile.tinted {
         background: linear-gradient(
           to bottom,
-          color-mix(in srgb, var(--cw-tile-tint) 30%, transparent),
-          color-mix(in srgb, var(--cw-tile-tint) 20%, transparent)
+          color-mix(in srgb, var(--cw-tile-tint) 22%, transparent),
+          color-mix(in srgb, var(--cw-tile-tint) 14%, transparent)
         );
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-tile-tint) 38%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-tile-tint) 30%, transparent);
       }
 
       .surface .tile.tinted {
-        background: color-mix(in srgb, var(--cw-tile-tint) 22%, var(--cw-track));
+        background: color-mix(in srgb, var(--cw-tile-tint) 16%, var(--cw-track));
       }
 
       .glyph {

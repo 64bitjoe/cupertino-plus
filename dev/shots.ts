@@ -55,6 +55,7 @@ import {
   CALENDAR_CARD_TAG,
   CHIPS_CARD_TAG,
   COMPLICATION_CARD_TAG,
+  TILES_CARD_TAG,
   WEATHER_CARD_TAG,
 } from '../src/index'
 import { columnsToPx, layoutFromBox, rowsToPx } from '../src/core/size'
@@ -70,6 +71,7 @@ import {
   WATER_TANK,
 } from './complication-entities'
 import { defineHaStubs } from './ha-stubs'
+import { tileSet } from './tile-fixtures'
 import { createMockHass } from './mock-hass'
 import { WEATHER_CABIN, WEATHER_HOME } from './weather-fixtures'
 
@@ -153,6 +155,12 @@ const chipsShot = (
   set: string,
   over: Record<string, unknown> = {},
 ): Partial<LovelaceCardConfig> => ({ entities: [...chipSet(set)], ...over })
+
+/** Routed through `tileSet`, for `chipsShot`'s reason. */
+const tilesShot = (
+  set: string,
+  over: Record<string, unknown> = {},
+): Partial<LovelaceCardConfig> => ({ tiles: [...tileSet(set)], ...over })
 
 const SHOTS: readonly Shot[] = [
   {
@@ -389,6 +397,33 @@ const SHOTS: readonly Shot[] = [
     config: chipsShot('templates'),
     columns: 12,
     rows: 3,
+    theme: 'light',
+  },
+  {
+    name: 'tiles-glass',
+    caption: 'four shortcut tiles on glass, each tinted for what it is',
+    tag: TILES_CARD_TAG,
+    config: tilesShot('shortcuts'),
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+  },
+  {
+    name: 'tiles-dark',
+    caption: 'the same grid against a dark ground',
+    tag: TILES_CARD_TAG,
+    config: tilesShot('shortcuts'),
+    columns: 12,
+    rows: 4,
+    theme: 'dark',
+  },
+  {
+    name: 'tiles-entities',
+    caption: 'plain entity tiles: the tint comes from what each one is',
+    tag: TILES_CARD_TAG,
+    config: tilesShot('entities'),
+    columns: 12,
+    rows: 4,
     theme: 'light',
   },
 ]

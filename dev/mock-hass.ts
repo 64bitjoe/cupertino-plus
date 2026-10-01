@@ -2,6 +2,7 @@ import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/
 import { BATTERY_STATES } from './battery-devices'
 import { CHIP_STATES, TEMPLATE_RESULTS } from './chip-fixtures'
 import { COMPLICATION_STATES } from './complication-entities'
+import { TILE_STATES } from './tile-fixtures'
 import {
   WEATHER_DAILY_FORECASTS,
   WEATHER_HOURLY_FORECASTS,
@@ -100,12 +101,13 @@ const STATES: Record<string, HassEntity> = {
   /*
    * One file per card, each holding its mock entities beside the config that points at them:
    * the battery card's devices in `battery-devices.ts`, the complication card's entities in
-   * `complication-entities.ts`, the chips card's in `chip-fixtures.ts`, and the weather card's
+   * `complication-entities.ts`, the chips card's in `chip-fixtures.ts` (and the one entity the
+   * tiles card adds to them in `tile-fixtures.ts`), and the weather card's
    * in `weather-fixtures.ts` — whose forecasts are not states at all, arriving instead over
    * `weather/subscribe_forecast`, answered below alongside the calendar and to-do
    * subscriptions.
    */
-  ...fixtureStates(BATTERY_STATES, COMPLICATION_STATES, CHIP_STATES, WEATHER_STATES),
+  ...fixtureStates(BATTERY_STATES, COMPLICATION_STATES, CHIP_STATES, TILE_STATES, WEATHER_STATES),
 }
 
 /**

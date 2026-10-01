@@ -141,6 +141,11 @@ advance:
 hover`). At rest it is the plain glass or surface tile, and only its glyph carries the colour.
 `wash: always` is v1.13.0's tile, washed at rest, exactly as it was.
 
+<p align="center">
+  <img src="images/tiles-always.png" width="420"
+       alt="The same four tiles with wash: always, each filled with a light wash of its colour">
+</p>
+
 The default is the first live dashboard's choice. What it buys is a resting grid that reads as
 one family of plain tiles, told apart by their glyphs, with the colour arriving as the answer to
 a pointer or a finger, where it says "this is a button".

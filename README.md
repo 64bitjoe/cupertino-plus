@@ -14,7 +14,7 @@ taken from the box you drag them into rather than from a size setting.
 > **A fork.** This is a fork of
 > [sabbaken/cupertino-widgets](https://github.com/sabbaken/cupertino-widgets) by
 > **Kirill Verenih**, who wrote the calendar and battery cards and everything they stand on.
-> The complication, weather and chips cards are the additions here. Same AGPL-3.0 licence, and
+> The complication, weather, chips and tiles cards are the additions here. Same AGPL-3.0 licence, and
 > the original copyright notice travels with every build.
 
 It needs a current Home Assistant, **2026.7 or newer**: the cards track the latest frontend
@@ -40,7 +40,7 @@ Then install **Cupertino Plus** and reload your browser.
 
 ## The cards
 
-Five of them. Each one is in the card picker; none of them needs YAML.
+Six of them. Each one is in the card picker; none of them needs YAML.
 
 ### The calendar
 
@@ -143,13 +143,35 @@ answer, and gives the pills an ordinary card surface to sit on.
 The rules, including the two containers and what a press can be made to do, are in
 [`docs/chips-widget-rules.md`](docs/chips-widget-rules.md).
 
+### The tiles
+
+A wrapping grid of small rounded tiles, one per shortcut, each a glyph, a name and a line of
+state. This is the Home Screen family where the chips are the Lock Screen one: a tile is a
+coloured object rather than a mark in one ink, so it tints itself from what its entity is (a
+thermometer orange, a lock red, a scene purple) and a `color` of your own overrides that. Tiles
+are a fixed size and the grid wraps to the width it is given, three across a phone and four
+across a wide section, so there is no column count to keep in step with a box you can drag.
+
+<p align="center">
+  <img src="docs/images/tiles-glass.png" width="420"
+       alt="A grid of glass tiles, each a coloured glyph over a name and a line of state">
+</p>
+
+A tile does not need an entity: with a name, an icon and a `navigate` press it is a shortcut
+to another view, and draws a dash where the state would be. Name, icon, colour, state and
+visibility can each be a template. A press opens more-info by default, and per tile can
+toggle, navigate, call a service, or do nothing.
+
+The rules, including why tiles carry a colour where chips refuse one, are in
+[`docs/tiles-widget-rules.md`](docs/tiles-widget-rules.md).
+
 ## Configuring
 
 Every card has a visual editor — add it from the picker and fill in the form. Nobody needs to
 write YAML, and there is no size field in any of them: **Home Assistant's Layout tab owns the
 footprint**, and the card re-lays itself out for whatever box you drag it into.
 
-The five types, if you do want to paste config:
+The six types, if you do want to paste config:
 
 | Card         | Type                                 | Asks for                                    |
 | ------------ | ------------------------------------ | ------------------------------------------- |
@@ -158,6 +180,7 @@ The five types, if you do want to paste config:
 | Battery      | `custom:cupertino-plus-battery`      | which battery sensors                       |
 | Weather      | `custom:cupertino-plus-weather`      | one weather entity                          |
 | Chips        | `custom:cupertino-plus-chips`        | entities, and what a press on each one does |
+| Tiles        | `custom:cupertino-plus-tiles`        | which shortcuts, and what each one opens    |
 
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.

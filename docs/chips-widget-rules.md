@@ -174,6 +174,11 @@ DOM this drew before rows existed.
 > still one ink, because a coloured number is a second, blurrier opinion about a number the
 > chip has already printed.
 
+> **The other side of this rule is the tiles card.** A Home Screen tile is the object a chip is
+> not, and it carries an identity by default: see [`tiles-widget-rules.md`](tiles-widget-rules.md) §3.
+> This section's argument stands for the Lock Screen and is not an argument against a
+> coloured tile.
+
 The complication card's §2 says the colour comes from what the entity measures and then holds
 still — orange for a thermometer at 40°F and at 90°F, because the colour is "what kind of thing
 is this" rather than "how is this reading doing". **Chips have no per-entity colour at all**,

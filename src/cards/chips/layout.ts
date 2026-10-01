@@ -18,6 +18,7 @@
  */
 
 import { columnsFor, gridColumnsToPx, rowsFor, type Floors } from '../../core/floors'
+import { INSET, linesFor } from '../../core/wrapping'
 import { DEFAULT_CONTENT, type ChipContent } from './model'
 
 /**
@@ -29,7 +30,7 @@ import { DEFAULT_CONTENT, type ChipContent } from './model'
  */
 export interface ChipBand {
   content: ChipContent
-  /** True for a chip that starts a new row. See `groupRows`. */
+  /** True for a chip that starts a new row. See `groupRows` in `core/wrapping.ts`. */
   break?: boolean
   /** True for a chip that absorbs the row's leftover width rather than claiming a width. */
   fill?: boolean
@@ -45,38 +46,10 @@ export interface ChipBand {
   name?: string
 }
 
-/**
- * The chips split into the rows they were asked to be drawn on.
- *
- * A chip carrying `break` starts a new row; everything else joins the row before it. The card
- * renders one flex container per group and the floor below prices each group's own wrapping,
- * so the two agree about how many lines there are — which they must, or a card with forced
- * rows would be handed a box too short and clip the difference.
- *
- * A `break` on the very first chip is ignored rather than honoured into a leading empty row:
- * every chip starts a row when it is the first one, so the flag says nothing there. That
- * matters more than it sounds, because dragging a chip to the top is how a config acquires
- * one, and an empty row would be 44 units of unexplained gap above the card's content.
- */
-export const groupRows = <T extends ChipBand>(chips: readonly T[]): T[][] => {
-  const rows: T[][] = []
-  for (const chip of chips) {
-    if (chip.break === true && rows.length > 0) rows.push([chip])
-    else if (rows.length === 0) rows.push([chip])
-    else (rows[rows.length - 1] as T[]).push(chip)
-  }
-  return rows
-}
-
-/**
- * Must match `--cw-inset`, the padding inside the card — in `card` mode.
- *
- * `glass` paints no surface, so it insets by nothing at all and passes `0` here: there is no
- * edge for the content to be held away from, and the 32 units this would otherwise add
- * vertically are the difference between a single row of chips fitting in one grid row (44 of
- * 56) and needing two (76). A card padded away from a box nobody can see is just a taller card.
- */
-export const INSET = 16
+// Re-exported rather than relocated in every caller: `groupRows` is this card's rows as far as
+// the card is concerned, and `INSET` is its own padding. Where the arithmetic lives is
+// `core/wrapping.ts`'s business, not theirs.
+export { groupRows, INSET } from '../../core/wrapping'
 
 /** The gap between one chip and the next, both across and down. Must match `--cw-space-2`. */
 const GAP = 8
@@ -244,32 +217,23 @@ export const floorsFor = (
     (measured ?? gridColumnsToPx(min_columns)) - 2 * inset,
   )
 
-  // Each configured row wraps on its own, so the lines are the sum of each row's own wrapping
-  // rather than of the whole list's — a card using `break` split one-and-two is two lines, not
-  // one, and an under-reported floor is the clipping this module exists to prevent.
+  // Each configured row wraps on its own (see `linesFor`), so a card using `break` split
+  // one-and-two is two lines, not one, and an under-reported floor is the clipping this module
+  // exists to prevent.
   //
   // Within a row the chips are packed at their OWN nominal widths rather than all at the
   // band's. The band is the tallest mode present, so pricing every chip at it charged an
   // icon-only chip 96 units for the 52 it takes — and now that a chip actually draws its own
   // content (rather than the band's, which was a bug), that overcharge has no excuse left.
-  const lines = groupRows(chips).reduce((total, row) => {
-    let used = 0
-    let rowLines = 1
-    for (const chip of row) {
-      const width = widthOf(chip)
-      // Elastic, so it never pushes a line: `widthOf` prices it at nothing and it is skipped
-      // outright rather than contributing a gap of its own.
-      if (width === 0) continue
-      const need = used === 0 ? width : used + GAP + width
-      if (need > usable && used > 0) {
-        rowLines += 1
-        used = width
-      } else {
-        used = need
-      }
-    }
-    return total + rowLines
-  }, 0)
+  const lines = linesFor(
+    chips.map(chip => ({
+      width: widthOf(chip),
+      ...(chip.break === true ? { break: true } : {}),
+      ...(chip.fill === true ? { fill: true } : {}),
+    })),
+    usable,
+    GAP,
+  )
 
   const content = lines * rowHeightFor(band) + (lines - 1) * GAP + 2 * inset
 

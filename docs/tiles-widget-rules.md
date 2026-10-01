@@ -131,7 +131,8 @@ Both are the chips card's, adopted rather than re-argued (see
 [`chips-widget-rules.md`](chips-widget-rules.md)). `name`, `icon`, `color`, `value` and `show`
 may each be a template, a string holding `{{` or `{%`, resolved through the shared
 subscription pool. `{{ config.entity }}` is in scope, so one template serves every tile.
-`entity` is never templatable: it is the row's identity, and the card needs it before anything
+The card-level `color` and a tap action's `navigation_path` and `service` take templates
+too. `entity` is never templatable: it is the row's identity, and the card needs it before anything
 resolves.
 
 `entity` is **optional.** A tile with none and a `name` and `icon` of its own is a navigation
@@ -149,14 +150,16 @@ it.
 
 **When there is nothing to read the line is an em dash**, and that is a real case here rather
 than an edge: a navigation tile has no state, and the cards being replaced draw exactly that
-(`Climate –`, `Scenes –`). A `value` that resolves empty draws the dash rather than collapsing,
-because a grid in which some tiles have a third line and some do not is ragged where a row of
-chips was not.
+(`Climate –`, `Scenes –`). An entity-less tile whose `value` is absent or resolves empty draws
+the dash, and so does an unavailable entity. An entity tile whose `value` template is empty,
+or not yet answered, falls back to the entity's formatted state instead. Either way the third
+line is never blank, which is what keeps the grid regular: a grid in which some tiles have a
+third line and some do not is ragged where a row of chips was not.
 
 ## 6. The press, and the container
 
 Both are the chips card's. `container: glass | card` means what it means there, including that
-glass insets by nothing in either direction. That was the fix that ended the chips sizing saga
+glass is the default and insets by nothing in either direction. That was the fix that ended the chips sizing saga
 and is the thing most likely to be re-broken by writing a second card's padding from scratch.
 The press is `core/actions.ts`: `more-info`, `toggle`, `navigate`, `call-service` and `none`,
 with the same rule that a tile set to `none` is not drawn as a button: no role, no tab stop, no

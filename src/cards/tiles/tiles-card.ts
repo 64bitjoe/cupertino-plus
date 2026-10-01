@@ -12,8 +12,9 @@ import { isPressable, runAction } from '../../core/actions'
 import { withFloors, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
-import type { LovelaceGridOptions } from '../../core/types/ha'
+import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { DEFAULT_CONTAINER, type ChipsContainer } from '../chips/model'
+import { TILES_EDITOR_TAG } from './tiles-card-editor'
 import { floorsFor, groupRows, INSET, type TileBand } from './layout'
 import {
   readTiles,
@@ -193,6 +194,10 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
       }
     `,
   ]
+
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement(TILES_EDITOR_TAG) as LovelaceCardEditor
+  }
 
   public static getStubConfig(): TilesCardConfig {
     return { type: `custom:${TILES_CARD_TAG}` }

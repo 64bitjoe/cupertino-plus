@@ -42,7 +42,7 @@ card in the library makes: everything downstream draws a `TileView` and knows no
 entities. What a row _is_ (an entity or none, a bare string or an object, templates in the same
 five fields) is the chips card's question and `model.ts` asks it by importing the chips model's
 own functions. What differs is what a tile draws. It always draws icon, name and state, so
-there is no `content`; it is a fixed width, so there is no `fill`; and an entity-less tile is a
+there is no `content`; it already shares its row's width (§2), so there is no `fill`; and an entity-less tile is a
 navigation tile rather than a spacer.
 
 A tile is a Home Screen object, and that one sentence decides most of what follows. A chip is
@@ -50,9 +50,10 @@ one ink on a wallpaper; a tile is a coloured thing with a name on it, sitting am
 
 ## 2. The grid, and why it wraps
 
-**Tiles are a fixed size and wrap.** As many fit on a line as the section allows: four across
-a wide section, three on a phone on glass and two in card mode at about 360px, reflowing rather than cramping. There is no `columns:`
-setting.
+**Tiles share their row and wrap.** The tiles in a row divide its width equally, so a row fills
+its section edge to edge as Apple Home's does, and a line wraps only when one more tile would
+push every tile below its minimum width: four across a section of about 410px or more, three on
+a phone, reflowing rather than cramping. There is no `columns:` setting.
 
 That is not the obvious choice, since Home Assistant's own grid card takes a column count, so it
 is worth saying why. A `columns: 4` card dragged narrow gives four cramped tiles; a wrapping
@@ -62,21 +63,33 @@ arrangement the chips card reached after four releases of getting the arithmetic
 reusing that code is worth more than matching a convention.
 
 The arithmetic is `core/wrapping.ts`, shared with chips and generic over "a thing with a
-width". A tile's `widthOf` is a constant, which is the degenerate case of the chips card's
-content-priced one rather than a second function. Every detail in that module was earned by a
+width". Every tile is priced at its minimum width, which is the degenerate case of the chips card's
+content-priced one rather than a second function: a stretched tile is wider only because the
+line had room to spare, so the line count at the minimum is the line count the grid draws. Every detail in that module was earned by a
 bug (the width comes from the measurement, a container's inset is told rather than assumed),
 and writing them out again from memory is how they come back. `break: true` works exactly as
 chips' §2a describes, with the same three rules: it says where a row starts rather than that it
 fits, it is ignored on the first tile, and it is not templatable.
 
-**A tile is 112 units wide and 88 tall.** The spec guessed 112 by 96 and asked the first render
-to settle it. The render settled the height and left the width alone.
+**A tile is at least 96 units wide, and 88 tall.** The spec guessed a fixed 112 by 96 and asked
+the first render to settle it. The render settled the height; the first live dashboard settled
+the width.
 
-- **The width** is pinned from both sides. Four across fit a 500px glass section
-  (4 × 112 + 3 × 8 = 472), and three fit a phone's section of about 360 (352). It carries a
-  two-word name of up to about thirteen characters at footnote size; a longer one ellipsizes,
-  with the whole name in the tooltip. Widening to 116 would rescue "Bedroom Lamp" and cost the phone
-  its third column, which is the worse trade.
+- **The width** was a fixed 112 in v1.13.0, and in the user's glass column of about 425 three
+  fitted and the fourth wrapped alone beside a third of a column of nothing. It is now a
+  minimum, pinned from both sides. Four across must fit that column with room to spare
+  (4 × 96 + 3 × 8 = 408), and four across must fit a 500px section in card mode inside its two
+  16-unit insets (468), which 112 never did. Below it a name stops reading: the name gets the
+  tile less its two 12-unit paddings, 72 at the minimum, which holds "Hall Lamp" and "Front
+  Door" at footnote size and ellipsizes "Living Room", with the whole name in the tooltip. That
+  is only at the wrap point itself; at 425 a tile is 100 and "Living Room" reads whole.
+- **Every row shares one set of columns.** Each row is a CSS grid of equal tracks no narrower
+  than the minimum, capped at as many columns as the card's longest row has tiles. The cap is
+  what fills the line: four tiles in a 640 column are four tiles of 154, not four of six
+  narrower columns with a hole beside them. The tracks are what keep the grid a grid: a forced
+  row of one under a row of four, or the last line of a wrapped row, takes one column of the
+  rows above it rather than stretching across the card. A card of two tiles in a wide column
+  does make two wide tiles; that is the row being shared, which is what was asked for.
 - **The height** comes from the sections grid rather than from taste. A grid row is 56 with an
   8 gap, so two lines of 88-tall tiles are 184, which is exactly three rows, and one line inside
   the card container's two 16-unit insets is 120, which is exactly two. At 96 both spilled into
@@ -84,9 +97,9 @@ to settle it. The render settled the height and left the width alone.
   under it. And 88 is not cramped: the glyph still clears the name by nine pixels, and the
   glyph-top, text-bottom split reads as two groups.
 
-The floor is two tiles across rather than the chips card's three, because a tile is more than
-twice a chip's width and a floor of three would make the narrowest reachable card wider than
-most sections. Like the chips card's it is priced from the measured width once there is one,
+The floor is two tiles across rather than the chips card's three, because a tile is about twice
+a chip's width and a floor of three would make the narrowest reachable card wider than many
+sections: five grid columns on glass, six in card mode. Like the chips card's it is priced from the measured width once there is one,
 and the card asks Home Assistant for exactly its own content height.
 
 ## 3. Colour: a tile has an identity
@@ -139,8 +152,8 @@ resolves.
 tile, which is what Climate, Scenes and Cats actually were in the config being replaced.
 Unlike a chip, an entity-less tile is not a spacer, because a tile is a labelled object and one
 with a name and an icon has plenty to draw. There is no spacer concept at all; a grid of
-fixed-width tiles has no use for one. Its default press is `none`, for the chips card's reason:
-there is nothing to open.
+tiles that already share their row has no use for one. Its default press is `none`, for the
+chips card's reason: there is nothing to open.
 
 ## 5. The state line, and its dash
 
@@ -184,9 +197,6 @@ pressed state.
   shared sortable panel list is right in principle and a large refactor of two shipped editors
   in practice. It was deferred rather than done, and is the next thing to do before a fourth
   card wants one.
-- **`container: card` fits three across a 500px section, not four.** The 16-unit inset on each
-  side leaves 468 of 500 and four tiles need 472: four pixels short. Glass fits four. Unresolved;
-  it is one constant if it matters.
 - **Tiles borrow chips' helpers.** `tiles/model.ts` imports the row-reading, template, action-form
   and container helpers from `chips/model.ts`; a future `core/rows.ts` would remove that
   dependency.

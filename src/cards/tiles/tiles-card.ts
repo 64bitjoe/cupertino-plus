@@ -36,9 +36,9 @@ export interface TilesCardConfig extends CupertinoCardConfig {
 const NO_TILES = 'No Tiles'
 
 /**
- * A wrapping grid of fixed-size tiles, each one glyph, a name and a state line, and a tap
- * action. The chips card's sibling: `model.ts` reads the entities, `layout.ts` prices the floor,
- * and this class draws the answer and owns the glass/card container split.
+ * A wrapping grid of tiles that share each row equally, each one glyph, a name and a state
+ * line, and a tap action. The chips card's sibling: `model.ts` reads the entities, `layout.ts`
+ * prices the floor, and this class draws the answer and owns the glass/card container split.
  */
 class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   static override styles: CSSResultGroup = [
@@ -66,19 +66,48 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         padding: 0;
       }
 
+      /* One configured row, laid out as columns of equal width that share the line and wrap
+         only below a tile's minimum. 96 must match TILE_MIN_WIDTH in layout.ts, whose floor
+         counts lines by the same rule: CSS cannot read the constant.
+
+         auto-fill rather than auto-fit, and a second term in the track minimum, because each
+         of the plain choices fails one case in the render. auto-fit collapses the tracks a row
+         does not fill, so a forced row of one tile under a row of four stretched across the
+         whole card, and a row of two under four drew tiles twice as wide as their neighbours.
+         Plain auto-fill keeps every row on one column grid, but leaves empty tracks when the
+         card is wider than its tiles need: four tiles in a 640 column filled four of six
+         columns and left a hole down the right, which is the thing this layout exists to stop.
+
+         So the track minimum is the larger of the tile minimum and an Nth of the line, where N
+         is the longest row in the card (set on the stack as --cw-tile-columns). That caps the
+         grid at N columns, so the longest row always fills the line edge to edge, and it keeps
+         auto-fill's tracks, so a shorter row and the last line of a wrapped one keep the
+         columns of the rows above them instead of stretching to fill. */
       .row {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(
+          auto-fill,
+          minmax(
+            max(
+              calc(96px * var(--cw-scale)),
+              calc(
+                (100% - (var(--cw-tile-columns, 1) - 1) * var(--cw-space-2)) /
+                  var(--cw-tile-columns, 1)
+              )
+            ),
+            1fr
+          )
+        );
         gap: var(--cw-space-2);
         min-width: 0;
       }
 
-      /* 112 and 88 must match TILE_WIDTH and TILE_HEIGHT in layout.ts: CSS cannot read them. */
+      /* 88 must match TILE_HEIGHT in layout.ts. The width is the grid track's. */
       .tile {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        width: calc(112px * var(--cw-scale));
+        min-width: 0;
         height: calc(88px * var(--cw-scale));
         padding: calc(12px * var(--cw-scale));
         border-radius: calc(20px * var(--cw-scale));
@@ -380,11 +409,14 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     }
 
     // Real row containers rather than a break spacer, for the chips card's reason: a spacer
-    // would take the flex gap on both sides and push forced rows further apart than wrapped ones.
+    // would take the gap on both sides and push forced rows further apart than wrapped ones.
+    // The longest row sets the column count every row shares; see .row in the styles.
+    const rows = groupRows(tiles)
+    const columns = Math.max(...rows.map(row => row.length))
     return html`
       <ha-card class=${klass} aria-label=${`${tiles.length} tiles`}>
-        <div class="tiles">
-          ${groupRows(tiles).map(
+        <div class="tiles" style=${`--cw-tile-columns:${columns}`}>
+          ${rows.map(
             row => html`<div class="row">${row.map(tile => this._renderTile(tile))}</div>`,
           )}
         </div>

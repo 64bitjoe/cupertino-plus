@@ -11,7 +11,7 @@
  * the add control waits for `ha-entity-picker`); this file says only where it differs.
  *
  * It differs by what a tile is. There is no content dropdown, because a tile always draws icon,
- * name and state, and no fill switch, because a tile grid has fixed-width cells. An entity-less
+ * name and state, and no fill switch, because a tile grid already shares each row. An entity-less
  * tile is a navigation tile rather than a spacer, so a blank tile is a real thing to add and the
  * panel opens in template mode for it.
  */

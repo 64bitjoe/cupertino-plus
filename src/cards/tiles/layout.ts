@@ -15,20 +15,29 @@ import { groupRows, linesFor, INSET } from '../../core/wrapping'
 export { groupRows, INSET }
 
 /**
- * One tile's footprint.
+ * One tile's footprint: a minimum width, and a fixed height.
  *
  * A tile does NOT size to its content, which is the one place this card and the chips card
  * genuinely disagree about layout rather than about numbers: a chip is a label and wants to be
  * as wide as its label, and a grid of ragged-width tiles is not a grid.
  *
- * Spec §9 chose 112 x 96 and asked the first render to settle it. It settled the height at 88.
+ * Nor is it a fixed width any more. v1.13.0 drew every tile 112 wide, and on the first live
+ * dashboard (a glass column of about 425) three fitted and the fourth wrapped onto a line of
+ * its own, with a third of the column empty beside it. Apple Home does not do that: its tiles
+ * share the row. So a tile now stretches to an equal share of its row and wraps only once that
+ * share would fall below this minimum, which makes the minimum the one number the floor needs:
+ * it is exactly where the grid wraps (`tiles-card.ts` lays each row out with CSS grid's
+ * auto-fill, which counts columns the same way `linesFor` counts tiles).
  *
- * The width holds. It is pinned from both sides: four across must fit a 500px section on glass
- * (4 x 112 + 3 gaps = 472), and three across a phone's section of about 360 (352). It fits every
- * two-word name of up to about thirteen characters at footnote size ("Kitchen Lights", "Office
- * Heater"); "Bedroom Lamp" misses by three pixels and ellipsizes, with the full name in the
- * tooltip. Widening to 116 would rescue it and cost the phone its third column, which is the
- * worse trade.
+ * 96 is pinned from both sides. Four across has to fit the user's 425 column on glass with
+ * room to spare for a slightly narrower one (4 x 96 + 3 gaps = 408), and four across has to
+ * fit a 500 section in card mode inside its two 16 insets (468), which 112 never did and the
+ * rules doc carried as an open item; a phone's section of about 360 still takes three. Below
+ * it, a two-word name stops reading: the name gets the tile less its two 12 paddings, 72 at
+ * the minimum, which holds "Hall Lamp" and "Front Door" at footnote size and ellipsizes
+ * "Living Room" and "Kitchen Lights", with the full name in the tooltip. That is only at the
+ * wrap point itself, though. Above it the share is wider: at the user's 425 a tile is 100 and
+ * "Living Room" reads whole, and in card mode across 500 a tile is 110 and all four do.
  *
  * The height comes from the sections grid rather than from taste. A grid row is 56 with an 8
  * gap, so two lines of 88-tall tiles are 184, exactly three rows, and one line inside the card
@@ -37,7 +46,7 @@ export { groupRows, INSET }
  * a one-line card asked for three. The render shows 88 is not cramped: the glyph still clears
  * the name by nine pixels, and the glyph-top, text-bottom split reads as two groups.
  */
-export const TILE_WIDTH = 112
+export const TILE_MIN_WIDTH = 96
 export const TILE_HEIGHT = 88
 
 /** The gap between tiles, across and down. Must match `--cw-space-2`. */
@@ -45,8 +54,8 @@ export const GAP = 8
 
 /**
  * The fewest tiles the floor pretends fit across, so a multi-tile card cannot be dragged into a
- * single column. Two rather than the chips card's three: a tile is more than twice a chip's
- * width, and a floor of three would make the narrowest reachable card wider than most sections.
+ * single column. Two rather than the chips card's three: a tile is about twice a chip's width,
+ * and a floor of three would make the narrowest reachable card wider than many sections.
  */
 const FLOOR_TILES_ACROSS = 2
 
@@ -59,6 +68,10 @@ export interface TileBand {
  * The floor: wide enough for two tiles side by side, and tall enough for every line they wrap
  * onto at the width the card actually has.
  *
+ * Every tile is priced at `TILE_MIN_WIDTH`, not at the width it is drawn: a stretched tile is
+ * wider only because the line had room to spare, so the line count at the minimum is the line
+ * count the grid draws.
+ *
  * `measured` is the card's own width in design units once the ResizeObserver has reported one.
  * Without it the lines are counted against an assumed section, which is how the chips card spent
  * four releases handing users empty grid rows.
@@ -69,15 +82,15 @@ export const floorsFor = (
   inset: number = INSET,
 ): Floors => {
   const across = Math.min(Math.max(tiles.length, 1), FLOOR_TILES_ACROSS)
-  const min_columns = columnsFor(across * TILE_WIDTH + (across - 1) * GAP + 2 * inset)
+  const min_columns = columnsFor(across * TILE_MIN_WIDTH + (across - 1) * GAP + 2 * inset)
 
   if (tiles.length === 0) return { min_columns, min_rows: 1 }
 
-  const usable = Math.max(TILE_WIDTH, (measured ?? gridColumnsToPx(min_columns)) - 2 * inset)
+  const usable = Math.max(TILE_MIN_WIDTH, (measured ?? gridColumnsToPx(min_columns)) - 2 * inset)
 
   const lines = linesFor(
     tiles.map(tile => ({
-      width: TILE_WIDTH,
+      width: TILE_MIN_WIDTH,
       ...(tile.break === true ? { break: true } : {}),
     })),
     usable,

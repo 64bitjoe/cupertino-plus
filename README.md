@@ -149,8 +149,9 @@ A wrapping grid of small rounded tiles, one per shortcut, each a glyph, a name a
 state. This is the Home Screen family where the chips are the Lock Screen one: a tile is a
 coloured object rather than a mark in one ink, so it tints itself from what its entity is (a
 thermometer orange, a lock red, a scene purple) and a `color` of your own overrides that. Tiles
-are a fixed size and the grid wraps to the width it is given, four across a wide glass section, and three
-or two on a phone (two in card mode at about 360px), so there is no column count to keep in step with a box you can drag.
+share their row's width equally, so a row fills its section edge to edge, and wrap only when a
+tile would fall below 96 units: four across a section of about 410px or more, three on a phone.
+There is no column count to keep in step with a box you can drag.
 
 <p align="center">
   <img src="docs/images/tiles-glass.png" width="420"

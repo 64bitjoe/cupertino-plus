@@ -31,8 +31,8 @@ import {
  * none, bare string or object, templates in the same five fields) is the same question, so the
  * row-reading, the template request, the keys and the action form are the chips model's own
  * functions, imported. What differs is what a tile draws: always icon, name and state, so no
- * `content`; a fixed-width grid, so no `fill`; and an entity-less tile is a navigation tile,
- * never a spacer.
+ * `content`; a grid whose rows already share their width, so no `fill`; and an entity-less
+ * tile is a navigation tile, never a spacer.
  */
 
 /** One tile's configuration: a chip's, less `content` and `fill`. */

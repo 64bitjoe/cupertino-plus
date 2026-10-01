@@ -244,8 +244,16 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         }
       }
 
+      /* Sized outright, for the chips card's reason (see its .glyph): Home Assistant's ha-icon
+         lays its inner icon on a line box taller than the glyph, which pushed the glyph down
+         and the tile's glyph box past 24. */
       .glyph {
         --mdc-icon-size: calc(24px * var(--cw-scale));
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--mdc-icon-size);
+        height: var(--mdc-icon-size);
         flex: none;
         color: var(--cw-tile-tint, inherit);
       }

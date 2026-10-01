@@ -231,8 +231,23 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         background: color-mix(in srgb, var(--cw-chip-tint) 22%, var(--cw-track));
       }
 
+      /* A box exactly the glyph's size, said outright rather than left to the icon element.
+         Home Assistant's ha-icon sets no display of its own, so it is laid out as a block (it
+         is a flex item here) holding an inline-flex ha-svg-icon on a line box: the line is
+         as tall as the inherited font's line-height, and vertical-align: middle sits the
+         17-unit glyph about 1.5 units below that line's centre. Measured in the real element's
+         shape, an icon-only pill was 43 x 36 rather than 43 x 31, with 11 units above the
+         glyph and 8 below: visibly low in a pill that is nothing but the glyph and its
+         padding. inline-flex makes the inner icon a flex item, which takes no line box, and
+         the explicit size keeps the box honest before the icon has resolved. The dev stub's
+         ha-icon is itself inline-flex, which is why no showcase render ever showed it. */
       .glyph {
         --mdc-icon-size: calc(17px * var(--cw-scale));
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--mdc-icon-size);
+        height: var(--mdc-icon-size);
         flex: none;
       }
 

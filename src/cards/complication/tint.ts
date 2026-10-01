@@ -14,86 +14,17 @@
  * as decoration, and on a dashboard of a dozen complications it would turn a glance
  * into a colour-by-numbers puzzle.
  *
- * The palette moved to `core/` when the chips card became its second consumer; re-exported
- * rather than relocated in every caller, because `TINTS` is this card's `color:` option and
- * every complication file that names it is naming that option, not the shared palette.
+ * `tintFor` and the palette now live in `core/tint.ts`, shared with the other cards; what
+ * stays here is `onTintVar`, the ink for content drawn on a tint, which only this card does.
  */
 
-import type { HassEntity } from '../../core/types/ha'
-
-// The palette moved to `core/` when the chips card became its second consumer; re-exported
-// rather than relocated in every caller, because `TINTS` is this card's `color:` option and
-// every complication file that names it is naming that option, not the shared palette.
-export { TINTS, tintVar, type TintName } from '../../core/tint'
 import type { TintName } from '../../core/tint'
 
-/**
- * `device_class` to tint, for the entities that carry one. Grouped by what the class
- * measures rather than by the class name, so that classes which are really the same
- * kind of reading under a different label (`moisture` and `water`, `current` and
- * `voltage`) land on the same colour without the table having to say so twice.
- */
-const BY_DEVICE_CLASS: Record<string, TintName> = {
-  temperature: 'orange',
-  humidity: 'blue',
-  moisture: 'blue',
-  water: 'blue',
-  precipitation: 'blue',
-  battery: 'green',
-  energy: 'green',
-  power: 'yellow',
-  current: 'yellow',
-  voltage: 'yellow',
-  illuminance: 'yellow',
-  pressure: 'teal',
-  atmospheric_pressure: 'teal',
-  carbon_dioxide: 'indigo',
-  carbon_monoxide: 'indigo',
-  aqi: 'indigo',
-  door: 'red',
-  window: 'red',
-  safety: 'red',
-  problem: 'red',
-}
-
-/**
- * Domain to tint, for the entities `device_class` says nothing about: a `light` has
- * no device class to read, but "which kind of thing is this" is still answerable from
- * the domain alone. Only consulted once `BY_DEVICE_CLASS` has had first refusal, so an
- * entity that sets both (a `light` reporting `device_class: temperature`, say, from a
- * combined sensor) is coloured by what it measures rather than by what it is.
- */
-const BY_DOMAIN: Record<string, TintName> = {
-  lock: 'red',
-  media_player: 'pink',
-  light: 'yellow',
-  cover: 'indigo',
-  climate: 'orange',
-  fan: 'teal',
-  vacuum: 'purple',
-  person: 'blue',
-}
-
-/**
- * The tint for an entity, fixed by what it is rather than by what it currently reads.
- *
- * `device_class` first because it is the more specific claim — a `sensor.hallway`
- * could be measuring anything, but a `device_class: temperature` sensor is a
- * thermometer regardless of its domain. The domain is the fallback for the entities
- * with no device class to consult, and `accent` — the theme's own primary colour
- * rather than a system hue — is what is left for everything neither table recognises,
- * so an unrecognised entity still tints coherently with the rest of the dashboard
- * instead of falling back to some arbitrary system colour that was never chosen for it.
- */
-export const tintFor = (entity: HassEntity): TintName => {
-  const deviceClass = entity.attributes.device_class
-  if (typeof deviceClass === 'string' && BY_DEVICE_CLASS[deviceClass]) {
-    return BY_DEVICE_CLASS[deviceClass]
-  }
-
-  const domain = entity.entity_id.split('.')[0] ?? ''
-  return BY_DOMAIN[domain] ?? 'accent'
-}
+// The palette and `tintFor` live in `core/` because the chips card and the tiles card share
+// them with this one; re-exported rather than relocated in every caller, because `TINTS` is
+// this card's `color:` option and every complication file that names it is naming that option,
+// not the shared palette.
+export { TINTS, tintFor, tintVar, type TintName } from '../../core/tint'
 
 /**
  * White text over the tint, except where the tint is too light for white to sit on.

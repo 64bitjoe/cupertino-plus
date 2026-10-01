@@ -86,6 +86,15 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         transition: opacity var(--cw-duration-fast) var(--cw-ease);
       }
 
+      /* The chips card's glass, less its specular line. The pill lights its top edge with an
+         offset-only inset shadow (0 1px 0), and on a pill that reads as light. On a tile it
+         reads as a fault: an offset shadow on a 20-unit rounded rect draws a crescent that is
+         thickest along the top, hugs the two top corners and tapers to nothing down the sides,
+         so on the live dashboard the top corners looked a different radius from the bottom
+         ones. What replaces it is a one-pixel ring at low alpha, the same weight on all four
+         sides and so on all four corners, which still separates a tile from a wallpaper of
+         its own colour. Lighter than the line it replaces (6 against 8, 12 against 20 in
+         dark), because a ring is drawn four times as long and reads that much heavier. */
       .glass .tile {
         color: var(--cw-label);
         background: linear-gradient(
@@ -93,7 +102,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
           color-mix(in srgb, var(--cw-label) 10%, transparent),
           color-mix(in srgb, var(--cw-label) 18%, transparent)
         );
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-label) 8%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-label) 6%, transparent);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
         backdrop-filter: blur(24px) saturate(180%);
       }
@@ -104,7 +113,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
           color-mix(in srgb, var(--cw-label) 16%, transparent),
           color-mix(in srgb, var(--cw-label) 9%, transparent)
         );
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-label) 20%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-label) 12%, transparent);
       }
 
       .surface .tile {
@@ -123,7 +132,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
           color-mix(in srgb, var(--cw-tile-tint) 11%, transparent),
           color-mix(in srgb, var(--cw-tile-tint) 17%, transparent)
         );
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-tile-tint) 18%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-tile-tint) 12%, transparent);
       }
 
       :host([dark]) .glass .tile.tinted {
@@ -132,7 +141,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
           color-mix(in srgb, var(--cw-tile-tint) 22%, transparent),
           color-mix(in srgb, var(--cw-tile-tint) 14%, transparent)
         );
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-tile-tint) 30%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-tile-tint) 20%, transparent);
       }
 
       .surface .tile.tinted {

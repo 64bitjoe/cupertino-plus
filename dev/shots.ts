@@ -35,13 +35,17 @@
  *    seven-day fixture, which is the shape worth showing — the whole point of this shot is
  *    a full week's worth of bars next to each other.
  *
- *    The chips card is the exception the other way, and `2` and `3` are here for it alone.
+ *    The chips card is the exception the other way, and `2` and `3` were added for it.
  *    It draws a Lock Screen strip rather than a Home Screen square: one line of chips is 44
  *    design units of content inside a 16-unit inset, which `chips/layout.ts` floors at two
  *    grid rows, and two lines at three. Photographed in a 4-row box it would ship a picture
  *    that is mostly empty dashboard, and imply a card somebody is meant to drag that tall.
  *    So each chips shot below is taken at the shortest box its own floor allows, which is
  *    the footprint that card actually wants.
+ *
+ *    The tiles card is the same case and takes the same exception: one line of 88-unit tiles
+ *    is two grid rows on glass, so its shots are framed at two rather than at a 4-row box
+ *    that would be half empty dashboard.
  */
 
 import '../src/index'
@@ -120,7 +124,7 @@ interface Shot {
   columns: 6 | 12
   /**
    * See the module comment: `8` exists only for the weather card's `large` layout, and
-   * `2`/`3` only for the chips card's much shorter one.
+   * `2`/`3` only for the chips and tiles cards' much shorter ones.
    */
   rows: 2 | 3 | 4 | 8
   theme: 'light' | 'dark'
@@ -405,7 +409,7 @@ const SHOTS: readonly Shot[] = [
     tag: TILES_CARD_TAG,
     config: tilesShot('shortcuts'),
     columns: 12,
-    rows: 4,
+    rows: 2,
     theme: 'light',
   },
   {
@@ -414,7 +418,7 @@ const SHOTS: readonly Shot[] = [
     tag: TILES_CARD_TAG,
     config: tilesShot('shortcuts'),
     columns: 12,
-    rows: 4,
+    rows: 2,
     theme: 'dark',
   },
   {
@@ -423,7 +427,7 @@ const SHOTS: readonly Shot[] = [
     tag: TILES_CARD_TAG,
     config: tilesShot('entities'),
     columns: 12,
-    rows: 4,
+    rows: 2,
     theme: 'light',
   },
 ]

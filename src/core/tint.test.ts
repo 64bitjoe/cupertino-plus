@@ -71,12 +71,20 @@ describe('tintFor', () => {
   it('reads device_class first, because it is the more specific claim', () => {
     expect(tintFor(entity('sensor.hallway', { device_class: 'temperature' }))).toBe('orange')
     expect(tintFor(entity('sensor.tank', { device_class: 'humidity' }))).toBe('blue')
+    expect(tintFor(entity('sensor.leak', { device_class: 'moisture' }))).toBe('blue')
+    expect(tintFor(entity('sensor.phone', { device_class: 'battery' }))).toBe('green')
+    expect(tintFor(entity('sensor.plug', { device_class: 'power' }))).toBe('yellow')
+    expect(tintFor(entity('sensor.lux', { device_class: 'illuminance' }))).toBe('yellow')
+    expect(tintFor(entity('sensor.baro', { device_class: 'pressure' }))).toBe('teal')
+    expect(tintFor(entity('sensor.co2', { device_class: 'carbon_dioxide' }))).toBe('indigo')
   })
 
   it('falls back to the domain for an entity with no device class', () => {
     expect(tintFor(entity('lock.front_door'))).toBe('red')
     expect(tintFor(entity('light.kitchen'))).toBe('yellow')
     expect(tintFor(entity('person.joe'))).toBe('blue')
+    expect(tintFor(entity('media_player.tv'))).toBe('pink')
+    expect(tintFor(entity('cover.garage'))).toBe('indigo')
   })
 
   it('prefers what an entity measures over what it is', () => {

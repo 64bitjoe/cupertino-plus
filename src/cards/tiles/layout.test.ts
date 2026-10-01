@@ -56,12 +56,14 @@ describe('floorsFor', () => {
    * row of tiles fits the grid rows it asks for. The chips card lost a release to this.
    */
   it('asks for less when nothing is inset', () => {
-    expect(floorsFor(tiles(4), 640, 0).min_rows).toBeLessThanOrEqual(
-      floorsFor(tiles(4), 640, 16).min_rows,
-    )
+    // 472 is four tiles and three gaps: one line on glass. The card's two 16 insets leave 440,
+    // which wraps three and one, and the second line costs two more grid rows.
+    expect(floorsFor(tiles(4), 472, 0).min_rows).toBe(2)
+    expect(floorsFor(tiles(4), 472, 16).min_rows).toBe(4)
   })
 
-  it('is wide enough for two tiles side by side', () => {
-    expect(floorsFor(tiles(4)).min_columns).toBeGreaterThanOrEqual(4)
+  it('is wide enough for two tiles side by side, plus the inset on each side', () => {
+    expect(floorsFor(tiles(4), undefined, 0).min_columns).toBe(6)
+    expect(floorsFor(tiles(4), undefined, 16).min_columns).toBe(7)
   })
 })

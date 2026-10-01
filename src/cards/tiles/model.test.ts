@@ -121,6 +121,15 @@ describe('a tile with no entity', () => {
     expect(readTiles(hassWith(), [{ name: 'Scenes' }], {})[0]?.value).toBe('—')
   })
 
+  /** A literal empty `value:` is not a template result, but it must read as "no override" too. */
+  it('treats a literal empty value as no override', () => {
+    const [entityTile] = readTiles(hassWith(GARAGE), [{ entity: 'cover.garage', value: '' }], {})
+    const [bareTile] = readTiles(hassWith(GARAGE), ['cover.garage'], {})
+    expect(entityTile?.value).toBe(bareTile?.value)
+    expect(entityTile?.value).not.toBe('')
+    expect(readTiles(hassWith(), [{ name: 'Scenes', value: '' }], {})[0]?.value).toBe('—')
+  })
+
   it('defaults its press to doing nothing, not more-info', () => {
     expect(readTiles(hassWith(), [{ name: 'Scenes' }], {})[0]?.action).toEqual({ action: 'none' })
   })
@@ -247,6 +256,20 @@ describe('the form round trip', () => {
 
   it('turns a tile into an entity-less one rather than deleting it', () => {
     expect(tileFromForm(bare, { ...tileToForm(bare), entity: '' })).toEqual({})
+  })
+
+  /** A blank tile's form reports action 'none'; picking an entity must not freeze that in. */
+  it('leaves a blank tile pressable when it is given an entity', () => {
+    expect(tileFromForm({}, { ...tileToForm({}), entity: 'light.kitchen' })).toEqual({
+      entity: 'light.kitchen',
+    })
+  })
+
+  it('still writes an explicit none the user chose on a tile that has an entity', () => {
+    expect(tileFromForm(bare, { ...tileToForm(bare), action: 'none' })).toEqual({
+      entity: 'cover.garage',
+      tap_action: { action: 'none' },
+    })
   })
 
   it('carries the YAML-only action keys through an unrelated edit', () => {

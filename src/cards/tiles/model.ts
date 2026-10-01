@@ -122,6 +122,8 @@ export const readTile = (
   const visible = row.show === undefined ? true : truthy(field(row.show, row.entity))
   const name = field(row.name, row.entity)
   const icon = field(row.icon, row.entity)
+  // A literal `value: ''` is no more an override than a template that rendered to nothing.
+  const value = (): string | undefined => field(row.value, row.entity) || undefined
   const configured = (): string | undefined =>
     colorValue(field(row.color, row.entity) ?? field(defaults.color, undefined))
 
@@ -133,7 +135,7 @@ export const readTile = (
       name: name ?? '',
       icon: icon ?? TILE_FALLBACK_ICON,
       picture: undefined,
-      value: field(row.value, row.entity) ?? VALUE_DASH,
+      value: value() ?? VALUE_DASH,
       color: configured(),
       unavailable: false,
       visible,
@@ -166,7 +168,7 @@ export const readTile = (
     name: name ?? nameFor(entity),
     icon: icon ?? iconFor(entity),
     picture: icon === undefined && !unavailable ? pictureFor(entity) : undefined,
-    value: unavailable ? VALUE_DASH : (field(row.value, row.entity) ?? formatValue(hass, entity)),
+    value: unavailable ? VALUE_DASH : (value() ?? formatValue(hass, entity)),
     // Configured, then card default, then what the entity is. The dim is the signal that a tile
     // is not reporting, so an unavailable tile gets no tint at all.
     color: unavailable ? undefined : (configured() ?? tintVar(tileTintFor(entity))),
@@ -217,7 +219,15 @@ export const tileFromForm = (prior: TileConfig, data: Record<string, unknown>): 
   // explicit action on a tile that now has no entity to show one for.
   const staleDefault =
     entity === undefined && prior.entity !== undefined && prior.tap_action === undefined
-  const tapAction = staleDefault ? undefined : actionFromForm(prior.tap_action, data, bareDefault)
+  // The mirror image: a blank tile's form reports 'none', and picking it an entity must not
+  // write that stale default as an explicit action on a tile that should now be pressable.
+  const staleNone =
+    entity !== undefined &&
+    prior.entity === undefined &&
+    prior.tap_action === undefined &&
+    data.action === 'none'
+  const tapAction =
+    staleDefault || staleNone ? undefined : actionFromForm(prior.tap_action, data, bareDefault)
   if (tapAction !== undefined) next.tap_action = tapAction
 
   return next

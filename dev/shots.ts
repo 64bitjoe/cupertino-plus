@@ -470,6 +470,22 @@ const SHOTS: readonly Shot[] = [
     theme: 'light',
     wallpaper: true,
   },
+  {
+    name: 'complication-glass',
+    caption: 'container: glass: four circular complications on a translucent panel',
+    tag: COMPLICATION_CARD_TAG,
+    config: {
+      ...complicationShot(
+        [LOUNGE_TEMPERATURE, LOUNGE_HUMIDITY, WATER_TANK, PHONE_BATTERY],
+        'circular',
+      ),
+      container: 'glass',
+    },
+    columns: 12,
+    rows: 4,
+    theme: 'dark',
+    wallpaper: true,
+  },
 ]
 
 /** What `screenshots.mjs` needs to know: one entry per file it is about to write. */

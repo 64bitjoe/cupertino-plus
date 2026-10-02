@@ -1,4 +1,5 @@
 import { CupertinoCardEditor } from '../../core/card-editor'
+import { PANEL_CONTAINER_FIELD, PANEL_DEFAULT_CONTAINER } from '../../core/container'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { ComplicationCardConfig } from './complication-card'
@@ -41,6 +42,7 @@ const FIELDS: readonly HaFormSchema[] = [
       },
     },
   },
+  PANEL_CONTAINER_FIELD,
 ]
 
 const LABELS: Record<string, string> = {
@@ -49,6 +51,7 @@ const LABELS: Record<string, string> = {
   min: 'Minimum',
   max: 'Maximum',
   color: 'Colour',
+  container: 'Background',
 }
 
 const HELPERS: Record<string, string> = {
@@ -91,7 +94,7 @@ class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCa
    * default. The first edit writes it through, which is what HA's own editors do.
    */
   protected override defaults(): Partial<ComplicationCardConfig> {
-    return { style: DEFAULT_STYLE }
+    return { style: DEFAULT_STYLE, container: PANEL_DEFAULT_CONTAINER }
   }
 
   protected override label(schema: HaFormSchema): string {

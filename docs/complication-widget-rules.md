@@ -263,3 +263,17 @@ Decided rather than known, each one edit away from being decided differently.
   priority order), which three already-reviewed tasks were built against holding. Worth
   reopening only as its own considered change, not as a patch bolted onto the end of this
   one.
+
+## 10. `container: glass | card`
+
+`card`, the default, is the theme's own card, as it has always been. `glass` (**Background:
+Glass** in the editor) is the library's glass from `tokens.ts`, the tile's translucent gradient,
+hairline and blur, drawn as a panel: the card keeps its shape, radius and inset, so `floorsFor`
+and `packFor` price exactly what they priced before. The rings, bars and tint-painted blocks
+are all drawn in the closed tint palette over a translucent track (`--cw-track`), and rendered
+over a navy and a pale wallpaper every face kept its readings and captions legible.
+
+`rectangular-bleed` is the face glass changes least: its tint fills the card edge to edge
+either way, so the choice shows only as the theme's border giving way to the glass hairline at
+the rounded corners. That is deliberate rather than an omission: a bleed face is a block of
+colour by design (§7), and making it translucent would be a different face.

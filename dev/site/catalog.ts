@@ -361,6 +361,7 @@ const complication: Widget = {
       })),
       initial: DEFAULT_ENTITY_SET,
     },
+    PANEL_CONTAINER,
   ],
 
   /**
@@ -377,7 +378,7 @@ const complication: Widget = {
   toConfig(args) {
     const rows = entitySet(readString(args, 'entities', DEFAULT_ENTITY_SET))
     const style = readString(args, 'style', DEFAULT_STYLE) as ComplicationStyle
-    return { entities: [...rows], style }
+    return { entities: [...rows], style, ...panelContainer(args) }
   },
 
   toFixture() {

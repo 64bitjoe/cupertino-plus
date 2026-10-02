@@ -1,6 +1,7 @@
 import { css, html, nothing, svg, type CSSResultGroup, type TemplateResult } from 'lit'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
+import { panelClass, type CardContainer } from '../../core/container'
 import { registerCard } from '../../core/register'
 import { RING_BOX, RING_CIRCUMFERENCE, RING_RADIUS, RING_STROKE } from '../../core/ring'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
@@ -41,6 +42,11 @@ export interface ComplicationCardConfig extends CupertinoCardConfig {
   max?: number
   /** Card-level tint override, beneath a row's own `color`. See `tint.ts`. */
   color?: TintName
+  /**
+   * `glass` or, absent, the theme's `card`; see `core/container.ts`. The bleed face fills the
+   * card with its own tint either way, so on it the choice shows only at the corners.
+   */
+  container?: CardContainer
 }
 
 /** Not localised: HA has no string for it, and the library's own words are its own. */
@@ -777,7 +783,9 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
     const items = readComplications(this.hass, this._config.entities, this._defaults)
 
     if (items.length === 0) {
-      return html`<ha-card><div class="empty">${NO_ENTITIES}</div></ha-card>`
+      return html`<ha-card class=${panelClass(this._config.container)}
+        ><div class="empty">${NO_ENTITIES}</div></ha-card
+      >`
     }
 
     const pack = packFor(
@@ -794,7 +802,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
     const ring = `calc(${pack.ring}px * var(--cw-scale))`
 
     return html`
-      <ha-card class=${style}>
+      <ha-card class="${style} ${panelClass(this._config.container)}">
         <div
           class="grid ${style}"
           style=${`--cw-comp-columns:${pack.columns}; --cw-comp-ring:${ring}`}

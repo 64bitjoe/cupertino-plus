@@ -43,7 +43,7 @@ export interface ComplicationCardConfig extends CupertinoCardConfig {
   /** Card-level tint override, beneath a row's own `color`. See `tint.ts`. */
   color?: TintName
   /**
-   * `glass` or, absent, the theme's `card`; see `core/container.ts`. The bleed face fills the
+   * `glass`, the default, or the theme's `card`; see `core/container.ts`. The bleed face fills the
    * card with its own tint either way, so on it the choice shows only at the corners.
    */
   container?: CardContainer

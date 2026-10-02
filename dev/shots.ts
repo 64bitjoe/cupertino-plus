@@ -130,9 +130,9 @@ interface Shot {
   theme: 'light' | 'dark'
   /**
    * A wallpaper behind the card instead of the theme's flat dashboard colour, for the
-   * `container: glass` shots and only for them. Glass over one flat colour photographs as a
-   * slightly different flat colour, which is a picture of nothing; the gradient is what lets
-   * the README show that the panel is translucent. See `.frame.wallpaper` in `shots.css`.
+   * `*-glass` shots and only for them. Every card is glass by default now, but glass over one
+   * flat colour photographs as a slightly different flat colour, which is a picture of
+   * nothing; the gradient is what lets the README show that the panel is translucent. See `.frame.wallpaper` in `shots.css`.
    */
   wallpaper?: boolean
 }
@@ -451,9 +451,9 @@ const SHOTS: readonly Shot[] = [
   // position, which the camera crops as a line of grey page along one edge of each PNG.
   {
     name: 'calendar-glass',
-    caption: 'container: glass, the translucent panel the chips and tiles use, on a wallpaper',
+    caption: 'glass, the default: the translucent panel the chips and tiles use, on a wallpaper',
     tag: CALENDAR_CARD_TAG,
-    config: { ...calendarShot('default'), container: 'glass' },
+    config: calendarShot('default'),
     columns: 12,
     rows: 4,
     theme: 'dark',
@@ -461,10 +461,9 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'battery-glass',
-    caption:
-      'container: glass on a light wallpaper; the charging notch is cut through to the glass',
+    caption: 'glass on a light wallpaper; the charging notch is cut through to the glass',
     tag: BATTERY_CARD_TAG,
-    config: { ...batteryShot('four'), container: 'glass' },
+    config: batteryShot('four'),
     columns: 12,
     rows: 4,
     theme: 'light',
@@ -472,15 +471,12 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'complication-glass',
-    caption: 'container: glass: four circular complications on a translucent panel',
+    caption: 'glass: four circular complications on a translucent panel',
     tag: COMPLICATION_CARD_TAG,
-    config: {
-      ...complicationShot(
-        [LOUNGE_TEMPERATURE, LOUNGE_HUMIDITY, WATER_TANK, PHONE_BATTERY],
-        'circular',
-      ),
-      container: 'glass',
-    },
+    config: complicationShot(
+      [LOUNGE_TEMPERATURE, LOUNGE_HUMIDITY, WATER_TANK, PHONE_BATTERY],
+      'circular',
+    ),
     columns: 12,
     rows: 4,
     theme: 'dark',
@@ -488,9 +484,9 @@ const SHOTS: readonly Shot[] = [
   },
   {
     name: 'weather-glass',
-    caption: 'container: glass on a light wallpaper',
+    caption: 'glass on a light wallpaper',
     tag: WEATHER_CARD_TAG,
-    config: { ...weatherShot(WEATHER_HOME), container: 'glass' },
+    config: weatherShot(WEATHER_HOME),
     columns: 12,
     rows: 4,
     theme: 'light',

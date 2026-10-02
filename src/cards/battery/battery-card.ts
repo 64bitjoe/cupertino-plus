@@ -24,7 +24,7 @@ export interface BatteryCardConfig extends CupertinoCardConfig {
    * before it can draw anything.
    */
   entities?: (string | BatteryDeviceConfig)[]
-  /** `glass` or, absent, the theme's `card`; see `core/container.ts`. */
+  /** `glass`, the default, or the theme's `card`; see `core/container.ts`. */
   container?: CardContainer
 }
 

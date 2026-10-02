@@ -292,12 +292,13 @@ Decided rather than known, each one edit away from being decided differently.
 
 ## 10. `container: glass | card`
 
-`card`, the default, is the theme's own card, as it has always been. `glass` (**Background:
-Glass** in the editor) is the library's glass from `tokens.ts`, the same translucent gradient,
+`glass`, the default (**Background: Glass** in the editor), as on every card in the library
+(calendar §11 has why), is the library's glass from `tokens.ts`, the same translucent gradient,
 hairline and blur as a glass tile, drawn as a panel: shape, radius, inset and grid arithmetic
 are untouched. The track (`--cw-track`) is translucent already, so on glass it lets the
 wallpaper through like the panel does, and the green arc and the label-coloured glyph and
-caption read on both a navy and a pale wallpaper.
+caption read on both a navy and a pale wallpaper. `card` is the theme's own card, which is
+what this card drew before the default changed.
 
 The one thing glass changes is the charging badge. Its disc is filled with `--cw-surface` to cut
 a notch out of the arc behind the bolt (`CHARGING_BADGE` in `battery-card.ts`), and on glass there

@@ -199,19 +199,19 @@ const DATA_OPTIONS = [
 
 /**
  * The four panel cards' **Background** select, one control rather than four copies, for the
- * reason `PANEL_CONTAINER_FIELD` is one editor row. Card first, because it is the default and
- * the reading every existing dashboard has.
+ * reason `PANEL_CONTAINER_FIELD` is one editor row. Glass first, because it is the default and
+ * the reading the chips and tiles beside it have.
  */
 const PANEL_CONTAINER: Control = {
   kind: 'select',
   name: 'container',
   label: 'Background',
   description:
-    'Card is your theme’s surface; glass is the translucent panel the chips and tiles use.',
+    'Glass is the translucent panel the chips and tiles use; card is your theme’s surface.',
   group: 'card',
   options: [
-    { value: 'card', label: 'Card' },
     { value: 'glass', label: 'Glass' },
+    { value: 'card', label: 'Card' },
   ],
   initial: PANEL_DEFAULT_CONTAINER,
 }

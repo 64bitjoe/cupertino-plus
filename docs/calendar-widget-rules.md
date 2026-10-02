@@ -532,11 +532,17 @@ drawn inside, and nothing beyond the next heading.
 
 ## 11. `container: glass | card`
 
-`card`, the default, is the theme's own card, which is what this card has always drawn: nobody's
-dashboard changes colour on upgrade. `glass` (**Background: Glass** in the editor) is the
-library's glass (`--cw-glass-fill`, `--cw-glass-ring` and `--cw-glass-filter` in `tokens.ts`),
-the same translucent gradient, even hairline and blur as a glass tile, so a calendar beside a
-column of glass chips and tiles reads as one material rather than as the one opaque card in it.
+`glass`, the default (**Background: Glass** in the editor), is the library's glass
+(`--cw-glass-fill`, `--cw-glass-ring` and `--cw-glass-filter` in `tokens.ts`), the same
+translucent gradient, even hairline and blur as a glass tile, so a calendar beside a column of
+glass chips and tiles reads as one material rather than as the one opaque card in it. `card` is
+the theme's own card.
+
+The default was `card` when the option shipped, on the argument that nobody's dashboard should
+change colour on upgrade. The first dashboard to meet it was exactly the one that argument
+missed: a calendar with no `container` key, drawn as the one greyer, opaque panel in a column of
+glass chips and tiles, and a user asking for the cards to be unified. Every card in the library
+now defaults to glass, and `container: card` is the way back to the theme's surface.
 
 It is a translucent _panel_, not the chips card's "no background": the card keeps its shape,
 its radius and its 16-unit inset, and the row budget is untouched, because the content is one

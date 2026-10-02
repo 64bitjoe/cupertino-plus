@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CARD_CONTAINERS, containerFor, panelClass } from './container'
+import { CARD_CONTAINERS, PANEL_DEFAULT_CONTAINER, containerFor, panelClass } from './container'
 
 describe('containerFor', () => {
   it('reads either container through', () => {
@@ -9,7 +9,8 @@ describe('containerFor', () => {
   })
 
   it('falls back to the card’s own default when the key is absent', () => {
-    // Each card keeps its own default: glass for chips and tiles, card for the four panels.
+    // The vocabulary still takes the fallback as an argument, even though every card now passes
+    // glass: a card that wants the other reading says so here rather than in a second helper.
     expect(containerFor(undefined, 'glass')).toBe('glass')
     expect(containerFor(undefined, 'card')).toBe('card')
   })
@@ -26,13 +27,21 @@ describe('containerFor', () => {
 })
 
 describe('panelClass', () => {
-  it('is cw-glass only when a panel card asks for glass outright', () => {
-    expect(panelClass('glass')).toBe('cw-glass')
+  it('is nothing only when a panel card asks for its theme’s card outright', () => {
+    expect(panelClass('card')).toBe('')
   })
 
-  it('is nothing for card, for an absent key, and for anything unreadable: panels default to card', () => {
-    expect(panelClass('card')).toBe('')
-    expect(panelClass(undefined)).toBe('')
-    expect(panelClass('frosted')).toBe('')
+  it('is cw-glass for glass, for an absent key, and for anything unreadable: panels default to glass', () => {
+    // A contract change in feedback round 4: the panels defaulted to card until a calendar
+    // with no container key sat as the one opaque card among glass chips and tiles.
+    expect(panelClass('glass')).toBe('cw-glass')
+    expect(panelClass(undefined)).toBe('cw-glass')
+    expect(panelClass('frosted')).toBe('cw-glass')
+  })
+})
+
+describe('PANEL_DEFAULT_CONTAINER', () => {
+  it('is glass, the default chips and tiles already have, so every card matches out of the box', () => {
+    expect(PANEL_DEFAULT_CONTAINER).toBe('glass')
   })
 })

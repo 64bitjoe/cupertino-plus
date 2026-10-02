@@ -198,11 +198,12 @@ The six types, if you do want to paste config:
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.
 
-And every card takes `container` (**Background** in the editor). The chips and tiles cards
-default to `glass`, floating on the dashboard. The calendar, battery, complication and weather
-cards default to `card`, your theme's own card, exactly as before; set `container: glass` and
-they draw the same translucent glass as a tile, as a panel with its inset intact, so a column
-mixing them reads as one material.
+And every card takes `container` (**Background** in the editor), and every card defaults to
+`glass`, so a dashboard of them reads as one material out of the box. The chips and tiles float
+on the dashboard; the calendar, battery, complication and weather cards draw the same
+translucent glass as a tile, as a panel with its inset intact. Set `container: card` on any of
+them for your theme's own card instead, which is what the four panel cards drew by default up
+to v1.16.
 
 <p align="center">
   <img src="docs/images/calendar-glass.png" width="420"

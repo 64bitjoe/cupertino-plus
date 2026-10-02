@@ -30,7 +30,7 @@ export interface WeatherCardConfig extends CupertinoCardConfig {
    * a worse guess than asking.
    */
   entity?: string
-  /** `glass` or, absent, the theme's `card`; see `core/container.ts`. */
+  /** `glass`, the default, or the theme's `card`; see `core/container.ts`. */
   container?: CardContainer
 }
 

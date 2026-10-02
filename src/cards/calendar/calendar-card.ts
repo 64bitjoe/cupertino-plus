@@ -52,9 +52,9 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
    */
   time_format?: TimeFormatOption
   /**
-   * `glass` for the library's translucent panel, the one the chips and tiles cards float on the
-   * dashboard; absent or `card` for the theme's own card, which is what the card always drew.
-   * See `core/container.ts`.
+   * `glass`, or absent, for the library's translucent panel, the one the chips and tiles cards
+   * float on the dashboard; `card` for the theme's own card, which is what the card drew before
+   * every card defaulted to glass. See `core/container.ts`.
    */
   container?: CardContainer
   /**

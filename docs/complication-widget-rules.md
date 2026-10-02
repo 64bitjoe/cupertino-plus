@@ -266,12 +266,13 @@ Decided rather than known, each one edit away from being decided differently.
 
 ## 10. `container: glass | card`
 
-`card`, the default, is the theme's own card, as it has always been. `glass` (**Background:
-Glass** in the editor) is the library's glass from `tokens.ts`, the tile's translucent gradient,
+`glass`, the default (**Background: Glass** in the editor), as on every card in the library
+(calendar §11 has why), is the library's glass from `tokens.ts`, the tile's translucent gradient,
 hairline and blur, drawn as a panel: the card keeps its shape, radius and inset, so `floorsFor`
 and `packFor` price exactly what they priced before. The rings, bars and tint-painted blocks
 are all drawn in the closed tint palette over a translucent track (`--cw-track`), and rendered
-over a navy and a pale wallpaper every face kept its readings and captions legible.
+over a navy and a pale wallpaper every face kept its readings and captions legible. `card` is
+the theme's own card, which is what this card drew before the default changed.
 
 `rectangular-bleed` is the face glass changes least: its tint fills the card edge to edge
 either way, so the choice shows only as the theme's border giving way to the glass hairline at

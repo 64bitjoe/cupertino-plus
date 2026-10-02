@@ -135,10 +135,11 @@ line of code inside it.
 
 ## 7. `container: glass | card`
 
-`card`, the default, is the theme's own card, as it has always been. `glass` (**Background:
-Glass** in the editor) is the library's glass from `tokens.ts`, the tile's translucent gradient,
+`glass`, the default (**Background: Glass** in the editor), as on every card in the library
+(calendar §11 has why), is the library's glass from `tokens.ts`, the tile's translucent gradient,
 hairline and blur, drawn as a panel: shape, radius, inset and `packFor`'s arithmetic are
 untouched, and every `ha-card` the card draws takes it, the not-configured state included.
+`card` is the theme's own card, which is what this card drew before the default changed.
 
 Rendered medium and large over a navy and a pale wallpaper, the reading, the hourly strip and
 the daily rows stay legible, and the range bars' track is translucent already. Today's dot keeps

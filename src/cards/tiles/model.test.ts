@@ -120,9 +120,28 @@ describe('a tile with no entity', () => {
     })
   })
 
-  /** §5: the state line is a dash rather than absent, so the grid stays regular. */
-  it('draws a dash for its state line rather than collapsing', () => {
-    expect(readTiles(hassWith(), [{ name: 'Scenes' }], {})[0]?.value).toBe('—')
+  /**
+   * §5: nothing for its state line, not a dash. A dash is what a tile that is not reporting
+   * shows, and a navigation tile has nothing to report; the element keeps the line's height.
+   */
+  it('reads an empty state line rather than a dash', () => {
+    expect(readTiles(hassWith(), [{ name: 'Scenes' }], {})[0]?.value).toBe('')
+  })
+
+  it('reads an empty state line when its value template renders nothing', () => {
+    const [tile] = readTiles(hassWith(), [{ name: 'Scenes', value: '{{ x }}' }], {}, () => '')
+    expect(tile?.value).toBe('')
+  })
+
+  it('still draws a value it was given', () => {
+    expect(readTiles(hassWith(), [{ name: 'Garage', value: 'All Closed' }], {})[0]?.value).toBe(
+      'All Closed',
+    )
+  })
+
+  /** The dash keeps its one meaning: an entity that is not reporting. */
+  it('leaves the dash to an entity tile that is not reporting', () => {
+    expect(readTile(hassWith(), { entity: 'cover.gone' }).value).toBe('—')
   })
 
   /** A literal empty `value:` is not a template result, but it must read as "no override" too. */
@@ -131,7 +150,7 @@ describe('a tile with no entity', () => {
     const [bareTile] = readTiles(hassWith(GARAGE), ['cover.garage'], {})
     expect(entityTile?.value).toBe(bareTile?.value)
     expect(entityTile?.value).not.toBe('')
-    expect(readTiles(hassWith(), [{ name: 'Scenes', value: '' }], {})[0]?.value).toBe('—')
+    expect(readTiles(hassWith(), [{ name: 'Scenes', value: '' }], {})[0]?.value).toBe('')
   })
 
   it('defaults its press to doing nothing, not more-info', () => {

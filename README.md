@@ -167,7 +167,8 @@ tiles sit at the top of the taller box.
 </p>
 
 A tile does not need an entity: with a name, an icon and a `navigate` press it is a shortcut
-to another view, and draws a dash where the state would be. Name, icon, colour, state and
+to another view, and leaves its state line empty (a dash there is kept for an entity that is
+not reporting). Name, icon, colour, state and
 visibility can each be a template. A press opens more-info by default on a tile with an
 entity (one without defaults to no action), and per tile can
 toggle, navigate, call a service, or do nothing.

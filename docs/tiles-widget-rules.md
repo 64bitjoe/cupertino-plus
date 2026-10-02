@@ -28,7 +28,7 @@ where the two disagree, this document describes what shipped.
   name: string,         // drawn, unlike a chip's name in two of its three modes
   icon: string,         // an `mdi:` name; `mdi:apps` when nothing says otherwise
   picture: string | undefined, // an entity_picture, drawn in the glyph's place
-  value: string,        // the state line; an em dash for nothing to read
+  value: string,        // the state line; an em dash for not reporting, '' for §4 with none
   color: string | undefined,   // a resolved CSS value: the glyph, and a wash (§3a)
   unavailable: boolean,
   visible: boolean,     // whether the tile is drawn at all
@@ -221,19 +221,28 @@ with a name and an icon has plenty to draw. There is no spacer concept at all; a
 tiles that already share their row has no use for one. Its default press is `none`, for the
 chips card's reason: there is nothing to open.
 
-## 5. The state line, and its dash
+## 5. The state line, and when it is a dash
 
 `value` is the entity's formatted state through `core/entity-view.ts`, so a tile, a chip and a
 complication never disagree about what a thermostat reads, unless a `value` template replaces
 it.
 
-**When there is nothing to read the line is an em dash**, and that is a real case here rather
-than an edge: a navigation tile has no state, and the cards being replaced draw exactly that
-(`Climate –`, `Scenes –`). An entity-less tile whose `value` is absent or resolves empty draws
-the dash, and so does an unavailable entity. An entity tile whose `value` template is empty,
-or not yet answered, falls back to the entity's formatted state instead. Either way the third
-line is never blank, which is what keeps the grid regular: a grid in which some tiles have a
-third line and some do not is ragged where a row of chips was not.
+**The dash means "not reporting", and nothing else.** A missing or `unavailable` entity draws
+an em dash, beside the 55% dim, and that pair is the one signal the card has for a tile whose
+reading cannot be trusted.
+
+**A navigation tile with no `value` draws an empty line.** Up to v1.15.0 it drew the dash too,
+copying the cards being replaced (`Climate –`, `Scenes –`), on the grounds that a blank line
+would make the grid ragged. On a live dashboard it read the other way: a column of Climate,
+Scenes and Cats shortcuts under a Garage reading `All Closed` looked like three broken tiles,
+because the dash already meant "not reporting" two lines up this section. So an entity-less
+tile whose `value` is absent or resolves empty now reads `''`, and the element draws a
+no-break space in its place: the line keeps its height, so every name in a row still sits on
+one baseline and the grid stays exactly as regular as the dash kept it, without the ink. Its
+accessible name is the tile's name alone, with no dash and no stray comma.
+
+An entity tile whose `value` template is empty, or not yet answered, still falls back to the
+entity's formatted state; only a tile with no entity can have nothing to say.
 
 ## 6. The press, and the container
 

@@ -565,7 +565,7 @@ class CupertinoTilesList extends LitElement {
   }
 
   /**
-   * A tile with nothing selected: a navigation tile, drawn with a dash for its reading. Opened
+   * A tile with nothing selected: a navigation tile, drawn with an empty state line. Opened
    * straight into template mode (`_templating`'s own note has why) and expanded immediately,
    * for the same reason `_addTile` opens an entity-bearing tile's panel: the row just added is
    * the one somebody is most likely about to fill in.

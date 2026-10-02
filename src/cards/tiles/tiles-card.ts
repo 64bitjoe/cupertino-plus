@@ -44,6 +44,15 @@ export interface TilesCardConfig extends CupertinoCardConfig {
 const NO_TILES = 'No Tiles'
 
 /**
+ * What an empty state line draws: a no-break space, so the line keeps its line box and a tile
+ * with nothing to say under its name stays aligned with its neighbour that has. The tile spaces
+ * glyph and text apart with space-between, so a line that collapsed would drop the name to the
+ * bottom edge, a few pixels below every other name in the row. Not part of the accessible name:
+ * `_renderTile` builds that from `tile.value`, where it is empty and filtered out.
+ */
+const NO_STATE = '\u00a0'
+
+/**
  * A wrapping grid of tiles that share each row equally, each one glyph, a name and a state
  * line, and a tap action. The chips card's sibling: `model.ts` reads the entities, `layout.ts`
  * prices the floor, and this class draws the answer and owns the glass/card container split.
@@ -508,7 +517,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         }
         <div class="text">
           <div class="name">${tile.name}</div>
-          <div class="state">${tile.value}</div>
+          <div class="state">${tile.value || NO_STATE}</div>
         </div>
       </div>
     `

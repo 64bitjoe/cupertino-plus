@@ -53,6 +53,10 @@ export interface TileView {
   name: string
   icon: string
   picture: string | undefined
+  /**
+   * The state line. `—` only for an entity that is missing or not reporting; `''` for a tile
+   * with no entity and no value, which draws an empty line of the same height (see `readTile`).
+   */
   value: string
   color: string | undefined
   unavailable: boolean
@@ -176,15 +180,21 @@ export const readTile = (
   const configured = (): string | undefined =>
     colorValue(field(row.color, row.entity) ?? field(defaults.color, undefined))
 
-  // A navigation tile: it draws what it was given, and a dash where the state would be so the
-  // grid stays regular.
+  // A navigation tile: it draws what it was given, and an empty state line where it was given
+  // no value. Not a dash, which it used to be so the grid stayed regular: the element now keeps
+  // the line's height whether or not it holds anything, so regularity costs no ink. And the dash
+  // has a job of its own two branches down, where an entity is missing or unavailable: there it
+  // is the "not reporting" mark, beside the dim. On a tile with no entity there is nothing to
+  // report, so the same mark there said something untrue, and a user with a column of Climate,
+  // Scenes and Cats shortcuts read it as three broken tiles. That is why only this branch
+  // changes.
   if (row.entity === undefined) {
     return {
       entityId: undefined,
       name: name ?? '',
       icon: icon ?? TILE_FALLBACK_ICON,
       picture: undefined,
-      value: value() ?? VALUE_DASH,
+      value: value() ?? '',
       color: configured(),
       unavailable: false,
       visible,

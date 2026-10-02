@@ -1,4 +1,5 @@
 import { CupertinoCardEditor } from '../../core/card-editor'
+import { PANEL_CONTAINER_FIELD, PANEL_DEFAULT_CONTAINER } from '../../core/container'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { WeatherCardConfig } from './weather-card'
@@ -6,7 +7,8 @@ import type { WeatherCardConfig } from './weather-card'
 export const WEATHER_EDITOR_TAG = 'cupertino-plus-weather-editor'
 
 /**
- * One row, plus the scale every card in the library shares.
+ * Two rows, plus the scale every card in the library shares: the entity, and **Background**,
+ * which is about the dashboard behind the card rather than about the weather.
  *
  * There is nothing else to ask. The location, the units, the condition words, the glyphs
  * and the forecast all come off the entity, and the footprint belongs to the Layout tab.
@@ -19,9 +21,10 @@ const FIELDS: readonly HaFormSchema[] = [
     selector: { entity: { filter: { domain: 'weather' } } },
     required: true,
   },
+  PANEL_CONTAINER_FIELD,
 ]
 
-const LABELS: Record<string, string> = { entity: 'Weather entity' }
+const LABELS: Record<string, string> = { entity: 'Weather entity', container: 'Background' }
 
 const HELPERS: Record<string, string> = {
   entity: 'Everything else — the place, the units, the forecast — comes from this entity.',
@@ -30,15 +33,19 @@ const HELPERS: Record<string, string> = {
 /**
  * The weather card's visual editor.
  *
- * One row of the card's own — which entity — plus the library-wide **Scale** the base
- * class appends. Nothing else: unlike the complication or battery cards, this card has no
- * per-row overrides to round-trip and no field whose absence would render as a broken
- * empty control, so it needs neither `defaults()` nor `toForm`/`fromForm` — `fields()`,
- * `label()` and `helper()` are the whole of what this class adds to `CupertinoCardEditor`.
+ * Two rows of the card's own — which entity, and which background — plus the library-wide
+ * **Scale** the base class appends. Unlike the complication or battery cards, this card has
+ * no per-row overrides to round-trip, so it needs no `toForm`/`fromForm`; `defaults()` is
+ * here only so the Background dropdown shows `card` rather than an empty control that reads
+ * as broken.
  */
 class CupertinoWeatherCardEditor extends CupertinoCardEditor<WeatherCardConfig> {
   protected override fields(): readonly HaFormSchema[] {
     return FIELDS
+  }
+
+  protected override defaults(): Partial<WeatherCardConfig> {
+    return { container: PANEL_DEFAULT_CONTAINER }
   }
 
   protected override label(schema: HaFormSchema): string {

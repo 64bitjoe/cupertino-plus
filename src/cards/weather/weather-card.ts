@@ -9,6 +9,7 @@ import {
 import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
+import { panelClass, type CardContainer } from '../../core/container'
 import { registerCard } from '../../core/register'
 import type { LovelaceCardEditor } from '../../core/types/ha'
 import { packFor, spanFor, weekRange, type Span } from './layout'
@@ -29,6 +30,8 @@ export interface WeatherCardConfig extends CupertinoCardConfig {
    * a worse guess than asking.
    */
   entity?: string
+  /** `glass` or, absent, the theme's `card`; see `core/container.ts`. */
+  container?: CardContainer
 }
 
 /**
@@ -675,10 +678,16 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
     if (!this._config || !this.hass) return nothing
 
     const entityId = this._config.entity
-    if (!entityId) return html`<ha-card><div class="empty">${NO_ENTITY}</div></ha-card>`
+    if (!entityId)
+      return html`<ha-card class=${panelClass(this._config.container)}
+        ><div class="empty">${NO_ENTITY}</div></ha-card
+      >`
 
     const view = readWeather(this.hass, entityId, this._daily, this._hourly)
-    if (!view) return html`<ha-card><div class="empty">${NO_ENTITY}</div></ha-card>`
+    if (!view)
+      return html`<ha-card class=${panelClass(this._config.container)}
+        ><div class="empty">${NO_ENTITY}</div></ha-card
+      >`
 
     // `medium` and `large` share the header block and the hourly strip; only `large`
     // grows the daily list underneath them, the same two-way split `calendar-card.ts`'s
@@ -703,7 +712,7 @@ class CupertinoWeatherCard extends CupertinoCard<WeatherCardConfig> {
     }`
 
     return html`
-      <ha-card>
+      <ha-card class=${panelClass(this._config.container)}>
         <div
           class="widget cw-pressable"
           role="button"

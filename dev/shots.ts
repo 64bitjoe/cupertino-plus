@@ -486,6 +486,16 @@ const SHOTS: readonly Shot[] = [
     theme: 'dark',
     wallpaper: true,
   },
+  {
+    name: 'weather-glass',
+    caption: 'container: glass on a light wallpaper',
+    tag: WEATHER_CARD_TAG,
+    config: { ...weatherShot(WEATHER_HOME), container: 'glass' },
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+    wallpaper: true,
+  },
 ]
 
 /** What `screenshots.mjs` needs to know: one entry per file it is about to write. */

@@ -132,3 +132,16 @@ level the way `forecast` was standardised into `weather/subscribe_forecast` — 
 would mean picking one integration's shape to support and leaving every other installation
 without it, which is a different kind of feature than the rest of this card, not a missing
 line of code inside it.
+
+## 7. `container: glass | card`
+
+`card`, the default, is the theme's own card, as it has always been. `glass` (**Background:
+Glass** in the editor) is the library's glass from `tokens.ts`, the tile's translucent gradient,
+hairline and blur, drawn as a panel: shape, radius, inset and `packFor`'s arithmetic are
+untouched, and every `ha-card` the card draws takes it, the not-configured state included.
+
+Rendered medium and large over a navy and a pale wallpaper, the reading, the hourly strip and
+the daily rows stay legible, and the range bars' track is translucent already. Today's dot keeps
+its `--cw-surface` border on glass: there it reads as a dark (or white) ring around the dot
+rather than as a cut-out, which is the job the border does, separating the dot from the bar
+under it, so it is left alone rather than given the battery badge's mask.

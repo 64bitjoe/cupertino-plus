@@ -197,6 +197,17 @@ The six types, if you do want to paste config:
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.
 
+And every card takes `container` (**Background** in the editor). The chips and tiles cards
+default to `glass`, floating on the dashboard. The calendar, battery, complication and weather
+cards default to `card`, your theme's own card, exactly as before; set `container: glass` and
+they draw the same translucent glass as a tile, as a panel with its inset intact, so a column
+mixing them reads as one material.
+
+<p align="center">
+  <img src="docs/images/calendar-glass.png" width="420"
+       alt="The calendar card drawn as translucent glass over a navy wallpaper: Friday the 24th, four events and a two-more-events line">
+</p>
+
 ## Development
 
 `pnpm install && pnpm dev` serves the showcase — every card against a mock Home Assistant,

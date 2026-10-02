@@ -418,6 +418,7 @@ const weather: Widget = {
       })),
       initial: DEFAULT_WEATHER_SET,
     },
+    PANEL_CONTAINER,
   ],
 
   /**
@@ -428,7 +429,10 @@ const weather: Widget = {
    * mock installation's, which is the one thing a visitor has to substitute for their own.
    */
   toConfig(args) {
-    return { entity: weatherEntity(readString(args, 'set', DEFAULT_WEATHER_SET)) }
+    return {
+      entity: weatherEntity(readString(args, 'set', DEFAULT_WEATHER_SET)),
+      ...panelContainer(args),
+    }
   },
 
   toFixture() {

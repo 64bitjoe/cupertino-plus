@@ -296,6 +296,7 @@ const battery: Widget = {
       })),
       initial: DEFAULT_DEVICE_SET,
     },
+    PANEL_CONTAINER,
   ],
 
   /**
@@ -308,7 +309,7 @@ const battery: Widget = {
    */
   toConfig(args) {
     const rows = deviceSet(readString(args, 'devices', DEFAULT_DEVICE_SET))
-    return rows.length > 0 ? { entities: [...rows] } : {}
+    return { ...(rows.length > 0 ? { entities: [...rows] } : {}), ...panelContainer(args) }
   },
 
   toFixture() {

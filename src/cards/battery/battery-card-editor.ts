@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from 'lit'
 
 import { CupertinoCardEditor } from '../../core/card-editor'
+import { PANEL_CONTAINER_FIELD, PANEL_DEFAULT_CONTAINER } from '../../core/container'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { BatteryCardConfig } from './battery-card'
@@ -15,8 +16,8 @@ export const BATTERY_EDITOR_TAG = 'cupertino-plus-battery-editor'
 /**
  * The battery card's visual editor: the device list, then the **Scale** every card shares.
  *
- * There is no `ha-form` row of this card's own, and that is the point of it. The one question
- * it asks, which devices and what to draw for each, is a list whose rows are each a small
+ * There is one `ha-form` row of this card's own, **Background**, and it is about paint. The one
+ * question about content, which devices and what to draw for each, is a list whose rows are each a small
  * config, so it is a control rather than a field: `device-list-editor.ts` draws it, and the
  * long note there says why an entity picker and a stack of form panels could not.
  *
@@ -26,10 +27,20 @@ export const BATTERY_EDITOR_TAG = 'cupertino-plus-battery-editor'
  */
 class CupertinoBatteryCardEditor extends CupertinoCardEditor<BatteryCardConfig> {
   /**
-   * None. `schema()` still appends **Scale**, so the form below the list is that one row.
+   * One: **Background**, glass or the theme's card (`core/container.ts`). `schema()` still
+   * appends **Scale** after it, so the form below the list is those two rows.
    */
   protected override fields(): readonly HaFormSchema[] {
-    return []
+    return [PANEL_CONTAINER_FIELD]
+  }
+
+  /** Shown rather than blank, as every other dropdown in the library is. */
+  protected override defaults(): Partial<BatteryCardConfig> {
+    return { container: PANEL_DEFAULT_CONTAINER }
+  }
+
+  protected override label(schema: HaFormSchema): string {
+    return schema.name === 'container' ? 'Background' : super.label(schema)
   }
 
   /**

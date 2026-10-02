@@ -289,3 +289,19 @@ Decided rather than known, each one edit away from being decided differently.
 - **A tap opens `more-info` for the device.** Per cell rather than per card, because the card
   has no single subject; six devices behind one dialog would have to pick one, and picking
   the first is a card that opens the wrong thing five times out of six.
+
+## 10. `container: glass | card`
+
+`card`, the default, is the theme's own card, as it has always been. `glass` (**Background:
+Glass** in the editor) is the library's glass from `tokens.ts`, the same translucent gradient,
+hairline and blur as a glass tile, drawn as a panel: shape, radius, inset and grid arithmetic
+are untouched. The track (`--cw-track`) is translucent already, so on glass it lets the
+wallpaper through like the panel does, and the green arc and the label-coloured glyph and
+caption read on both a navy and a pale wallpaper.
+
+The one thing glass changes is the charging badge. Its disc is filled with `--cw-surface` to cut
+a notch out of the arc behind the bolt (`CHARGING_BADGE` in `battery-card.ts`), and on glass there
+is no opaque surface for it to match: rendered that way it was a coin of the theme's card
+colour sitting on the translucent panel. So on glass the notch is cut out of the gauge itself
+with a mask the disc's exact size and position, and the disc paints nothing. The arc still
+stops short of the bolt, and what shows through the notch is the glass.

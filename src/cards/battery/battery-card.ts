@@ -1,6 +1,7 @@
 import { css, html, nothing, svg, type CSSResultGroup, type TemplateResult } from 'lit'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
+import { panelClass, type CardContainer } from '../../core/container'
 import { registerCard } from '../../core/register'
 import type { LovelaceCardEditor } from '../../core/types/ha'
 import { BATTERY_EDITOR_TAG } from './battery-card-editor'
@@ -23,6 +24,8 @@ export interface BatteryCardConfig extends CupertinoCardConfig {
    * before it can draw anything.
    */
   entities?: (string | BatteryDeviceConfig)[]
+  /** `glass` or, absent, the theme's `card`; see `core/container.ts`. */
+  container?: CardContainer
 }
 
 /**
@@ -82,7 +85,7 @@ const BOLT = 'translate(12 12) scale(0.95) translate(-12.3 -12)'
  */
 const CHARGING_BADGE = html`
   <svg class="bolt" viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="12" cy="12" r="12" fill="var(--cw-surface)" />
+    <circle class="disc" cx="12" cy="12" r="12" fill="var(--cw-surface)" />
     <path d=${BOLT_PATH} transform=${BOLT} fill="var(--cw-green)" />
   </svg>
 `
@@ -199,6 +202,30 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
         transform: translate(-50%, -50%);
       }
 
+      /* On glass the disc cannot be the card's surface, because there is no opaque surface to
+         match: rendered that way it was a dark coin of the theme's card colour sitting on the
+         translucent panel. So glass punches the notch out of the gauge itself, with a mask the
+         disc's exact size and position (0.34 of the ring wide, so a radius of 0.17, centred
+         0.05 down), and the disc paints nothing: the arc still stops short of the bolt, which
+         is the whole job, and what shows through the notch is the glass. */
+      .cw-glass .ring.charging .gauge {
+        --cw-notch: calc(var(--cw-ring-size) * 0.17);
+        -webkit-mask-image: radial-gradient(
+          circle var(--cw-notch) at 50% calc(var(--cw-ring-size) * 0.05),
+          transparent calc(var(--cw-notch) - 0.5px),
+          #000 var(--cw-notch)
+        );
+        mask-image: radial-gradient(
+          circle var(--cw-notch) at 50% calc(var(--cw-ring-size) * 0.05),
+          transparent calc(var(--cw-notch) - 0.5px),
+          #000 var(--cw-notch)
+        );
+      }
+
+      .cw-glass .bolt .disc {
+        fill: none;
+      }
+
       /* 22px semibold, and it does not shrink for a three-digit reading, which is why
          layout.ts prices a captioned column against the width that reading needs. Tabular
          figures so the numeral does not shift between 9% and 90%. */
@@ -295,7 +322,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
     const centre = RING_BOX / 2
 
     return html`
-      <div class="ring">
+      <div class="ring ${device.charging ? 'charging' : ''}">
         <svg class="gauge" viewBox="0 0 ${RING_BOX} ${RING_BOX}" aria-hidden="true">
           <g transform="rotate(-90 ${centre} ${centre})">
             <circle
@@ -365,7 +392,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
 
     if (devices.length === 0) {
       return html`
-        <ha-card>
+        <ha-card class=${panelClass(this._config.container)}>
           <div class="widget"><div class="empty">${NO_DEVICES}</div></div>
         </ha-card>
       `
@@ -391,7 +418,7 @@ class CupertinoBatteryCard extends CupertinoCard<BatteryCardConfig> {
     const tail = grid.tail === 'center' ? 'center' : 'flex-start'
 
     return html`
-      <ha-card>
+      <ha-card class=${panelClass(this._config.container)}>
         <div class="widget" style=${`--cw-ring-size: calc(${grid.ring}px * var(--cw-scale))`}>
           <div class="grid">
             ${rows.map(

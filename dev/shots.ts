@@ -459,6 +459,17 @@ const SHOTS: readonly Shot[] = [
     theme: 'dark',
     wallpaper: true,
   },
+  {
+    name: 'battery-glass',
+    caption:
+      'container: glass on a light wallpaper; the charging notch is cut through to the glass',
+    tag: BATTERY_CARD_TAG,
+    config: { ...batteryShot('four'), container: 'glass' },
+    columns: 12,
+    rows: 4,
+    theme: 'light',
+    wallpaper: true,
+  },
 ]
 
 /** What `screenshots.mjs` needs to know: one entry per file it is about to write. */

@@ -42,6 +42,18 @@ body {
   background: var(--primary-background-color);
 }
 
+/* A dashboard with a background image, for the glass shots: glass is only visible as glass
+   against something that varies behind it. Two diagonal washes rather than a photograph, so
+   the PNG stays reproducible and small. The dark one is the navy of the dashboard the glass
+   option was asked for on. */
+.frame.wallpaper {
+  background: linear-gradient(135deg, #c9d8f0, #f1e4d3 55%, #d9cfe9);
+}
+
+.frame.wallpaper.theme-dark {
+  background: linear-gradient(135deg, #0d1230, #1d2550 55%, #0b0f24);
+}
+
 /* The box the sections grid would put the card in. The card measures this and picks its
    layout from it; nothing here tells it which one to draw.
 

@@ -1,4 +1,5 @@
 import { CupertinoCardEditor } from '../../core/card-editor'
+import { PANEL_CONTAINER_FIELD, PANEL_DEFAULT_CONTAINER } from '../../core/container'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { CalendarCardConfig } from './calendar-card'
@@ -18,7 +19,7 @@ const CALENDARS_KEY = 'ui.panel.lovelace.editor.card.calendar.calendar_entities'
 const TODO_LISTS_KEY = 'panel.todo'
 
 /**
- * Four rows of the card's own, and it took a detour to get here. (A fifth, **Scale**,
+ * Five rows of the card's own, and it took a detour to get here. (Another, **Scale**,
  * arrives from `CupertinoCardEditor`, since it belongs to every card in the library, not to
  * this one.)
  *
@@ -33,7 +34,10 @@ const TODO_LISTS_KEY = 'panel.todo'
  *
  * What remains is the questions the card cannot answer for itself: where its rows come
  * from, and which clock to print them on. The clock is here for a narrower reason than the
- * entities are. See `TIME_FORMAT_OPTIONS`.
+ * entities are. See `TIME_FORMAT_OPTIONS`. **Background** is last and the one question about
+ * paint rather than content: whether the card sits on the theme's surface or on the glass the
+ * chips and tiles cards use, which is a judgement about the dashboard behind it and so the
+ * user's (`core/container.ts`).
  */
 const CLOCK_LABELS: Record<string, string> = {
   system: 'System',
@@ -94,8 +98,8 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
    */
   protected override fields(): readonly HaFormSchema[] {
     return remindersEnabled(this._config?.show_reminders)
-      ? [CALENDARS_ROW, REMINDERS_ROW, TODO_LISTS_ROW, CLOCK_ROW]
-      : [CALENDARS_ROW, REMINDERS_ROW, CLOCK_ROW]
+      ? [CALENDARS_ROW, REMINDERS_ROW, TODO_LISTS_ROW, CLOCK_ROW, PANEL_CONTAINER_FIELD]
+      : [CALENDARS_ROW, REMINDERS_ROW, CLOCK_ROW, PANEL_CONTAINER_FIELD]
   }
 
   /**
@@ -104,7 +108,7 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
    * be saying the opposite of what the card is doing.
    */
   protected override defaults(): Partial<CalendarCardConfig> {
-    return { time_format: 'system', show_reminders: true }
+    return { time_format: 'system', show_reminders: true, container: PANEL_DEFAULT_CONTAINER }
   }
 
   /** The default branches hand the shared rows back to the base: see `CupertinoCardEditor`. */
@@ -118,6 +122,8 @@ class CupertinoCalendarCardEditor extends CupertinoCardEditor<CalendarCardConfig
         return this.hass?.localize(TODO_LISTS_KEY) || 'To-do lists'
       case 'time_format':
         return 'Clock'
+      case 'container':
+        return 'Background'
       default:
         return super.label(schema)
     }

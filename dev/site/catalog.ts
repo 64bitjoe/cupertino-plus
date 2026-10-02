@@ -38,6 +38,7 @@ import {
   type ComplicationStyle,
 } from '../../src/cards/complication/style'
 import { DEFAULT_FLOW, DEFAULT_WASH, flowFor, washFor } from '../../src/cards/tiles/model'
+import { PANEL_DEFAULT_CONTAINER, type CardContainer } from '../../src/core/container'
 import {
   BATTERY_CARD_TAG,
   CALENDAR_CARD_TAG,
@@ -196,6 +197,33 @@ const DATA_OPTIONS = [
   ...DEMO_SCENARIOS.map(key => ({ value: key, label: SCENARIO_LABELS[key] ?? titleCase(key) })),
 ]
 
+/**
+ * The four panel cards' **Background** select, one control rather than four copies, for the
+ * reason `PANEL_CONTAINER_FIELD` is one editor row. Card first, because it is the default and
+ * the reading every existing dashboard has.
+ */
+const PANEL_CONTAINER: Control = {
+  kind: 'select',
+  name: 'container',
+  label: 'Background',
+  description:
+    'Card is your theme’s surface; glass is the translucent panel the chips and tiles use.',
+  group: 'card',
+  options: [
+    { value: 'card', label: 'Card' },
+    { value: 'glass', label: 'Glass' },
+  ],
+  initial: PANEL_DEFAULT_CONTAINER,
+}
+
+/**
+ * Written at its default too, the rule `cardOptions` states for `scale`: a key that came and
+ * went as the select moved would shift the YAML above the control out from under the cursor.
+ */
+const panelContainer = (args: Args): { container: CardContainer } => ({
+  container: readString(args, 'container', PANEL_DEFAULT_CONTAINER) as CardContainer,
+})
+
 const calendar: Widget = {
   id: 'calendar',
   name: 'Calendar',
@@ -213,6 +241,7 @@ const calendar: Widget = {
       options: DATA_OPTIONS,
       initial: DEFAULT_DEMO_SCENARIO,
     },
+    PANEL_CONTAINER,
   ],
 
   /**
@@ -222,7 +251,7 @@ const calendar: Widget = {
    */
   toConfig(args) {
     const entities = readList(args, 'entities')
-    return entities.length > 0 ? { entities: [...entities] } : {}
+    return { ...(entities.length > 0 ? { entities: [...entities] } : {}), ...panelContainer(args) }
   },
 
   toFixture(args) {

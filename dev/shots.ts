@@ -128,6 +128,13 @@ interface Shot {
    */
   rows: 2 | 3 | 4 | 8
   theme: 'light' | 'dark'
+  /**
+   * A wallpaper behind the card instead of the theme's flat dashboard colour, for the
+   * `container: glass` shots and only for them. Glass over one flat colour photographs as a
+   * slightly different flat colour, which is a picture of nothing; the gradient is what lets
+   * the README show that the panel is translucent. See `.frame.wallpaper` in `shots.css`.
+   */
+  wallpaper?: boolean
 }
 
 const calendarShot = (scenario: string): Partial<LovelaceCardConfig> => ({
@@ -439,6 +446,19 @@ const SHOTS: readonly Shot[] = [
     rows: 2,
     theme: 'light',
   },
+  // The glass shots go last, and any added later should too: the page is a wrapping row of
+  // frames, and a frame inserted mid-list moves every frame after it onto a half-pixel
+  // position, which the camera crops as a line of grey page along one edge of each PNG.
+  {
+    name: 'calendar-glass',
+    caption: 'container: glass, the translucent panel the chips and tiles use, on a wallpaper',
+    tag: CALENDAR_CARD_TAG,
+    config: { ...calendarShot('default'), container: 'glass' },
+    columns: 12,
+    rows: 4,
+    theme: 'dark',
+    wallpaper: true,
+  },
 ]
 
 /** What `screenshots.mjs` needs to know: one entry per file it is about to write. */
@@ -481,7 +501,7 @@ for (const shot of SHOTS) {
   figure.className = 'shot'
 
   const frame = document.createElement('div')
-  frame.className = `frame theme-${shot.theme}`
+  frame.className = `frame theme-${shot.theme}${shot.wallpaper ? ' wallpaper' : ''}`
   frame.id = `shot-${shot.name}`
   frame.style.setProperty('--shot-margin', `${SHOT_MARGIN}px`)
 

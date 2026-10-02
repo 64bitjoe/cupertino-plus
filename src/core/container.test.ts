@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CARD_CONTAINERS, containerFor } from './container'
+import { CARD_CONTAINERS, containerFor, panelClass } from './container'
 
 describe('containerFor', () => {
   it('reads either container through', () => {
@@ -22,5 +22,17 @@ describe('containerFor', () => {
 
   it('names exactly the two containers, in the order the editors list them', () => {
     expect(CARD_CONTAINERS).toEqual(['glass', 'card'])
+  })
+})
+
+describe('panelClass', () => {
+  it('is cw-glass only when a panel card asks for glass outright', () => {
+    expect(panelClass('glass')).toBe('cw-glass')
+  })
+
+  it('is nothing for card, for an absent key, and for anything unreadable: panels default to card', () => {
+    expect(panelClass('card')).toBe('')
+    expect(panelClass(undefined)).toBe('')
+    expect(panelClass('frosted')).toBe('')
   })
 })

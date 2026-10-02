@@ -529,3 +529,19 @@ the current answer is whichever keeps the rule simplest to state.
 
 How far `N` reaches used to be open here as well. It is settled: the section the row is
 drawn inside, and nothing beyond the next heading.
+
+## 11. `container: glass | card`
+
+`card`, the default, is the theme's own card, which is what this card has always drawn: nobody's
+dashboard changes colour on upgrade. `glass` (**Background: Glass** in the editor) is the
+library's glass (`--cw-glass-fill`, `--cw-glass-ring` and `--cw-glass-filter` in `tokens.ts`),
+the same translucent gradient, even hairline and blur as a glass tile, so a calendar beside a
+column of glass chips and tiles reads as one material rather than as the one opaque card in it.
+
+It is a translucent _panel_, not the chips card's "no background": the card keeps its shape,
+its radius and its 16-unit inset, and the row budget is untouched, because the content is one
+block that still needs an edge to sit inside. The event chips stay opaque. Their backgrounds
+are lightnesses of the calendar's own colour (§1) rather than tints over the surface, so they
+read the same on glass as on the card, and rendered on a navy wallpaper and a pale one every
+title, time, heading and the `2 more events` line kept its contrast. The theme's border and
+drop shadow are dropped on glass, the ring standing in for the border.

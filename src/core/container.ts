@@ -55,3 +55,11 @@ export const PANEL_CONTAINER_FIELD: HaFormSchema = {
 
 /** The four panel cards' default: what every dashboard drew before the option existed. */
 export const PANEL_DEFAULT_CONTAINER: CardContainer = 'card'
+
+/**
+ * The class a panel card puts on its `ha-card`: `cw-glass` for glass, nothing for its theme's
+ * card. Every `ha-card` the card renders takes it, the empty and not-configured states included,
+ * so a glass card does not flash opaque while it waits for an entity.
+ */
+export const panelClass = (raw: unknown): string =>
+  containerFor(raw, PANEL_DEFAULT_CONTAINER) === 'glass' ? 'cw-glass' : ''

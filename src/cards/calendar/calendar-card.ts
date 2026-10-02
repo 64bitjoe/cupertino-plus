@@ -10,6 +10,7 @@ import {
 import { state } from 'lit/decorators.js'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
+import { panelClass, type CardContainer } from '../../core/container'
 import { cwNavigate } from '../../core/navigate'
 import { registerCard } from '../../core/register'
 import type { HomeAssistant, LovelaceCardEditor } from '../../core/types/ha'
@@ -50,6 +51,12 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
    * having at all.
    */
   time_format?: TimeFormatOption
+  /**
+   * `glass` for the library's translucent panel, the one the chips and tiles cards float on the
+   * dashboard; absent or `card` for the theme's own card, which is what the card always drew.
+   * See `core/container.ts`.
+   */
+  container?: CardContainer
   /**
    * Which fixture from `demo-data.ts` to draw INSTEAD of the user's calendars.
    *
@@ -746,7 +753,7 @@ class CupertinoCalendarCard extends CupertinoCard<CalendarCardConfig> {
     // list of things to open is not itself one thing to open, and the whole surface dipping
     // under a finger aimed at one row was the card claiming otherwise.
     return html`
-      <ha-card>
+      <ha-card class=${panelClass(this._config?.container)}>
         <div class="widget">
           <div class="column">
             <div class="date">

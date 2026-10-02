@@ -202,6 +202,11 @@ third line and some do not is ragged where a row of chips was not.
 Both are the chips card's. `container: glass | card` means what it means there, including that
 glass is the default and insets by nothing in either direction. That was the fix that ended the chips sizing saga
 and is the thing most likely to be re-broken by writing a second card's padding from scratch.
+One departure: a glass tiles card does not clip. Every card's `ha-card` has `overflow: hidden`
+at the card's outer radius (22, or the theme's, 24 on a stock 2026 frontend), and with no inset
+the tiles in the card's corners met that clip. v1.14.0 drew those three corners at the card's
+wider curve with their ring cut away, and cut the focus ring along every outer edge. The card
+container keeps its clip; its inset keeps the tiles clear of it.
 The press is `core/actions.ts`: `more-info`, `toggle`, `navigate`, `call-service` and `none`,
 with the same rule that a tile set to `none` is not drawn as a button: no role, no tab stop, no
 pressed state.

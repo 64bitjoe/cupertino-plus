@@ -47,10 +47,23 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   static override styles: CSSResultGroup = [
     CupertinoCard.styles,
     css`
+      /* Glass also lets its tiles out, because ha-card clips (base-styles.ts gives every card
+         overflow: hidden and the outer radius, 22 or the theme's own, 24 on a stock 2026
+         frontend), and a glass card has no inset to keep its tiles off that clip. So the
+         three tile corners that touched a corner of the card, top left, top right and the
+         first tile of the last line, were cut to the card's wider curve, with their ring
+         sliced away along it, while every other corner kept its own 20: the live dashboard's
+         "clipped corners", which measure pixel for pixel like a render at the card's radius.
+         The focus ring, two units outside the tile, was cut off along every outer edge too.
+         Changing the radius would fix the corners and still cut the ring, and a glass card
+         paints nothing for a clip to tidy: its height is the floor's exact count of lines
+         (layout.ts), so there is nothing below the last line to hide. The card container
+         keeps its clip, where an inset holds the tiles well clear of it. */
       ha-card.glass {
         background: none;
         border: none;
         box-shadow: none;
+        overflow: visible;
       }
 
       .tiles {

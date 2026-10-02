@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { LARGE_HEIGHT_THRESHOLD, LAYOUT_THRESHOLD, layoutFromBox } from './size'
+import {
+  DEFAULT_HEIGHT,
+  LARGE_HEIGHT_THRESHOLD,
+  LAYOUT_THRESHOLD,
+  heightFloor,
+  layoutFromBox,
+} from './size'
 
 /** A section of the usual ~500px: the small square, the 2:1 medium, and the tall large. */
 const SMALL = { width: 246, height: 248 }
@@ -43,5 +49,20 @@ describe('layoutFromBox', () => {
   it('agrees with the constants it is documented against', () => {
     expect(LAYOUT_THRESHOLD).toBe(340)
     expect(LARGE_HEIGHT_THRESHOLD).toBe(380)
+  })
+})
+
+describe('heightFloor', () => {
+  it('gives a footprint card the default height, clamped to the box it was measured in', () => {
+    expect(heightFloor('footprint', DEFAULT_HEIGHT)).toBe(DEFAULT_HEIGHT)
+    expect(heightFloor('footprint', 184)).toBe(184)
+    expect(heightFloor('footprint', 600)).toBe(DEFAULT_HEIGHT)
+  })
+
+  it('gives a content-sized card no floor at all, whatever it was measured at', () => {
+    // The measurement under rows: auto is the floor read back to itself, so any number here
+    // is a 248px card around 88px of tiles.
+    expect(heightFloor('content', DEFAULT_HEIGHT)).toBeUndefined()
+    expect(heightFloor('content', 88)).toBeUndefined()
   })
 })

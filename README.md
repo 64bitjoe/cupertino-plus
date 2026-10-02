@@ -136,7 +136,9 @@ the row reads as one band rather than as a ragged line.
 A press opens more-info by default, and per chip it can toggle, navigate to another view, call
 a service, or be turned off entirely — a chip that does nothing is drawn as a chip that does
 nothing, with no button role and no tab stop. The row wraps onto a second line rather than
-hiding a chip, and the card asks Home Assistant for the height that takes. Put it over a busy
+hiding a chip, and the card asks Home Assistant for exactly the height that takes: it arrives
+with the Layout tab's **Auto height** on, so it sits at the height of its chips with no strip of
+empty dashboard under it, and nothing to set in `grid_options`. Put it over a busy
 wallpaper and the translucency has nothing predictable behind it; `container: card` is the
 answer, and gives the pills an ordinary card surface to sit on.
 
@@ -155,7 +157,9 @@ to edge, and wrap only when a tile would fall below 96 units: four across a sect
 410px or more, three on a phone. There is no column count to keep in step with a box you can
 drag. To keep each row on one line however narrow the card, set `flow: row` (**Rows: One line
 per row** in the editor): the tiles narrow to share the line instead, their names ellipsizing,
-and a `break` still starts a new row.
+and a `break` still starts a new row. Like the chips, the card is exactly as tall as its tiles
+(Auto height in the Layout tab) unless you drag it to a row count of your own, in which case the
+tiles sit at the top of the taller box.
 
 <p align="center">
   <img src="docs/images/tiles-glass.png" width="420"
@@ -175,7 +179,9 @@ The rules, including why tiles carry a colour where chips refuse one, are in
 
 Every card has a visual editor — add it from the picker and fill in the form. Nobody needs to
 write YAML, and there is no size field in any of them: **Home Assistant's Layout tab owns the
-footprint**, and the card re-lays itself out for whatever box you drag it into.
+footprint**, and the card re-lays itself out for whatever box you drag it into. The chips and
+tiles cards are the exception that proves it: they default to Auto height, so their footprint is
+their content until you drag one.
 
 The six types, if you do want to paste config:
 

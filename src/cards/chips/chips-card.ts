@@ -9,9 +9,10 @@ import {
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { isPressable, runAction } from '../../core/actions'
-import { withFloors, type Floors } from '../../core/floors'
+import { contentCardSize, contentGridOptions, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
+import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { bandFor, floorsFor, groupRows, INSET, rowHeightFor, type ChipBand } from './layout'
 import {
@@ -529,27 +530,36 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * first tick, on live visibility — that changes under the card, exactly as the complication
    * card's own `getGridOptions` does.
    *
-   * **`rows` is this card's own content height, not the library's shared footprint**, and that
-   * is the whole difference between this override and every other card's. `core/size.ts`'s
+   * **The height is this card's content, not the library's shared footprint**, and that is the
+   * whole difference between this override and the four panel cards'. `core/size.ts`'s
    * `gridOptions()` answers a flat `rows: 4` — the 2:1 shape Apple's medium widget has, right
-   * for the four cards that draw a square-ish panel — and `withFloors` only ever *raises* it,
-   * because its job is to stop a card being handed a box too short for its content.
+   * for a card that draws a square-ish panel — and `withFloors` only ever *raises* it, because
+   * its job is to stop a card being handed a box too short for its content.
    *
-   * A chips card is a strip, not a panel. Three chips need one 44-unit line inside a 16-unit
-   * inset: 76px, which quantises to two grid rows. Left to the shared default it would be
-   * handed four rows — 248px — and the difference is drawn as empty dashboard, which in
-   * `glass` mode is not even a visible card, just a gap nobody asked for. So `rows` is set to
-   * the same number the floor is, rather than to the larger of the two.
+   * A chips card is a strip, not a panel. Left to the shared default it was handed four rows —
+   * 248px — around one 44-unit line. Asking for `rows: min_rows` instead, up to v1.15.0, fixed
+   * most of that and not all of it: a row count is a quantised height, and the 56px row that
+   * covers a 44-unit line still drew 12px of dashboard under it. So the card now asks for
+   * `rows: 'auto'`, which Home Assistant sizes to the content exactly, and carries no
+   * `min-height` floor (`sizing` below); `contentGridOptions` has what the frontend source says
+   * about both, including why `min_rows` stays the content's row count.
    *
-   * This is not the same thing as the visibility work `_floorBand` and `_floorFor` do above,
-   * and fixing one did not fix the other: those decide *how much content there is to price*,
-   * this decides *what to do with the price*. A card asking for exactly its content's height
-   * is still free to be dragged taller — Home Assistant writes that into the card's own
-   * `grid_options`, which `hui-card.getGridOptions()` spreads over this answer and wins with.
+   * This is not the same thing as the visibility work `_floorBand` and `_floorFor` do above:
+   * those decide *how much content there is to price*, which under auto height still sets
+   * `min_rows`, `min_columns` and the masonry estimate. A user who drags the card to a fixed row
+   * count gets it through the card's own `grid_options`, which `hui-card.getGridOptions()`
+   * spreads over this answer and wins with; the chips then sit at the top of the taller cell.
    */
+  protected override get sizing(): CardSizing {
+    return 'content'
+  }
+
   public override getGridOptions(): LovelaceGridOptions {
-    const floors = this._floorFor(this._floorBand)
-    return { ...withFloors(super.getGridOptions(), floors), rows: floors.min_rows }
+    return contentGridOptions(super.getGridOptions(), this._floorFor(this._floorBand))
+  }
+
+  public override getCardSize(): number {
+    return contentCardSize(this._floorFor(this._floorBand))
   }
 
   /**

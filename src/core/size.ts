@@ -110,6 +110,29 @@ export const cardSize = (): number => Math.round(rowsToPx(DEFAULT_ROWS) / 50)
 export const DEFAULT_HEIGHT = rowsToPx(DEFAULT_ROWS)
 
 /**
+ * How a card gets its height: from the default footprint, or from its own content.
+ *
+ * Four cards draw a panel (calendar, battery, complication, weather): they fill whatever box
+ * they are given and budget their content to it, so in the masonry layout, where no box is
+ * given, they need a height to budget against, and that is `DEFAULT_HEIGHT`. The chips and
+ * tiles cards draw a strip whose height is a fact about the content (lines of 44 or 88), and
+ * a floor under them is only ever empty card: 248px around 88px of tiles, which is what a
+ * live dashboard showed under `rows: auto`.
+ */
+export type CardSizing = 'footprint' | 'content'
+
+/**
+ * The `min-height` `ha-card` keeps, or undefined for none.
+ *
+ * A footprint card keeps `DEFAULT_HEIGHT` clamped to the box it was measured in, for the
+ * reasons `_applyMinHeight` in `base-card.ts` gives. A content-sized card keeps nothing, and
+ * the clamp cannot stand in for that: under `rows: auto` Home Assistant imposes no height, so
+ * the box measured is the floor's own 248 and the clamp hands it straight back.
+ */
+export const heightFloor = (sizing: CardSizing, measured: number): number | undefined =>
+  sizing === 'content' ? undefined : Math.min(DEFAULT_HEIGHT, measured)
+
+/**
  * Width to assume until the ResizeObserver has reported.
  *
  * The other half of `DEFAULT_HEIGHT`, and there for cards that price their content in two

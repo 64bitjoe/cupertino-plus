@@ -59,7 +59,8 @@ export const baseStyles = css`
     height: 100%;
     /* ...and still have a height in the legacy masonry layout, where the cell is
        content-sized. Set by the base card from the default footprint, clamped to the box
-       the card was measured in -- see _applyMinHeight. */
+       the card was measured in -- see _applyMinHeight. Left unset, and so auto, for the
+       chips and tiles cards, which are as tall as their content (sizing in base-card.ts). */
     min-height: var(--cw-min-height, auto);
     box-sizing: border-box;
     display: flex;

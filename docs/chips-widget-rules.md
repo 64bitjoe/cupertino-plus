@@ -275,6 +275,17 @@ than the floor allowed; price it against a one-chip width and a twelve-chip card
 rows tall, because `withFloors` raises the default rows to the floor. Three makes the floors
 reachable and the clipping unreachable at the same time.
 
+**The height itself is not a row count.** The floor is `min_rows`; the card's `rows` is
+`'auto'`, which Home Assistant sizes to the content exactly. A row count is quantised: one 44-unit
+line of glass chips in the 56px row that covers it left 12px of empty section under every such
+card, and the tiles card's 88 in 120 left 32. Auto height comes from the card's own
+`getGridOptions()`, the way Home Assistant's heading card asks for it (`core/floors.ts` cites the
+frontend source), so it needs nothing in the user's YAML, and the card carries none of the 248
+default-footprint `min-height` the four panel cards keep (`sizing` in `core/base-card.ts`):
+under auto there is no cell height for that floor to clamp to, so it would simply be the card's
+height. Turning Auto height off in the Layout tab writes `rows: min_rows`, the fewest rows that
+hold the chips; dragging taller leaves the chips at the top of the box.
+
 **The floor is priced against what is actually visible, not against every configured row.** A
 chip hidden by its own `show` (§7) takes no room, which is what stops a card built mostly of
 chips that are usually hidden from reserving space for all of them anyway. But `getGridOptions()`

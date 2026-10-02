@@ -10,7 +10,9 @@ import {
   DEFAULT_WIDTH,
   cardSize,
   gridOptions,
+  heightFloor,
   layoutFromBox,
+  type CardSizing,
   type WidgetLayout,
 } from './size'
 import type {
@@ -211,7 +213,23 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
    * `base-styles.ts` has the loop and why it only closes under a grid or flex parent.
    */
   private _applyMinHeight(): void {
-    this.style.setProperty('--cw-min-height', `${Math.min(DEFAULT_HEIGHT, this.boxHeight)}px`)
+    const floor = heightFloor(this.sizing, this.boxHeight)
+    if (floor === undefined) this.style.removeProperty('--cw-min-height')
+    else this.style.setProperty('--cw-min-height', `${floor}px`)
+  }
+
+  /**
+   * Whether this card is as tall as its content, or as tall as the default footprint.
+   *
+   * Everything above about the floor is true of a panel, and of nothing else. The chips and
+   * tiles cards answer `content`: their height is a count of lines, they ask Home Assistant for
+   * `rows: 'auto'`, and under that the cell imposes no height, so the measurement this floor
+   * clamps to is the floor itself and a one-line tiles card stood 248px tall. They opt out here,
+   * by a getter each overrides, rather than by every card naming its sizing, so that the four
+   * panel cards are not touched at all by a change made for the other two.
+   */
+  protected get sizing(): CardSizing {
+    return 'footprint'
   }
 
   /**

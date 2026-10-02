@@ -107,3 +107,44 @@ export const withFloors = (base: LovelaceGridOptions, floors: Floors): LovelaceG
       ? Math.max(base.rows, floors.min_rows)
       : (base.rows ?? floors.min_rows),
 })
+
+/**
+ * The grid options of a card that is as tall as its content: the floors, and `rows: 'auto'`.
+ *
+ * Verified against the frontend Home Assistant 2026.9 ships (20260826.x), not assumed:
+ *
+ *  - `hui-card.getGridOptions()` spreads the element's own answer first and the config's
+ *    `grid_options` over it, so `'auto'` from here is a default and a row count the user
+ *    dragged still wins.
+ *  - `computeCardGridSize` passes a string `rows` through untouched (min_rows and max_rows
+ *    clamp only a number), and `hui-grid-section` then gives the cell neither `--row-size` nor
+ *    the `fit-rows` class: it spans one `grid-auto-rows: auto` track, as tall as the card.
+ *  - The heading card answers `rows: 'auto'` from its own `getGridOptions()`, so this is the
+ *    frontend's own idiom rather than a custom card leaning on a config-only value.
+ *  - The Layout tab shows Auto height switched on, and switching it off writes
+ *    `rows: min_rows ?? 1`, which is why `min_rows` stays the content's row count: the user who
+ *    opts out of auto lands on the fewest rows that hold the content, exactly the default this
+ *    replaced.
+ *
+ * Before this, both cards answered `rows: min_rows`, and a row count is a quantised height: one
+ * line of glass tiles is 88, and the two rows that cover it are 120, so every such card drew a
+ * 32px strip of dashboard under itself that no floor arithmetic could remove.
+ */
+export const contentGridOptions = (
+  base: LovelaceGridOptions,
+  floors: Floors,
+): LovelaceGridOptions => ({ ...withFloors(base, floors), rows: 'auto' })
+
+/** Home Assistant's masonry unit: `getCardSize()` counts in roughly 50px. */
+const MASONRY_UNIT = 50
+
+/**
+ * A content-sized card's `getCardSize()`: its floor in masonry units, rounded up.
+ *
+ * Masonry asks only to choose the shortest column, so this is an estimate, but it should be
+ * an estimate of this card rather than of the 248px footprint `core/size.ts`'s `cardSize()`
+ * answers for, or a one-line chips card counts as five units and pushes its column's next card
+ * somewhere else.
+ */
+export const contentCardSize = (floors: Floors): number =>
+  Math.ceil(rowsToPx(floors.min_rows) / MASONRY_UNIT)

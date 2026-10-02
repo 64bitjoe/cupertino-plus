@@ -102,6 +102,20 @@ a chip's width and a floor of three would make the narrowest reachable card wide
 sections: five grid columns on glass, six in card mode. Like the chips card's it is priced from the measured width once there is one,
 and the card asks Home Assistant for exactly its own content height.
 
+**Exactly, not to the nearest row.** Up to v1.15.0 that request was `rows: min_rows`, and a row
+count is a quantised height: one line of glass tiles is 88, the two rows that cover it are 120,
+and a live dashboard showed the 32px strip of empty section under the card. Setting
+`grid_options: { rows: auto }` was worse, 248px around 88px of tiles, because every card in the
+library carried the 248 default footprint as a `min-height` and under auto nothing imposed a
+height for the floor to clamp to. So the card now answers `rows: 'auto'` from its own
+`getGridOptions()` (Home Assistant's heading card does the same; `core/floors.ts` cites the
+frontend source) and carries no footprint floor (`sizing` in `core/base-card.ts`): it is the
+height of its tiles in the sections layout, in masonry and in a panel, with nothing in the
+user's YAML. The Layout tab shows Auto height on; turning it off lands on `min_rows`, the fewest
+rows that hold the tiles, and a row count dragged taller than that draws the tiles at the top
+of the box with the rest empty, never clipped. That is also why the 88 above still matters: it
+is what keeps that fallback exact for one and two lines.
+
 ### 2b. One line per row: `flow: wrap | row`
 
 Asked for by the second live dashboard, whose glass column was 396: four 96s and three gaps are

@@ -9,9 +9,10 @@ import {
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
 import { isPressable, runAction } from '../../core/actions'
-import { withFloors, type Floors } from '../../core/floors'
+import { contentCardSize, contentGridOptions, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
+import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { DEFAULT_CONTAINER, type ChipsContainer } from '../chips/model'
 import { TILES_EDITOR_TAG } from './tiles-card-editor'
@@ -458,13 +459,19 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   }
 
   /**
-   * `rows` is this card's own content height rather than the shared footprint, for the reason
-   * the chips card gives: a grid asks for exactly its content, and is still free to be dragged
-   * taller through the card's own `grid_options`.
+   * As tall as the tiles, for the chips card's reason: `rows: 'auto'`, no 248 floor, and a
+   * row count the user drags in the Layout tab still wins. See `contentGridOptions`.
    */
+  protected override get sizing(): CardSizing {
+    return 'content'
+  }
+
   public override getGridOptions(): LovelaceGridOptions {
-    const floors = this._floorFor(this._floorBand)
-    return { ...withFloors(super.getGridOptions(), floors), rows: floors.min_rows }
+    return contentGridOptions(super.getGridOptions(), this._floorFor(this._floorBand))
+  }
+
+  public override getCardSize(): number {
+    return contentCardSize(this._floorFor(this._floorBand))
   }
 
   /** Bound unconditionally and guarded inside; see the chips card for why. */

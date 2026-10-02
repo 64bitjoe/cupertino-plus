@@ -17,11 +17,13 @@ import { DEFAULT_CONTAINER, type ChipsContainer } from '../chips/model'
 import { TILES_EDITOR_TAG } from './tiles-card-editor'
 import { floorsFor, groupRows, INSET, type TileBand } from './layout'
 import {
+  flowFor,
   readTiles,
   tileConfigs,
   tileTemplates,
   tileWatchedIds,
   washFor,
+  type TileFlow,
   type TilesDefaults,
   type TileView,
   type TileWash,
@@ -34,6 +36,7 @@ export interface TilesCardConfig extends CupertinoCardConfig {
   color?: string
   container?: ChipsContainer
   wash?: TileWash
+  flow?: TileFlow
 }
 
 const NO_TILES = 'No Tiles'
@@ -116,6 +119,31 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         );
         gap: var(--cw-space-2);
         min-width: 0;
+      }
+
+      /* flow: row. Exactly N columns and no minimum, N being the longest row, so no row can
+         wrap: its tiles narrow instead, however narrow the card.
+
+         The longest row's N rather than each row's own count, for the reason the wrapping
+         grid above gives. Rendered both ways with a break making rows of four and two at 396:
+         each row's own count drew the two half the card wide each, twice the width of the
+         four above them, which is the ragged grid auto-fit was rejected for. The shared count
+         keeps one column grid, and it buys something more: wherever the longest row fits at
+         96, this draws exactly what wrap does, so the option changes nothing until a line is
+         too narrow to hold its row.
+
+         minmax(0, 1fr) rather than 1fr, whose minimum is the tile's content: a long name
+         would hold its column open and push the last tile off the card. The name and state
+         ellipsize instead (they already do), and the tile clips its own content, so below the
+         48 at which its glyph and paddings stop fitting the glyph is cut at the tile's edge,
+         not drawn over the next tile. The width floor (TILE_ROW_MIN_WIDTH in layout.ts) is
+         what keeps a user from dragging the card that narrow on a typical section. */
+      .flow-row .row {
+        grid-template-columns: repeat(var(--cw-tile-columns, 1), minmax(0, 1fr));
+      }
+
+      .flow-row .tile {
+        overflow: hidden;
       }
 
       /* 88 must match TILE_HEIGHT in layout.ts. The width is the grid track's. */
@@ -405,13 +433,15 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   private _floorFor(band: TileBand[]): Floors {
     const width = this._floorWidth
     const inset = this._floorInset
-    const floors = floorsFor(band, width, inset)
+    const flow = flowFor(this._config?.flow)
+    const floors = floorsFor(band, width, inset, flow)
     // The measured width is part of the identity, or the high-water mark would hold the
     // pre-measurement estimate and the card would never shrink to the width it actually got.
     const key = JSON.stringify([
       this._config?.tiles ?? null,
       width === undefined ? null : Math.round(width),
       inset,
+      flow,
     ])
 
     if (!this._floorMax || this._floorMax.key !== key) {
@@ -506,7 +536,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     return html`
       <ha-card class=${klass} aria-label=${`${tiles.length} tiles`}>
         <div
-          class="tiles wash-${washFor(this._config.wash)}"
+          class="tiles wash-${washFor(this._config.wash)} flow-${flowFor(this._config.flow)}"
           style=${`--cw-tile-columns:${columns}`}
         >
           ${rows.map(

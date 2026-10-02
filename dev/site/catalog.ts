@@ -37,7 +37,7 @@ import {
   STYLE_LABELS,
   type ComplicationStyle,
 } from '../../src/cards/complication/style'
-import { DEFAULT_WASH, washFor } from '../../src/cards/tiles/model'
+import { DEFAULT_FLOW, DEFAULT_WASH, flowFor, washFor } from '../../src/cards/tiles/model'
 import {
   BATTERY_CARD_TAG,
   CALENDAR_CARD_TAG,
@@ -541,12 +541,25 @@ const tiles: Widget = {
       ],
       initial: DEFAULT_WASH,
     },
+    {
+      kind: 'select',
+      name: 'flow',
+      label: 'Rows',
+      description:
+        'Whether a row too long for the card wraps onto more lines, or stays one line and narrows its tiles.',
+      group: 'card',
+      options: [
+        { value: 'wrap', label: 'Wrap onto more lines' },
+        { value: 'row', label: 'One line per row' },
+      ],
+      initial: DEFAULT_FLOW,
+    },
   ],
 
   /**
    * The chips entry's reasoning, unchanged: no fixtures, so the YAML printed above the controls
    * is the config that drew the card, the shortcuts set's `navigate` rows included; and
-   * `container` and `wash` are written at their defaults too, so the pane never changes height
+   * `container`, `wash` and `flow` are written at their defaults too, so the pane never changes height
    * under a select.
    */
   toConfig(args) {
@@ -554,6 +567,7 @@ const tiles: Widget = {
       tiles: [...tileSet(readString(args, 'set', DEFAULT_TILE_SET))],
       container: readString(args, 'container', DEFAULT_CONTAINER) as ChipsContainer,
       wash: washFor(readString(args, 'wash', DEFAULT_WASH)),
+      flow: flowFor(readString(args, 'flow', DEFAULT_FLOW)),
     }
   },
 

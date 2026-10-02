@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { floorsFor, TILE_HEIGHT, TILE_MIN_WIDTH } from './layout'
+import { floorsFor, TILE_HEIGHT, TILE_MIN_WIDTH, TILE_ROW_MIN_WIDTH } from './layout'
 
 const tiles = (n: number, at?: number) =>
   Array.from({ length: n }, (_, i) => (i === at ? { break: true } : {}))
@@ -93,5 +93,63 @@ describe('floorsFor', () => {
   it('is wide enough for two tiles side by side, plus the inset on each side', () => {
     expect(floorsFor(tiles(4), undefined, 0).min_columns).toBe(5)
     expect(floorsFor(tiles(4), undefined, 16).min_columns).toBe(6)
+  })
+})
+
+/**
+ * `flow: row`: every configured row is one line however narrow the card, so the line count is
+ * the number of rows and the width never enters into it.
+ */
+describe('floorsFor, one line per row', () => {
+  /** The second live dashboard: four tiles in a glass column of 396, where wrap gives 3 + 1. */
+  it('keeps the four tiles that wrap at 396 on one line, and asks for one line of rows', () => {
+    expect(floorsFor(tiles(4), 396, 0).min_rows).toBe(3)
+    expect(floorsFor(tiles(4), 396, 0, 'row').min_rows).toBe(2)
+  })
+
+  it('never counts a second line, however narrow the card or long the row', () => {
+    expect(floorsFor(tiles(4), 120, 0, 'row').min_rows).toBe(2)
+    expect(floorsFor(tiles(9), 200, 0, 'row').min_rows).toBe(2)
+    expect(floorsFor(tiles(4), 120, 16, 'row').min_rows).toBe(2)
+  })
+
+  /** A break still starts a new row, and each row is one line: two rows are 88 + 8 + 88. */
+  it('counts one line for each configured row', () => {
+    expect(floorsFor(tiles(4, 2), 2000, 0, 'row').min_rows).toBe(3)
+    expect(floorsFor(tiles(4, 2), 120, 0, 'row').min_rows).toBe(3)
+    expect(floorsFor(tiles(4, 2), 120, 16, 'row').min_rows).toBe(4)
+  })
+
+  it('asks for the same with or without a measurement, since the width cannot matter', () => {
+    expect(floorsFor(tiles(5, 3), undefined, 0, 'row')).toEqual(
+      floorsFor(tiles(5, 3), 300, 0, 'row'),
+    )
+  })
+
+  /**
+   * The width floor prices the longest row at the row minimum, not two tiles at the wrap
+   * minimum: a row that never wraps needs room for all of its tiles at once.
+   */
+  it('is wide enough for the longest row at the row minimum', () => {
+    // 4 x 64 + 3 x 8 = 280: seven grid columns (288) on glass; 312 in a card wants eight (331).
+    expect(floorsFor(tiles(4), undefined, 0, 'row').min_columns).toBe(7)
+    expect(floorsFor(tiles(4), undefined, 16, 'row').min_columns).toBe(8)
+    // Rows of four and two: the four sets it.
+    expect(floorsFor(tiles(6, 4), undefined, 0, 'row').min_columns).toBe(7)
+    // Two tiles are 136, which the library's own four columns (161) already cover.
+    expect(floorsFor(tiles(2), undefined, 0, 'row').min_columns).toBe(4)
+  })
+
+  /**
+   * And the row minimum is chosen so the user's own row is no wider than their column: four at
+   * the minimum fit the 396 the wrapping grid could not.
+   */
+  it('fits four tiles across the 396 column at the row minimum', () => {
+    expect(4 * TILE_ROW_MIN_WIDTH + 3 * 8).toBeLessThanOrEqual(396)
+    expect(TILE_ROW_MIN_WIDTH).toBeLessThan(TILE_MIN_WIDTH)
+  })
+
+  it('leaves the wrapping floor as it was when told to wrap', () => {
+    expect(floorsFor(tiles(4), 407, 0, 'wrap')).toEqual(floorsFor(tiles(4), 407, 0))
   })
 })

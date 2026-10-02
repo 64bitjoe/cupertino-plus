@@ -11,6 +11,7 @@
 
 import { columnsFor, gridColumnsToPx, rowsFor, type Floors } from '../../core/floors'
 import { groupRows, linesFor, INSET } from '../../core/wrapping'
+import type { TileFlow } from './model'
 
 export { groupRows, INSET }
 
@@ -49,6 +50,20 @@ export { groupRows, INSET }
 export const TILE_MIN_WIDTH = 96
 export const TILE_HEIGHT = 88
 
+/**
+ * The narrowest a tile is priced at under `flow: row`, where a row never wraps and its tiles
+ * narrow to share the line instead. Only the width floor reads it; nothing in the stylesheet
+ * stops a tile at it, because a row that refused to narrow past it would have to overflow the
+ * card, and the one promise `row` makes is that it does not.
+ *
+ * 64 because it is where a tile stops reading as a tile. The glyph and the two 12 paddings are
+ * 48, the width at which the glyph itself stops fitting; 64 leaves the name 40, which in the
+ * render is "Gara..." and "Clim...": short, but a word's start beside a glyph that says the rest.
+ * It also clears the case that asked for the option: four of them and three gaps are 280, well
+ * inside the 396 column where the wrapping grid's four 96s (408) did not fit.
+ */
+export const TILE_ROW_MIN_WIDTH = 64
+
 /** The gap between tiles, across and down. Must match `--cw-space-2`. */
 export const GAP = 8
 
@@ -80,7 +95,10 @@ export const floorsFor = (
   tiles: readonly TileBand[],
   measured?: number,
   inset: number = INSET,
+  flow: TileFlow = 'wrap',
 ): Floors => {
+  if (flow === 'row') return rowFloorsFor(tiles, inset)
+
   const across = Math.min(Math.max(tiles.length, 1), FLOOR_TILES_ACROSS)
   const min_columns = columnsFor(across * TILE_MIN_WIDTH + (across - 1) * GAP + 2 * inset)
 
@@ -97,6 +115,30 @@ export const floorsFor = (
     GAP,
   )
 
+  const content = lines * TILE_HEIGHT + (lines - 1) * GAP + 2 * inset
+
+  return { min_columns, min_rows: Math.max(1, rowsFor(content)) }
+}
+
+/**
+ * The floor under `flow: row`, where each configured row is exactly one line: the height is the
+ * row count whatever the width, so the measurement is not read at all, and the width is the
+ * longest row with every tile at `TILE_ROW_MIN_WIDTH`, since that row cannot wrap to fit a
+ * narrower card. Not floored at two tiles across, as the wrapping floor is: there is no
+ * wrapping for a narrow card to cause, so a row of one asks only for the library minimum.
+ *
+ * A column count, so a promise about the 500 section `gridColumnsToPx` assumes and no more: in
+ * a narrower section the same columns are narrower, and the stylesheet narrows the tiles below
+ * the minimum rather than overflow.
+ */
+const rowFloorsFor = (tiles: readonly TileBand[], inset: number): Floors => {
+  const rows = groupRows(tiles)
+  const across = Math.max(1, ...rows.map(row => row.length))
+  const min_columns = columnsFor(across * TILE_ROW_MIN_WIDTH + (across - 1) * GAP + 2 * inset)
+
+  if (tiles.length === 0) return { min_columns, min_rows: 1 }
+
+  const lines = rows.length
   const content = lines * TILE_HEIGHT + (lines - 1) * GAP + 2 * inset
 
   return { min_columns, min_rows: Math.max(1, rowsFor(content)) }

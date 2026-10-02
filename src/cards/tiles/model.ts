@@ -109,6 +109,29 @@ export const DEFAULT_WASH: TileWash = 'hover'
 export const washFor = (value: unknown): TileWash =>
   (TILE_WASHES as readonly unknown[]).includes(value) ? (value as TileWash) : DEFAULT_WASH
 
+/**
+ * How a configured row meets a line too narrow for it: it wraps onto more lines (`wrap`, the
+ * grid v1.14.0 drew), or it stays one line and its tiles narrow to share it (`row`). A `break`
+ * starts a new row under both, so `row` means one line per configured row, not one line in all.
+ *
+ * Named `flow` rather than the obvious `layout`, because Home Assistant's own card editor has a
+ * Layout tab, which sizes the card on the grid; a second "layout" on the same card, meaning
+ * something else, would be read as that one. Two named values rather than a `wrap: false`,
+ * for `wash`'s and `container`'s reason: the editor offers it as a choice between two
+ * described behaviours, and a third (a row that scrolls sideways) would be a value, not a
+ * second boolean. `row` because it names what each configured row becomes, in the word the
+ * rest of the card already uses for one.
+ */
+export const TILE_FLOWS = ['wrap', 'row'] as const
+
+export type TileFlow = (typeof TILE_FLOWS)[number]
+
+export const DEFAULT_FLOW: TileFlow = 'wrap'
+
+/** The card's `flow`, or the default for anything else; silent, as `washFor` is. */
+export const flowFor = (value: unknown): TileFlow =>
+  (TILE_FLOWS as readonly unknown[]).includes(value) ? (value as TileFlow) : DEFAULT_FLOW
+
 /** A tile with no icon is a shortcut, not an unreadable sensor, so it is not an eye. */
 export const TILE_FALLBACK_ICON = 'mdi:apps'
 

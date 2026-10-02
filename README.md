@@ -153,7 +153,9 @@ rest the colour is in the glyph, and the tile fills with it on hover or press; `
 keeps every tile filled. Tiles share their row's width equally, so a row fills its section edge
 to edge, and wrap only when a tile would fall below 96 units: four across a section of about
 410px or more, three on a phone. There is no column count to keep in step with a box you can
-drag.
+drag. To keep each row on one line however narrow the card, set `flow: row` (**Rows: One line
+per row** in the editor): the tiles narrow to share the line instead, their names ellipsizing,
+and a `break` still starts a new row.
 
 <p align="center">
   <img src="docs/images/tiles-glass.png" width="420"

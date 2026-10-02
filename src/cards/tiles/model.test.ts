@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_FLOW,
   DEFAULT_WASH,
+  flowFor,
   readTile,
   readTiles,
   tileConfigs,
@@ -318,5 +320,26 @@ describe('washFor', () => {
     expect(washFor('')).toBe('hover')
     expect(washFor(true)).toBe('hover')
     expect(washFor(null)).toBe('hover')
+  })
+})
+
+describe('flowFor', () => {
+  /** Today's grid, so a card configured before the option existed draws exactly as it did. */
+  it('defaults to wrapping', () => {
+    expect(DEFAULT_FLOW).toBe('wrap')
+    expect(flowFor(undefined)).toBe('wrap')
+  })
+
+  it('reads the two values it knows', () => {
+    expect(flowFor('wrap')).toBe('wrap')
+    expect(flowFor('row')).toBe('row')
+  })
+
+  it('falls back to the default for anything else', () => {
+    expect(flowFor('Row')).toBe('wrap')
+    expect(flowFor('rows')).toBe('wrap')
+    expect(flowFor('')).toBe('wrap')
+    expect(flowFor(false)).toBe('wrap')
+    expect(flowFor(null)).toBe('wrap')
   })
 })

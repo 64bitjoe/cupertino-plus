@@ -10,13 +10,18 @@ import { COLOR_CUSTOM, COLOR_SELECTOR, DEFAULT_CONTAINER } from '../chips/model'
 // time this editor renders it, and this is the only thing that reaches it.
 import './tile-list-editor'
 import type { TilesChangedDetail } from './tile-list-editor'
-import { DEFAULT_WASH, TILE_WASHES, tileConfigs } from './model'
+import { DEFAULT_FLOW, DEFAULT_WASH, TILE_FLOWS, TILE_WASHES, tileConfigs } from './model'
 
 export const TILES_EDITOR_TAG = 'cupertino-plus-tiles-editor'
 
 const CONTAINER_LABELS: Record<string, string> = {
   glass: 'Glass — floats on the dashboard',
   card: 'Card — draws its own surface',
+}
+
+const FLOW_LABELS: Record<string, string> = {
+  wrap: 'Wrap onto more lines',
+  row: 'One line per row',
 }
 
 const WASH_LABELS: Record<string, string> = {
@@ -57,6 +62,16 @@ const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
       },
     },
   })
+  // Last of the three, because it is the one question that is not about paint.
+  rows.push({
+    name: 'flow',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: TILE_FLOWS.map(value => ({ value, label: FLOW_LABELS[value] ?? value })),
+      },
+    },
+  })
   return rows
 }
 
@@ -65,6 +80,7 @@ const LABELS: Record<string, string> = {
   color_custom: 'Custom colour',
   container: 'Background',
   wash: 'Colour wash',
+  flow: 'Rows',
 }
 
 const HELPERS: Record<string, string> = {
@@ -73,10 +89,11 @@ const HELPERS: Record<string, string> = {
   container:
     'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
   wash: 'When a tile fills with its colour. Its glyph always carries the colour either way.',
+  flow: 'What a row too long for the card does. One line per row narrows its tiles to fit instead; a break still starts a new row.',
 }
 
 /**
- * The tiles card's visual editor: the tile list, then the three card-level questions, then the
+ * The tiles card's visual editor: the tile list, then the four card-level questions, then the
  * **Scale** every card shares.
  *
  * The chips card's editor, adapted: the list is a control of its own (`tile-list-editor.ts`)
@@ -112,7 +129,7 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
    * through on the first edit, as Home Assistant's own editors do with theirs.
    */
   protected override defaults(): Partial<TilesCardConfig> {
-    return { container: DEFAULT_CONTAINER, wash: DEFAULT_WASH }
+    return { container: DEFAULT_CONTAINER, wash: DEFAULT_WASH, flow: DEFAULT_FLOW }
   }
 
   protected override label(schema: HaFormSchema): string {

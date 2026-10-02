@@ -102,6 +102,30 @@ a chip's width and a floor of three would make the narrowest reachable card wide
 sections: five grid columns on glass, six in card mode. Like the chips card's it is priced from the measured width once there is one,
 and the card asks Home Assistant for exactly its own content height.
 
+### 2b. One line per row: `flow: wrap | row`
+
+Asked for by the second live dashboard, whose glass column was 396: four 96s and three gaps are
+408, so Cats wrapped onto a line of its own. `flow: row` keeps each configured row on one line
+however narrow the card; `wrap`, the default, is the grid above unchanged. A `break` still
+starts a new row under both, so `row` is one line per row, not one line in all.
+
+- **The name.** `flow`, because Home Assistant's own card editor already has a Layout tab, and
+  a `layout` key meaning something else would be read as that one. Two named values rather
+  than `wrap: false`, as `wash` and `container` are, so a third (a row that scrolls) would be a
+  value. Unknown values draw `wrap`, silently, as theirs do.
+- **The columns.** Exactly as many as the card's longest row, `minmax(0, 1fr)` each, so nothing
+  can wrap. The longest row's count rather than each row's own: rendered with rows of four and
+  two at 396, each row's own count drew the two twice as wide as the four above them, the
+  ragged grid auto-fit was rejected for. The shared count keeps one grid, and means `row` draws
+  exactly what `wrap` does wherever the longest row fits at 96: the option changes nothing until
+  a line is too narrow to hold its row.
+- **Narrow.** Names and states ellipsize; at the user's 396 a tile is 93 and every name reads.
+  The width floor prices the longest row at 64 a tile (4 × 64 + 3 × 8 = 280, seven grid columns
+  of a typical section, eight in card mode), where a name is four letters and an ellipsis. Below
+  that nothing stops the tiles narrowing, because the one promise is never to overflow the card:
+  under 48 the glyph no longer fits its paddings and the tile clips it at its own edge. The
+  height is one line per configured row whatever the width.
+
 ## 3. Colour: a tile has an identity
 
 **A tile tints itself from what its entity is, and a per-tile `color` overrides that.**

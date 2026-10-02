@@ -167,26 +167,18 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
          has stopped being translucent. */
       .glass .pill {
         color: var(--cw-label);
-        background: linear-gradient(
-          to bottom,
-          color-mix(in srgb, var(--cw-label) 10%, transparent),
-          color-mix(in srgb, var(--cw-label) 18%, transparent)
-        );
+        background: var(--cw-glass-fill);
         box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-label) 8%, transparent);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
-        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: var(--cw-glass-filter);
+        backdrop-filter: var(--cw-glass-filter);
       }
 
       /* Not the same gradient inverted. The light still comes from above, but the surface is
          dark: the top edge gets BRIGHTER relative to the body and the body gets LESS dense,
          where the light-mode version gets denser downward. Flipping one gradient would light
-         the pill from underneath. */
+         the pill from underneath. The fill itself is the library's glass now (--cw-glass-fill
+         in tokens.ts carries both variants), so what stays here is the pill's own highlight. */
       :host([dark]) .glass .pill {
-        background: linear-gradient(
-          to bottom,
-          color-mix(in srgb, var(--cw-label) 16%, transparent),
-          color-mix(in srgb, var(--cw-label) 9%, transparent)
-        );
         box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cw-label) 20%, transparent);
       }
 

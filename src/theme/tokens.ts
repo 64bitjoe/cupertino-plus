@@ -100,6 +100,28 @@ export const tokens = css`
     --cw-radius-inner: calc(12px * var(--cw-scale));
     --cw-radius-pill: 999px;
 
+    /* ---- Glass ------------------------------------------------------------- */
+    /* The one glass every card draws with container: glass -- a chip's pill, a tile, and the
+       four panel cards' ha-card -- so a column of them reads as one material. Born on the chip,
+       where the fill and the blur were tuned; the ring is the tile's, an even hairline on all
+       four sides rather than the pill's top-edge highlight, which on anything squarer than a
+       pill draws a crescent along the top corners. The pill keeps that highlight as its own.
+
+       A gradient of the label colour rather than of white or black, so a theme with its own
+       text colour gets glass of its own tint. Denser at the bottom in light, at the top in dark:
+       the light comes from above either way, and the dark surface is lit where the light one is
+       shaded. A token rather than a mixin because a token is the one thing every card's
+       stylesheet already reads; the var(--cw-label) inside it resolves on each card's host,
+       which is where --cw-label is decided too. */
+    --cw-glass-fill: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--cw-label) 10%, transparent),
+      color-mix(in srgb, var(--cw-label) 18%, transparent)
+    );
+    --cw-glass-ring: color-mix(in srgb, var(--cw-label) 6%, transparent);
+    /* Not scaled: the blur is about the dashboard behind the glass, not the widget's type. */
+    --cw-glass-filter: blur(24px) saturate(180%);
+
     /* ---- Spacing ----------------------------------------------------------- */
     /* Home Assistant's own scale is 4px-stepped (--ha-space-1 is 4px), the same
        grid Apple uses, so we ride on it and inherit any theme that rescales it;
@@ -142,5 +164,14 @@ export const tokens = css`
     --cw-pink: #ff375f;
 
     --cw-surface: var(--ha-card-background, var(--card-background-color, #1c1c1e));
+
+    --cw-glass-fill: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--cw-label) 16%, transparent),
+      color-mix(in srgb, var(--cw-label) 9%, transparent)
+    );
+    /* Heavier than light's 6 for the reason the fill is: a hairline of white at 6% over a dark
+       wallpaper is not there at all. */
+    --cw-glass-ring: color-mix(in srgb, var(--cw-label) 12%, transparent);
   }
 `

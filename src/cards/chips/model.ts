@@ -27,6 +27,7 @@ import {
 } from '../../core/entity-view'
 import { isTemplate, type TemplateRequest } from '../../core/templates'
 import { colorValue, TINTS } from '../../core/tint'
+import type { CardContainer } from '../../core/container'
 import type { HomeAssistant } from '../../core/types/ha'
 
 /**
@@ -40,8 +41,12 @@ import type { HomeAssistant } from '../../core/types/ha'
  * default as a *value* and the element imports the editor's tag — putting it in `chips-card.ts`
  * would close a runtime import cycle. `complication/style.ts` holds its card's style constants
  * for the same reason.
+ *
+ * The type itself is `core/container.ts`'s now, re-exported under this name so nothing that
+ * already says `ChipsContainer` has to change; the default stays here, because it is this
+ * card's and the panel cards default the other way.
  */
-export type ChipsContainer = 'glass' | 'card'
+export type ChipsContainer = CardContainer
 
 export const DEFAULT_CONTAINER: ChipsContainer = 'glass'
 

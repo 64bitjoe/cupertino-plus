@@ -71,6 +71,24 @@ export const baseStyles = css`
     min-width: 0;
   }
 
+  /* container: glass on a panel card (calendar, battery, complication, weather): the tile's glass,
+     drawn on ha-card itself. A translucent panel rather than no panel, which is the difference
+     from chips and tiles, whose glass ha-card paints nothing because each chip or tile is the
+     glass: a panel's content is one block that needs an edge to sit inside, so the card keeps
+     its shape, its radius and its inset, and only its paint changes.
+
+     The class is cw-glass rather than glass so it can never meet the chips and tiles cards'
+     own ha-card.glass, which says the opposite thing. The theme's border goes with the opaque
+     background (the ring replaces it, evenly on all four sides, as on a tile), and so does its
+     drop shadow, which under a translucent surface reads as a dark halo through the glass. */
+  ha-card.cw-glass {
+    background: var(--cw-glass-fill);
+    border: none;
+    box-shadow: inset 0 0 0 1px var(--cw-glass-ring);
+    -webkit-backdrop-filter: var(--cw-glass-filter);
+    backdrop-filter: var(--cw-glass-filter);
+  }
+
   /* Apple's touch feedback: the whole surface dips slightly, it does not flash. */
   .cw-pressable {
     cursor: pointer;

@@ -14,7 +14,8 @@ import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
 import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
-import { DEFAULT_CONTAINER, type ChipsContainer } from '../chips/model'
+import type { CardContainer } from '../../core/container'
+import { DEFAULT_CONTAINER } from '../chips/model'
 import { TILES_EDITOR_TAG } from './tiles-card-editor'
 import { floorsFor, groupRows, INSET, type TileBand } from './layout'
 import {
@@ -35,7 +36,7 @@ export const TILES_CARD_TAG = 'cupertino-plus-tiles'
 export interface TilesCardConfig extends CupertinoCardConfig {
   tiles?: unknown
   color?: string
-  container?: ChipsContainer
+  container?: CardContainer
   wash?: TileWash
   flow?: TileFlow
 }
@@ -171,8 +172,8 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
          dark), because a ring is drawn four times as long and reads that much heavier. */
       .glass .tile {
         color: var(--cw-label);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
-        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: var(--cw-glass-filter);
+        backdrop-filter: var(--cw-glass-filter);
       }
 
       .surface .tile {
@@ -207,22 +208,11 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         opacity: 0;
       }
 
+      /* The library's glass (tokens.ts), whose ring is this tile's own: the weights argued
+         above live there now, dark variant and all, so the panel cards' glass matches. */
       .glass .tile::before {
-        background: linear-gradient(
-          to bottom,
-          color-mix(in srgb, var(--cw-label) 10%, transparent),
-          color-mix(in srgb, var(--cw-label) 18%, transparent)
-        );
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-label) 6%, transparent);
-      }
-
-      :host([dark]) .glass .tile::before {
-        background: linear-gradient(
-          to bottom,
-          color-mix(in srgb, var(--cw-label) 16%, transparent),
-          color-mix(in srgb, var(--cw-label) 9%, transparent)
-        );
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-label) 12%, transparent);
+        background: var(--cw-glass-fill);
+        box-shadow: inset 0 0 0 1px var(--cw-glass-ring);
       }
 
       .surface .tile::before {

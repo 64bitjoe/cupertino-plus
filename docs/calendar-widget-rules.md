@@ -551,3 +551,16 @@ are lightnesses of the calendar's own colour (§1) rather than tints over the su
 read the same on glass as on the card, and rendered on a navy wallpaper and a pale one every
 title, time, heading and the `2 more events` line kept its contrast. The theme's border and
 drop shadow are dropped on glass, the ring standing in for the border.
+
+Measured rather than assumed, on a ground of the user's own navy, at DPR 2 (feedback round 4):
+the panel's glass is the tile's glass, pixel for pixel. A fill sampled 12 units in from the top
+of the calendar read rgb(45,55,102) against a tile's rgb(44,54,101), the middle rgb(38,49,97)
+against rgb(39,49,97), and 12 in from the bottom rgb(35,45,86) against rgb(36,45,87), and the
+battery, complication and weather panels read the same as the calendar; a chip, a third of a
+tile's height, reads within one point of lightness. Two things make a panel look different on a
+real dashboard and neither is the glass. The fill's gradient spans the element, so a panel four
+times a tile's height holds its denser top for four times as long, though its mean is the same.
+And a wallpaper that lightens downward lightens every glass on it by where it sits: beside each
+other at the same height, the weather panel and a tile both read rgb(51,60,114). What the user
+saw was the third thing, the `card` default: their calendar was the theme's neutral grey,
+rgb(28,28,28) in the same render, among blue-tinted glass.

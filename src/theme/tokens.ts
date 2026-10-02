@@ -112,15 +112,31 @@ export const tokens = css`
        the light comes from above either way, and the dark surface is lit where the light one is
        shaded. A token rather than a mixin because a token is the one thing every card's
        stylesheet already reads; the var(--cw-label) inside it resolves on each card's host,
-       which is where --cw-label is decided too. */
-    --cw-glass-fill: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--cw-label) 10%, transparent),
-      color-mix(in srgb, var(--cw-label) 18%, transparent)
+       which is where --cw-label is decided too.
+
+       Each reads a public theme variable first, --cupertino-glass-fill, -ring and -filter, the
+       one place in this file a variable of our own naming is bridged rather than one of Home
+       Assistant's. They are for the theme that wants every OTHER card on the dashboard to be
+       this glass too: it sets them once, points ha-card-background and ha-card-border-color at
+       them, and our cards and everyone else's then read one definition rather than two copies
+       that drift (README, "Glass on every card"). One name per token, not one per mode: a
+       theme's modes block gives the light and dark values, and Home Assistant sets whichever
+       applies, as it does for every other theme variable. Unset, each falls through to exactly
+       what it was before the bridge existed. */
+    --cw-glass-fill: var(
+      --cupertino-glass-fill,
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--cw-label) 10%, transparent),
+        color-mix(in srgb, var(--cw-label) 18%, transparent)
+      )
     );
-    --cw-glass-ring: color-mix(in srgb, var(--cw-label) 6%, transparent);
+    --cw-glass-ring: var(
+      --cupertino-glass-ring,
+      color-mix(in srgb, var(--cw-label) 6%, transparent)
+    );
     /* Not scaled: the blur is about the dashboard behind the glass, not the widget's type. */
-    --cw-glass-filter: blur(24px) saturate(180%);
+    --cw-glass-filter: var(--cupertino-glass-filter, blur(24px) saturate(180%));
 
     /* ---- Spacing ----------------------------------------------------------- */
     /* Home Assistant's own scale is 4px-stepped (--ha-space-1 is 4px), the same
@@ -165,13 +181,19 @@ export const tokens = css`
 
     --cw-surface: var(--ha-card-background, var(--card-background-color, #1c1c1e));
 
-    --cw-glass-fill: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--cw-label) 16%, transparent),
-      color-mix(in srgb, var(--cw-label) 9%, transparent)
+    --cw-glass-fill: var(
+      --cupertino-glass-fill,
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--cw-label) 16%, transparent),
+        color-mix(in srgb, var(--cw-label) 9%, transparent)
+      )
     );
     /* Heavier than light's 6 for the reason the fill is: a hairline of white at 6% over a dark
        wallpaper is not there at all. */
-    --cw-glass-ring: color-mix(in srgb, var(--cw-label) 12%, transparent);
+    --cw-glass-ring: var(
+      --cupertino-glass-ring,
+      color-mix(in srgb, var(--cw-label) 12%, transparent)
+    );
   }
 `

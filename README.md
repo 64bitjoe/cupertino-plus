@@ -210,6 +210,49 @@ to v1.16.
        alt="The calendar card drawn as translucent glass over a navy wallpaper: Friday the 24th, four events and a two-more-events line">
 </p>
 
+### Glass on every card
+
+The glass is three theme variables, so a Home Assistant theme can hand the same material to
+every other card on the dashboard as well. Our cards read `cupertino-glass-fill`,
+`cupertino-glass-ring` and `cupertino-glass-filter` before their own defaults; Home Assistant's
+own `ha-card` reads `ha-card-background`, `ha-card-border-color` and the rest, including
+`ha-card-backdrop-filter`, so no card-mod is needed for the blur. Point the second set at the
+first and there is one definition of the glass, in your theme. The values below are exactly
+the library's defaults, light and dark, so our cards look the same with or without it:
+
+```yaml
+# themes/cupertino-glass.yaml, with `frontend: themes: !include_dir_merge_named themes`
+Cupertino Glass:
+  modes:
+    light:
+      cupertino-glass-fill: 'linear-gradient(to bottom, color-mix(in srgb, var(--primary-text-color) 10%, transparent), color-mix(in srgb, var(--primary-text-color) 18%, transparent))'
+      cupertino-glass-ring: 'color-mix(in srgb, var(--primary-text-color) 6%, transparent)'
+    dark:
+      cupertino-glass-fill: 'linear-gradient(to bottom, color-mix(in srgb, var(--primary-text-color) 16%, transparent), color-mix(in srgb, var(--primary-text-color) 9%, transparent))'
+      cupertino-glass-ring: 'color-mix(in srgb, var(--primary-text-color) 12%, transparent)'
+  cupertino-glass-filter: 'blur(24px) saturate(180%)'
+  # Every other card:
+  ha-card-background: 'var(--cupertino-glass-fill)'
+  ha-card-border-color: 'var(--cupertino-glass-ring)'
+  ha-card-border-width: '1px'
+  ha-card-box-shadow: 'none'
+  ha-card-backdrop-filter: 'var(--cupertino-glass-filter)'
+```
+
+Change a `cupertino-glass-*` value and our cards and everyone else's change together. The
+glass only reads as glass over something worth blurring, so pair it with a wallpaper
+(`lovelace-background`, or the dashboard's own background setting). One side effect to know
+about: `ha-card-background` is also the colour a few of our details cut out of the card behind
+them (the ring around the weather card's today dot, and the battery card's charging notch
+under `container: card`), and a gradient is not a colour, so with this theme those lose their
+cut-out. And `container: card` draws Home Assistant's own card, which under
+this theme is the same glass.
+
+If you would rather use card-mod, `card-mod-card` can set `backdrop-filter` on `ha-card` in
+place of `ha-card-backdrop-filter`. Leave our chips and tiles out of it with
+`ha-card:not(.glass)`: they draw the glass on each chip and tile, and a blurred card around them
+would leave nothing for theirs to blur (they refuse the theme's blur for the same reason).
+
 ## Development
 
 `pnpm install && pnpm dev` serves the showcase — every card against a mock Home Assistant,

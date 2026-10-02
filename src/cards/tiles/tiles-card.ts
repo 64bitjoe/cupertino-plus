@@ -72,12 +72,17 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
          Changing the radius would fix the corners and still cut the ring, and a glass card
          paints nothing for a clip to tidy: its height is the floor's exact count of lines
          (layout.ts), so there is nothing below the last line to hide. The card container
-         keeps its clip, where an inset holds the tiles well clear of it. */
+         keeps its clip, where an inset holds the tiles well clear of it.
+
+         No blur on ha-card either, for the chips card's reason: a theme's
+         --ha-card-backdrop-filter would make this one a backdrop root and flatten every tile. */
       ha-card.glass {
         background: none;
         border: none;
         box-shadow: none;
         overflow: visible;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
 
       .tiles {

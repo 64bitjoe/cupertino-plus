@@ -63,11 +63,19 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       /* The glass container is the reason this card exists, and it is the first card in the
          library that must not paint a surface: backdrop-filter samples whatever is behind the
          element, so an opaque ha-card between the pill and the dashboard means the blur
-         samples the card and achieves nothing but cost. */
+         samples the card and achieves nothing but cost.
+
+         And no blur of its own, said outright because Home Assistant's ha-card will take one
+         from a theme: its own stylesheet reads --ha-card-backdrop-filter, which is how the
+         README's theme gives every other card the glass. A blurred ha-card is a backdrop root,
+         inside which each pill's blur samples an empty card, so that theme would have flattened
+         every chip. A rule here outranks ha-card's own :host one. */
       ha-card.glass {
         background: none;
         border: none;
         box-shadow: none;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
 
       /* The stack of rows. A card with no break configured has exactly one of them, so this

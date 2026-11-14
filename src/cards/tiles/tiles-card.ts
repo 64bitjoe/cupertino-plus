@@ -8,24 +8,29 @@ import {
 } from 'lit'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
-import { isPressable, runAction } from '../../core/actions'
+import { isPressable, runAction, type ActionConfig } from '../../core/actions'
+import { Gestures } from '../../core/gestures'
 import { contentCardSize, contentGridOptions, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
+import { templateRequest } from '../chips/model'
 import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import type { CardContainer } from '../../core/container'
 import { DEFAULT_CONTAINER } from '../chips/model'
 import { TILES_EDITOR_TAG } from './tiles-card-editor'
-import { floorsFor, groupRows, INSET, type TileBand } from './layout'
+import { floorsFor, groupRows, INSET, tileMetrics, type TileBand } from './layout'
 import {
   flowFor,
+  orientationFor,
   readTiles,
+  stateLinesFor,
   tileConfigs,
   tileTemplates,
   tileWatchedIds,
   washFor,
   type TileFlow,
+  type TileOrientation,
   type TilesDefaults,
   type TileView,
   type TileWash,
@@ -39,6 +44,8 @@ export interface TilesCardConfig extends CupertinoCardConfig {
   container?: CardContainer
   wash?: TileWash
   flow?: TileFlow
+  orientation?: TileOrientation
+  state_lines?: number
 }
 
 const NO_TILES = 'No Tiles'
@@ -124,7 +131,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
           auto-fill,
           minmax(
             max(
-              calc(96px * var(--cw-scale)),
+              calc(var(--cw-tile-min, 96) * 1px * var(--cw-scale)),
               calc(
                 (100% - (var(--cw-tile-columns, 1) - 1) * var(--cw-space-2)) /
                   var(--cw-tile-columns, 1)
@@ -162,13 +169,14 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         overflow: hidden;
       }
 
-      /* 88 must match TILE_HEIGHT in layout.ts. The width is the grid track's. */
+      /* The height is tileMetrics' in layout.ts, handed over as --cw-tile-height on the stack
+         (88 for a vertical tile at one state line). The width is the grid track's. */
       .tile {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         min-width: 0;
-        height: calc(88px * var(--cw-scale));
+        height: calc(var(--cw-tile-height, 88) * 1px * var(--cw-scale));
         padding: calc(12px * var(--cw-scale));
         border-radius: calc(20px * var(--cw-scale));
         box-sizing: border-box;
@@ -269,15 +277,33 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
          definition, since nothing else has a tab stop. An unavailable tile never has a colour
          to wash with (model.ts drops it), so none of these can reach one. */
       .wash-always .tile.tinted::after,
+      .tile.tinted.selected::after,
       .tile.tinted.cw-pressable:active::after,
       .tile.tinted:focus-visible::after {
         opacity: 1;
       }
 
       .wash-always .tile.tinted::before,
+      .tile.tinted.selected::before,
       .tile.tinted.cw-pressable:active::before,
       .tile.tinted:focus-visible::before {
         opacity: 0;
+      }
+
+      /* A selected tile is washed at rest, which under wash: always is what every tile is, so a
+         wash alone would select nothing there. It also takes a ring in its own colour, in place
+         of the wash's faint one, and its name in the heavier weight a chosen segment has: a
+         preset row reads as one chosen tile among plain ones in either wash. Repeated under the
+         dark host so it outranks the dark wash's own ring. */
+      .glass .tile.tinted.selected::after,
+      .surface .tile.tinted.selected::after,
+      :host([dark]) .glass .tile.tinted.selected::after {
+        box-shadow: inset 0 0 0 calc(1.5px * var(--cw-scale))
+          color-mix(in srgb, var(--cw-tile-tint) 60%, transparent);
+      }
+
+      .tile.selected .name {
+        font-weight: 600;
       }
 
       @media (hover: hover) {
@@ -326,6 +352,49 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         text-overflow: ellipsis;
       }
 
+      /* state_lines above one: the state wraps, and clamps with an ellipsis at the count. A
+         line break in the text is kept (pre-line), so a template can say where a line ends;
+         runs of spaces still collapse, as they do in the one-line state. The tile is taller by
+         a caption line per extra line (tileMetrics), so the clamp is what keeps a longer text
+         inside it. */
+      .lines .state {
+        white-space: pre-line;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: var(--cw-state-lines);
+        line-clamp: var(--cw-state-lines);
+        overflow-wrap: anywhere;
+      }
+
+      /* Every tile reserves all its state lines, used or not. A vertical tile spaces glyph and
+         text apart, so a one-line state beside a two-line one would otherwise drop its name a
+         line lower than its neighbour's, and a row's names would stop lining up. 13 is
+         STATE_LINE_HEIGHT in layout.ts. */
+      .lines:not(.horizontal) .state {
+        min-height: calc(var(--cw-state-lines) * 13px * var(--cw-scale));
+      }
+
+      /* orientation: horizontal. The glyph beside the text rather than above it, centred on
+         the tile's height, and the text taking what is left of the width. 10 is the gap
+         layout.ts prices in HORIZONTAL_TILE_MIN_WIDTH. The text is a column of its own so the
+         name and the state stay together as one block, whatever the height. */
+      .horizontal .tile {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: calc(10px * var(--cw-scale));
+      }
+
+      .horizontal .text {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .horizontal .glyph.portrait {
+        width: calc(28px * var(--cw-scale));
+        height: calc(28px * var(--cw-scale));
+      }
+
       .tile.unknown {
         opacity: 0.55;
       }
@@ -367,6 +436,14 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   /** The card's template subscriptions; see the chips card for why `requestUpdate`. */
   private readonly _templates = new TemplatePool(() => this.requestUpdate())
 
+  /** Hold and double tap, for the tiles that configure them; see `core/gestures.ts`. */
+  private readonly _gestures = new Gestures()
+
+  /** Who is looking, for a template's `user`; see `templateRequest`. */
+  private get _user(): string | undefined {
+    return this.hass?.user?.name
+  }
+
   public override disconnectedCallback(): void {
     this._templates.disconnect()
     super.disconnectedCallback()
@@ -376,7 +453,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   protected override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed)
     if (!this.hass || !this._config) return
-    this._templates.sync(this.hass, tileTemplates(this._config.tiles, this._defaults))
+    this._templates.sync(this.hass, tileTemplates(this._config.tiles, this._defaults, this._user))
   }
 
   protected override watchedEntities(): string[] {
@@ -391,17 +468,22 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
 
   /**
    * The reconstructed key here has to agree with `tileTemplates`' own (which is `chipTemplates`'),
-   * byte for byte, or the lookup silently misses and the field falls back forever. "No entity"
-   * means no `variables` key at all, on a row or off it.
+   * byte for byte, or the lookup silently misses and the field falls back forever. Both build it
+   * with `templateRequest`, which is what makes that agreement structural rather than careful.
    */
   private get _tiles(): TileView[] {
     if (!this.hass || !this._config) return []
+    const user = this._user
     return readTiles(this.hass, this._config.tiles, this._defaults, (template, entity) =>
-      this._templates.read(
-        requestKey(
-          entity === undefined ? { template } : { template, variables: { config: { entity } } },
-        ),
-      ),
+      this._templates.read(requestKey(templateRequest(template, entity, user))),
+    )
+  }
+
+  /** The footprint this config draws at, for the floor and the stylesheet alike. */
+  private get _metrics() {
+    return tileMetrics(
+      orientationFor(this._config?.orientation),
+      stateLinesFor(this._config?.state_lines),
     )
   }
 
@@ -439,14 +521,17 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     const width = this._floorWidth
     const inset = this._floorInset
     const flow = flowFor(this._config?.flow)
-    const floors = floorsFor(band, width, inset, flow)
+    const metrics = this._metrics
+    const floors = floorsFor(band, width, inset, flow, metrics)
     // The measured width is part of the identity, or the high-water mark would hold the
     // pre-measurement estimate and the card would never shrink to the width it actually got.
+    // The metrics are too: a card switched to horizontal must be allowed to get shorter.
     const key = JSON.stringify([
       this._config?.tiles ?? null,
       width === undefined ? null : Math.round(width),
       inset,
       flow,
+      metrics,
     ])
 
     if (!this._floorMax || this._floorMax.key !== key) {
@@ -479,39 +564,88 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   }
 
   /** Bound unconditionally and guarded inside; see the chips card for why. */
-  private _press(tile: TileView) {
+  private _run(tile: TileView, action: ActionConfig | undefined) {
     return (): void => {
-      if (!this.hass || !isPressable(tile.action)) return
-      runAction(this.hass, this, tile.action, tile.entityId)
+      if (!this.hass || !isPressable(action)) return
+      runAction(this.hass, this, action, tile.entityId)
     }
   }
 
+  /**
+   * The click is the tap, as it always was; `Gestures` only holds it back when the tile has a
+   * double tap to wait for, or swallows it when it was the release of a hold. A tile with
+   * neither runs no timer and taps on the click itself.
+   */
+  private _click(tile: TileView) {
+    return (event: Event): void => {
+      const run = this._run(tile, tile.action)
+      const double = tile.doubleTapAction
+      this._gestures.click(
+        event.currentTarget as object,
+        run,
+        double ? this._run(tile, double) : undefined,
+      )
+    }
+  }
+
+  private _down(tile: TileView) {
+    return (event: Event): void => {
+      const hold = tile.holdAction
+      this._gestures.down(event.currentTarget as object, hold ? this._run(tile, hold) : undefined)
+    }
+  }
+
+  private _cancel(event: Event): void {
+    this._gestures.cancel(event.currentTarget as object)
+  }
+
+  /** A long press on a touch screen opens the context menu, unless a hold has claimed it. */
+  private _menu(tile: TileView) {
+    return (event: Event): void => {
+      if (tile.holdAction) event.preventDefault()
+    }
+  }
+
+  /** Enter and Space are a tap: a keyboard has no hold, and its double press is two taps. */
   private _key(tile: TileView) {
     return (event: KeyboardEvent): void => {
       if (!isPressable(tile.action)) return
       if (event.key !== 'Enter' && event.key !== ' ') return
       event.preventDefault()
-      this._press(tile)()
+      this._run(tile, tile.action)()
     }
   }
 
-  /** One tile. A tile whose action is `none` is not a button: no role, no tab stop. */
+  /**
+   * One tile. A tile with nothing to do on any gesture is not a button: no role, no tab stop. A
+   * tile whose tap is `none` but which holds or double-taps is still one, since a pointer can
+   * press it; its Enter key does nothing, as its tap does.
+   */
   private _renderTile(tile: TileView): TemplateResult {
-    const pressable = isPressable(tile.action)
+    const pressable =
+      isPressable(tile.action) ||
+      tile.holdAction !== undefined ||
+      tile.doubleTapAction !== undefined
     const readable = tile.unavailable ? 'unavailable' : tile.value
     const label = [tile.name, readable].filter(part => part !== '').join(', ') || 'Tile'
 
     return html`
       <div
         class="tile ${tile.color ? 'tinted' : ''} ${tile.unavailable ? 'unknown' : ''} ${
-          pressable ? 'cw-pressable' : ''
-        }"
+          tile.selected ? 'selected' : ''
+        } ${pressable ? 'cw-pressable' : ''}"
         style=${tile.color ? `--cw-tile-tint:${tile.color}` : nothing}
         role=${pressable ? 'button' : nothing}
         tabindex=${pressable ? 0 : nothing}
         aria-label=${pressable ? label : nothing}
+        aria-pressed=${pressable && tile.selected ? 'true' : nothing}
         title=${tile.name}
-        @click=${this._press(tile)}
+        @click=${this._click(tile)}
+        @pointerdown=${this._down(tile)}
+        @pointerup=${this._cancel}
+        @pointerleave=${this._cancel}
+        @pointercancel=${this._cancel}
+        @contextmenu=${this._menu(tile)}
         @keydown=${this._key(tile)}
       >
         ${
@@ -544,11 +678,18 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     // The longest row sets the column count every row shares; see .row in the styles.
     const rows = groupRows(tiles)
     const columns = Math.max(...rows.map(row => row.length))
+    const orientation = orientationFor(this._config.orientation)
+    const lines = stateLinesFor(this._config.state_lines)
+    const { minWidth, height } = this._metrics
     return html`
       <ha-card class=${klass} aria-label=${`${tiles.length} tiles`}>
         <div
-          class="tiles wash-${washFor(this._config.wash)} flow-${flowFor(this._config.flow)}"
-          style=${`--cw-tile-columns:${columns}`}
+          class="tiles wash-${washFor(this._config.wash)} flow-${flowFor(this._config.flow)} ${
+            orientation
+          } ${lines > 1 ? 'lines' : ''}"
+          style=${`--cw-tile-columns:${columns};--cw-tile-min:${minWidth};--cw-tile-height:${
+            height
+          };--cw-state-lines:${lines}`}
         >
           ${rows.map(
             row => html`<div class="row">${row.map(tile => this._renderTile(tile))}</div>`,

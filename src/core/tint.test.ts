@@ -7,7 +7,7 @@ const entity = (entity_id: string, attributes: Record<string, unknown> = {}): Ha
   ({ entity_id, state: '0', attributes, last_changed: '', last_updated: '' }) as HassEntity
 
 describe('the palette', () => {
-  it('holds the ten names tokens.ts carries', () => {
+  it('holds the eleven names tokens.ts carries', () => {
     expect(TINTS).toEqual([
       'red',
       'orange',
@@ -18,6 +18,7 @@ describe('the palette', () => {
       'indigo',
       'purple',
       'pink',
+      'grey',
       'accent',
     ])
   })
@@ -49,6 +50,24 @@ describe('colorValue', () => {
     expect(colorValue('#ff8800')).toBe('#ff8800')
     expect(colorValue('var(--my-token)')).toBe('var(--my-token)')
     expect(colorValue('rgb(1 2 3)')).toBe('rgb(1 2 3)')
+  })
+
+  it("maps another card's colour names onto the palette, as tokens", () => {
+    expect(colorValue('grey')).toBe('var(--cw-grey)')
+    expect(colorValue('gray')).toBe('var(--cw-grey)')
+    expect(colorValue('disabled')).toBe('var(--cw-grey)')
+    expect(colorValue('amber')).toBe('var(--cw-yellow)')
+    expect(colorValue('deep-purple')).toBe('var(--cw-indigo)')
+    expect(colorValue('primary')).toBe('var(--cw-accent)')
+  })
+
+  it('draws white as the label ink, so it does not vanish on a light theme', () => {
+    expect(colorValue('white')).toBe('var(--cw-label)')
+  })
+
+  it('reads an alias whatever its case, since a template often builds the name', () => {
+    expect(colorValue('Amber')).toBe('var(--cw-yellow)')
+    expect(colorValue(' GREY ')).toBe('var(--cw-grey)')
   })
 
   it('answers nothing for nothing, so a card can ask without checking first', () => {

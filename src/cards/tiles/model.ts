@@ -12,6 +12,9 @@ import { colorValue, tintFor, tintVar, type TintName } from '../../core/tint'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 import {
   actionFromForm,
+  actionToForm,
+  gesturesFromForm,
+  gesturesToForm,
   chipConfigs,
   chipKeys,
   chipRows,
@@ -19,6 +22,8 @@ import {
   chipWatchedIds,
   NO_TARGET_ACTION,
   readAction,
+  readGestures,
+  templateRequest,
   text,
   truthy,
   type TemplateResolver,
@@ -35,7 +40,7 @@ import {
  * tile is a navigation tile, never a spacer.
  */
 
-/** One tile's configuration: a chip's, less `content` and `fill`. */
+/** One tile's configuration: a chip's, less `content` and `fill`, plus `selected`. */
 export interface TileConfig {
   entity?: string
   name?: string
@@ -43,8 +48,16 @@ export interface TileConfig {
   color?: string
   value?: string
   show?: string
+  /**
+   * Whether the tile is the chosen one of its row, usually a template: a selected tile is drawn
+   * washed in its colour at rest, whatever the card's `wash`, the way a segmented control marks
+   * its current segment. Read with `show`'s `truthy`, so `{{ is_state(…) }}` works as written.
+   */
+  selected?: string
   break?: boolean
   tap_action?: ActionConfig
+  hold_action?: ActionConfig
+  double_tap_action?: ActionConfig
 }
 
 /** One tile, resolved against `hass` and ready to draw. */
@@ -61,8 +74,12 @@ export interface TileView {
   color: string | undefined
   unavailable: boolean
   visible: boolean
+  /** True only for a tile whose `selected` says so; never for an unavailable one. */
+  selected: boolean
   break: boolean
   action: ActionConfig
+  holdAction?: ActionConfig
+  doubleTapAction?: ActionConfig
 }
 
 export interface TilesDefaults {
@@ -136,6 +153,42 @@ export const DEFAULT_FLOW: TileFlow = 'wrap'
 export const flowFor = (value: unknown): TileFlow =>
   (TILE_FLOWS as readonly unknown[]).includes(value) ? (value as TileFlow) : DEFAULT_FLOW
 
+/**
+ * Which way a tile reads: glyph over name over state (`vertical`, every tile up to v1.17), or
+ * glyph beside a name over its state (`horizontal`), the shape of Apple Home's small tile and of
+ * Mushroom's horizontal template card.
+ *
+ * `orientation` rather than `layout` for `flow`'s reason: Home Assistant's own card editor has a
+ * Layout tab. A horizontal tile is wider and shorter, so it is its own pair of numbers in
+ * `layout.ts` rather than the vertical tile stretched: at one state line it is exactly one
+ * sections row tall, which is what makes a column of them read as a list of status rows.
+ */
+export const TILE_ORIENTATIONS = ['vertical', 'horizontal'] as const
+
+export type TileOrientation = (typeof TILE_ORIENTATIONS)[number]
+
+export const DEFAULT_ORIENTATION: TileOrientation = 'vertical'
+
+/** The card's `orientation`, or the default for anything else; silent, as `washFor` is. */
+export const orientationFor = (value: unknown): TileOrientation =>
+  (TILE_ORIENTATIONS as readonly unknown[]).includes(value)
+    ? (value as TileOrientation)
+    : DEFAULT_ORIENTATION
+
+/**
+ * How many lines a tile's state may take before it ellipsizes: one, as it always has, or up to
+ * three. Card-wide rather than per tile because a tile's height is the grid's, and a row whose
+ * tiles disagreed about their height would no longer be a row. A line break in the text itself
+ * (`\n` in a template) starts a new line, so a two-line status can say where its line ends.
+ */
+export const MAX_STATE_LINES = 3
+
+export const stateLinesFor = (value: unknown): number => {
+  const lines = typeof value === 'string' ? Number(value) : value
+  if (typeof lines !== 'number' || !Number.isFinite(lines)) return 1
+  return Math.min(MAX_STATE_LINES, Math.max(1, Math.round(lines)))
+}
+
 /** A tile with no icon is a shortcut, not an unreadable sensor, so it is not an eye. */
 export const TILE_FALLBACK_ICON = 'mdi:apps'
 
@@ -150,8 +203,17 @@ export const tileWatchedIds = (tiles: unknown): string[] => chipWatchedIds(tiles
  * at all otherwise) is the chips model's, kept in one place because the element rebuilds the
  * identical `requestKey` from it; a second copy is where the two would drift.
  */
-export const tileTemplates = (tiles: unknown, defaults: TilesDefaults): TemplateRequest[] =>
-  chipTemplates(tiles, defaults)
+export const tileTemplates = (
+  tiles: unknown,
+  defaults: TilesDefaults,
+  user?: string,
+): TemplateRequest[] => [
+  ...chipTemplates(tiles, defaults, user),
+  // The one field a tile has that a chip does not, registered by the same rule.
+  ...tileConfigs(tiles).flatMap(row =>
+    isTemplate(row.selected) ? [templateRequest(row.selected, row.entity, user)] : [],
+  ),
+]
 
 export const readTiles = (
   hass: HomeAssistant,
@@ -173,6 +235,8 @@ export const readTile = (
   }
 
   const visible = row.show === undefined ? true : truthy(field(row.show, row.entity))
+  const selected = row.selected === undefined ? false : truthy(field(row.selected, row.entity))
+  const gestures = readGestures(row, field)
   const name = field(row.name, row.entity)
   const icon = field(row.icon, row.entity)
   // A literal `value: ''` is no more an override than a template that rendered to nothing.
@@ -198,8 +262,10 @@ export const readTile = (
       color: configured(),
       unavailable: false,
       visible,
+      selected,
       break: row.break === true,
       action: readAction(row.tap_action, field, row.entity, NO_TARGET_ACTION),
+      ...gestures,
     }
   }
 
@@ -216,8 +282,10 @@ export const readTile = (
       color: undefined,
       unavailable: true,
       visible,
+      selected: false,
       break: row.break === true,
       action,
+      ...gestures,
     }
   }
 
@@ -233,8 +301,10 @@ export const readTile = (
     color: unavailable ? undefined : (configured() ?? tintVar(tileTintFor(entity))),
     unavailable,
     visible,
+    selected: selected && !unavailable,
     break: row.break === true,
     action,
+    ...gestures,
   }
 }
 
@@ -251,11 +321,10 @@ export const tileToForm = (config: TileConfig): Record<string, unknown> => ({
   color: config.color,
   value: config.value,
   show: config.show,
+  selected: config.selected,
   break: config.break === true,
-  action:
-    config.tap_action?.action ?? (config.entity === undefined ? 'none' : DEFAULT_ACTION.action),
-  navigation_path: config.tap_action?.navigation_path,
-  service: config.tap_action?.service,
+  ...actionToForm(config.tap_action, config.entity),
+  ...gesturesToForm(config),
 })
 
 /** The inverse, dropping every empty value rather than writing it. */
@@ -265,7 +334,7 @@ export const tileFromForm = (prior: TileConfig, data: Record<string, unknown>): 
   const entity = text(data.entity)
   if (entity !== undefined) next.entity = entity
 
-  for (const key of ['name', 'icon', 'color', 'value', 'show'] as const) {
+  for (const key of ['name', 'icon', 'color', 'value', 'show', 'selected'] as const) {
     const value = text(data[key])
     if (value !== undefined) next[key] = value
   }
@@ -289,5 +358,5 @@ export const tileFromForm = (prior: TileConfig, data: Record<string, unknown>): 
     staleDefault || staleNone ? undefined : actionFromForm(prior.tap_action, data, bareDefault)
   if (tapAction !== undefined) next.tap_action = tapAction
 
-  return next
+  return { ...next, ...gesturesFromForm(prior, data) }
 }

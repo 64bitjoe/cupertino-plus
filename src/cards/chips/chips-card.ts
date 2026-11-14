@@ -8,7 +8,8 @@ import {
 } from 'lit'
 
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
-import { isPressable, runAction } from '../../core/actions'
+import { isPressable, runAction, type ActionConfig } from '../../core/actions'
+import { Gestures } from '../../core/gestures'
 import { contentCardSize, contentGridOptions, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
 import { requestKey, TemplatePool } from '../../core/templates'
@@ -16,8 +17,11 @@ import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { bandFor, floorsFor, groupRows, INSET, rowHeightFor, type ChipBand } from './layout'
 import {
+  alignmentFor,
   chipConfigs,
   chipTemplates,
+  templateRequest,
+  type ChipAlignment,
   chipWatchedIds,
   DEFAULT_CONTAINER,
   DEFAULT_CONTENT,
@@ -38,6 +42,7 @@ export interface ChipsCardConfig extends CupertinoCardConfig {
   content?: ChipContent
   color?: string
   container?: ChipsContainer
+  alignment?: ChipAlignment
 }
 
 const NO_ENTITIES = 'No Entities'
@@ -110,6 +115,19 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         flex-wrap: wrap;
         gap: var(--cw-space-2);
         min-width: 0;
+      }
+
+      /* alignment. On the row rather than the stack, so a wrapped row's second line lines up
+         the same way as its first. justify spreads the chips edge to edge, and a wrapped line of
+         one chip sits at the start, as space-between puts it. */
+      .align-center .row {
+        justify-content: center;
+      }
+      .align-end .row {
+        justify-content: flex-end;
+      }
+      .align-justify .row {
+        justify-content: space-between;
       }
 
       /* The pressable box, not the pill. layout.ts prices the row at 44 units for this: a
@@ -373,6 +391,14 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    */
   private readonly _templates = new TemplatePool(() => this.requestUpdate())
 
+  /** Hold and double tap, for the chips that configure them; see `core/gestures.ts`. */
+  private readonly _gestures = new Gestures()
+
+  /** Who is looking, for a template's `user`; see `templateRequest`. */
+  private get _user(): string | undefined {
+    return this.hass?.user?.name
+  }
+
   public override disconnectedCallback(): void {
     this._templates.disconnect()
     super.disconnectedCallback()
@@ -386,7 +412,10 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   protected override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed)
     if (!this.hass || !this._config) return
-    this._templates.sync(this.hass, chipTemplates(this._config.entities, this._defaults))
+    this._templates.sync(
+      this.hass,
+      chipTemplates(this._config.entities, this._defaults, this._user),
+    )
   }
 
   protected override watchedEntities(): string[] {
@@ -402,19 +431,15 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
 
   /**
    * The reconstructed key here has to agree with `chipTemplates`' own, byte for byte, or the
-   * lookup silently misses and the field falls back forever. The one thing worth restating:
-   * "no entity" means no `variables` key at all, on a row or off it — `chipTemplates`'s own
-   * note has the reasoning, and a mismatch here was exactly the class of bug that note exists
-   * to prevent.
+   * lookup silently misses and the field falls back forever. Both sides build it with
+   * `templateRequest`, so they cannot: the mismatch `chipTemplates`'s note describes was two
+   * hand-written copies of that rule, and there is one now.
    */
   private get _chips(): ChipView[] {
     if (!this.hass || !this._config) return []
+    const user = this._user
     return readChips(this.hass, this._config.entities, this._defaults, (template, entity) =>
-      this._templates.read(
-        requestKey(
-          entity === undefined ? { template } : { template, variables: { config: { entity } } },
-        ),
-      ),
+      this._templates.read(requestKey(templateRequest(template, entity, user))),
     )
   }
 
@@ -569,10 +594,44 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * feeding it a sentinel is a different code path in lit-html from feeding it a function.
    * Guarding inside is one branch either way and cannot be got subtly wrong.
    */
-  private _press(chip: ChipView) {
+  private _run(chip: ChipView, action: ActionConfig | undefined) {
     return (): void => {
-      if (!this.hass || !isPressable(chip.action)) return
-      runAction(this.hass, this, chip.action, chip.entityId)
+      if (!this.hass || !isPressable(action)) return
+      runAction(this.hass, this, action, chip.entityId)
+    }
+  }
+
+  /**
+   * The click is the tap; `Gestures` holds it back only for a chip with a double tap to wait
+   * for, and swallows it when it was the release of a hold. A chip with neither taps on the
+   * click itself, exactly as before either existed.
+   */
+  private _click(chip: ChipView) {
+    return (event: Event): void => {
+      const double = chip.doubleTapAction
+      this._gestures.click(
+        event.currentTarget as object,
+        this._run(chip, chip.action),
+        double ? this._run(chip, double) : undefined,
+      )
+    }
+  }
+
+  private _down(chip: ChipView) {
+    return (event: Event): void => {
+      const hold = chip.holdAction
+      this._gestures.down(event.currentTarget as object, hold ? this._run(chip, hold) : undefined)
+    }
+  }
+
+  private _cancel(event: Event): void {
+    this._gestures.cancel(event.currentTarget as object)
+  }
+
+  /** A long press on a touch screen opens the context menu, unless a hold has claimed it. */
+  private _menu(chip: ChipView) {
+    return (event: Event): void => {
+      if (chip.holdAction) event.preventDefault()
     }
   }
 
@@ -583,7 +642,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       // sitting inside.
       if (event.key !== 'Enter' && event.key !== ' ') return
       event.preventDefault()
-      this._press(chip)()
+      this._run(chip, chip.action)()
     }
   }
 
@@ -602,7 +661,11 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       return html`<div class="chip ${band} ${chip.fill ? 'fill' : ''}" aria-hidden="true"></div>`
     }
 
-    const pressable = isPressable(chip.action)
+    // A chip whose tap is `none` but which holds or double-taps is still a button to a pointer.
+    const pressable =
+      isPressable(chip.action) ||
+      chip.holdAction !== undefined ||
+      chip.doubleTapAction !== undefined
     // Ordinary entity-bearing chips always have both a name and a reading, so this produces
     // the exact same string it always did for them: `${chip.name}, ${...}`. The `filter` and
     // fallback only matter for an entity-less chip, where either half can resolve empty — an
@@ -643,7 +706,12 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         tabindex=${pressable ? 0 : nothing}
         aria-label=${pressable ? label : nothing}
         title=${chip.name}
-        @click=${this._press(chip)}
+        @click=${this._click(chip)}
+        @pointerdown=${this._down(chip)}
+        @pointerup=${this._cancel}
+        @pointerleave=${this._cancel}
+        @pointercancel=${this._cancel}
+        @contextmenu=${this._menu(chip)}
         @keydown=${this._key(chip)}
       >
         <span class="pill">
@@ -688,7 +756,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         style=${`--cw-chip-row:${rowHeightFor(band)}`}
         aria-label=${`${chips.length} chips`}
       >
-        <div class="chips">
+        <div class="chips align-${alignmentFor(this._config.alignment)}">
           ${groupRows(chips).map(
             row => html`<div class="row">${row.map(chip => this._renderChip(chip, band))}</div>`,
           )}

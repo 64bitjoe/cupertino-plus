@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  alignmentFor,
   chipConfigs,
   chipFromForm,
   chipKeys,
@@ -13,6 +14,7 @@ import {
   inheritedName,
   readChip,
   readChips,
+  templateRequest,
   truthy,
   type ChipConfig,
 } from './model'
@@ -168,6 +170,8 @@ describe('chipToForm', () => {
       action: 'more-info',
       navigation_path: undefined,
       service: undefined,
+      on_hold_action: 'none',
+      on_double_tap_action: 'none',
     })
   })
 
@@ -390,8 +394,8 @@ describe('chipTemplates', () => {
 
     expect(requests).toHaveLength(2)
     expect(requests.map(r => r.variables)).toEqual([
-      { config: { entity: 'light.a' } },
-      { config: { entity: 'light.b' } },
+      { config: { entity: 'light.a' }, entity: 'light.a' },
+      { config: { entity: 'light.b' }, entity: 'light.b' },
     ])
   })
 
@@ -634,7 +638,7 @@ describe('chipTemplates with no entity', () => {
     )
     expect(requests).toEqual([
       { template: '{{ n }}' },
-      { template: '{{ m }}', variables: { config: { entity: 'light.a' } } },
+      { template: '{{ m }}', variables: { config: { entity: 'light.a' }, entity: 'light.a' } },
     ])
   })
 })
@@ -725,5 +729,233 @@ describe('entity pictures', () => {
 
   it('has none for a chip with no entity at all', () => {
     expect(readChips(hassWith(), [{ name: 'Goodnight' }], {})[0]?.picture).toBeUndefined()
+  })
+})
+
+describe('templateRequest', () => {
+  it("hands a row's template Mushroom's variables: config.entity, entity and user", () => {
+    expect(templateRequest('T', 'light.a', 'Joe')).toEqual({
+      template: 'T',
+      variables: { config: { entity: 'light.a' }, entity: 'light.a', user: 'Joe' },
+    })
+  })
+
+  it('carries the user alone for a row with no entity', () => {
+    expect(templateRequest('T', undefined, 'Joe')).toEqual({
+      template: 'T',
+      variables: { user: 'Joe' },
+    })
+  })
+
+  it('carries no variables key at all with neither, so nothing hashes two ways', () => {
+    expect(templateRequest('T', undefined, undefined)).toEqual({ template: 'T' })
+  })
+
+  it('is what chipTemplates registers, user included', () => {
+    const requests = chipTemplates([{ entity: 'light.a', name: '{{ n }}' }], {}, 'Joe')
+    expect(requests).toEqual([templateRequest('{{ n }}', 'light.a', 'Joe')])
+  })
+})
+
+describe('templated actions', () => {
+  const resolve = (map: Record<string, string>) => (template: string) => map[template]
+
+  it("registers every template in an action's data and target, at any depth", () => {
+    const requests = chipTemplates(
+      [
+        {
+          entity: 'light.a',
+          tap_action: {
+            action: 'perform-action',
+            perform_action: '{{ s }}',
+            data: { brightness_pct: '{{ b }}', nested: { list: ['{{ l }}', 'plain'] } },
+            target: { entity_id: '{{ t }}' },
+          },
+        },
+      ],
+      {},
+    )
+    expect(requests.map(r => r.template).sort()).toEqual([
+      '{{ b }}',
+      '{{ l }}',
+      '{{ s }}',
+      '{{ t }}',
+    ])
+  })
+
+  it('registers the hold and the double tap too', () => {
+    const requests = chipTemplates(
+      [
+        {
+          entity: 'light.a',
+          hold_action: { action: 'navigate', navigation_path: '{{ h }}' },
+          double_tap_action: { action: 'url', url_path: '{{ d }}' },
+        },
+      ],
+      {},
+    )
+    expect(requests.map(r => r.template).sort()).toEqual(['{{ d }}', '{{ h }}'])
+  })
+
+  it('resolves the data and target leaves, and leaves out one still pending', () => {
+    const [chip] = readChips(
+      hassWith(HALL),
+      [
+        {
+          entity: 'sensor.hall',
+          tap_action: {
+            action: 'call-service',
+            service: 'light.turn_on',
+            data: { brightness_pct: '{{ b }}', transition: 2, pending: '{{ p }}' },
+            target: { entity_id: ['{{ t }}', 'light.b'] },
+          },
+        },
+      ],
+      {},
+      resolve({ '{{ b }}': '40', '{{ t }}': 'light.a' }),
+    )
+    expect(chip?.action).toEqual({
+      action: 'call-service',
+      service: 'light.turn_on',
+      data: { brightness_pct: '40', transition: 2 },
+      target: { entity_id: ['light.a', 'light.b'] },
+    })
+  })
+
+  it('leaves an action with no templates as the very object configured', () => {
+    const tap = { action: 'call-service' as const, service: 'a.b', data: { x: 1 } }
+    const [chip] = readChips(hassWith(HALL), [{ entity: 'sensor.hall', tap_action: tap }], {})
+    expect(chip?.action).toBe(tap)
+  })
+})
+
+describe('hold and double tap', () => {
+  it('reads both onto the view, only when configured', () => {
+    const [plain, both] = readChips(
+      hassWith(HALL),
+      [
+        'sensor.hall',
+        {
+          entity: 'sensor.hall',
+          hold_action: { action: 'more-info' },
+          double_tap_action: { action: 'toggle' },
+        },
+      ],
+      {},
+    )
+    expect(plain).not.toHaveProperty('holdAction')
+    expect(plain).not.toHaveProperty('doubleTapAction')
+    expect(both?.holdAction).toEqual({ action: 'more-info' })
+    expect(both?.doubleTapAction).toEqual({ action: 'toggle' })
+  })
+
+  it('drops a hold of none, so it starts no timer', () => {
+    const [chip] = readChips(
+      hassWith(HALL),
+      [{ entity: 'sensor.hall', hold_action: { action: 'none' } }],
+      {},
+    )
+    expect(chip).not.toHaveProperty('holdAction')
+  })
+
+  it('carries both through an edit to another field', () => {
+    const prior: ChipConfig = {
+      entity: 'sensor.hall',
+      hold_action: { action: 'more-info' },
+      double_tap_action: { action: 'toggle' },
+    }
+    const next = chipFromForm(prior, { ...chipToForm(prior), name: 'Renamed' })
+    expect(next).toEqual({ ...prior, name: 'Renamed' })
+  })
+
+  it('shows each in its own prefixed fields, defaulting to Nothing whatever the entity', () => {
+    expect(chipToForm({ entity: 'light.a' })).toMatchObject({
+      on_hold_action: 'none',
+      on_double_tap_action: 'none',
+    })
+    expect(
+      chipToForm({
+        entity: 'light.a',
+        hold_action: { action: 'navigate', navigation_path: '/lovelace/lights' },
+      }),
+    ).toMatchObject({ on_hold_action: 'navigate', on_hold_navigation_path: '/lovelace/lights' })
+  })
+
+  it('writes a hold chosen in the panel, with its argument, and nothing for one left at Nothing', () => {
+    const prior: ChipConfig = { entity: 'light.a' }
+    const next = chipFromForm(prior, {
+      ...chipToForm(prior),
+      on_hold_action: 'call-service',
+      on_hold_service: 'script.night',
+    })
+    expect(next).toEqual({
+      entity: 'light.a',
+      hold_action: { action: 'call-service', service: 'script.night' },
+    })
+  })
+
+  it('removes a gesture set back to Nothing, and keeps its YAML-only data while it stays', () => {
+    const prior: ChipConfig = {
+      entity: 'light.a',
+      hold_action: { action: 'call-service', service: 'light.turn_on', data: { brightness: 9 } },
+      double_tap_action: { action: 'toggle' },
+    }
+    const next = chipFromForm(prior, { ...chipToForm(prior), on_double_tap_action: 'none' })
+    expect(next).toEqual({ entity: 'light.a', hold_action: prior.hold_action })
+  })
+
+  it('keeps a gesture whose fields a partial answer leaves out', () => {
+    const prior: ChipConfig = { entity: 'light.a', hold_action: { action: 'toggle' } }
+    expect(chipFromForm(prior, { entity: 'light.a' })).toEqual(prior)
+  })
+})
+
+describe('perform-action in the panel', () => {
+  it('shows as Call a service, with its perform_action in the Service field', () => {
+    const form = chipToForm({
+      entity: 'light.a',
+      tap_action: { action: 'perform-action', perform_action: 'script.night' },
+    })
+    expect(form).toMatchObject({ action: 'call-service', service: 'script.night' })
+  })
+
+  it('writes it back under the name it came in with, data and confirmation kept', () => {
+    const prior: ChipConfig = {
+      entity: 'light.a',
+      tap_action: {
+        action: 'perform-action',
+        perform_action: 'script.night',
+        data: { a: 1 },
+        confirmation: true,
+      },
+    }
+    const next = chipFromForm(prior, { ...chipToForm(prior), name: 'Night' })
+    expect(next.tap_action).toEqual(prior.tap_action)
+  })
+
+  it('keeps an action the dropdown does not offer, whole, through an unrelated edit', () => {
+    const prior: ChipConfig = {
+      entity: 'light.a',
+      tap_action: { action: 'fire-dom-event', browser_mod: { service: 'x' } } as never,
+    }
+    const next = chipFromForm(prior, { ...chipToForm(prior), name: 'Popup' })
+    expect(next.tap_action).toBe(prior.tap_action)
+  })
+
+  it('writes a url action with its address', () => {
+    const next = chipFromForm(
+      { entity: 'light.a' },
+      { entity: 'light.a', action: 'url', url_path: 'https://example.com' },
+    )
+    expect(next.tap_action).toEqual({ action: 'url', url_path: 'https://example.com' })
+  })
+})
+
+describe('alignmentFor', () => {
+  it('takes the four words and defaults anything else to start', () => {
+    expect(alignmentFor('center')).toBe('center')
+    expect(alignmentFor('justify')).toBe('justify')
+    expect(alignmentFor('middle')).toBe('start')
+    expect(alignmentFor(undefined)).toBe('start')
   })
 })

@@ -158,6 +158,14 @@ in the chips card's three cases: light glass, dark glass, and card mode mixed in
 track. The name and the state line stay one ink, for the reason the complication card gives
 about colour that moves with a value.
 
+A `color` is a palette name (`red`, `orange`, `yellow`, `green`, `teal`, `blue`, `indigo`,
+`purple`, `pink`, `grey`, `accent`), any CSS colour, or a template answering either. `grey` is
+Apple's systemGray, the one neutral, for a state that is off. The Material names other cards use
+are read too and land on the nearest palette token (`core/tint.ts`'s `ALIASES`): `amber` is our
+yellow, `deep-orange` orange, `cyan` teal, `blue-grey` and `disabled` grey, and `white` and
+`black` are the label ink, so a tile tinted `white` on a dark dashboard does not vanish on a light
+one. Names are read case-insensitively.
+
 Two things differ from a tinted chip, both found in the first render rather than argued in
 advance:
 
@@ -254,9 +262,63 @@ at the card's outer radius (22, or the theme's, 24 on a stock 2026 frontend), an
 the tiles in the card's corners met that clip. v1.14.0 drew those three corners at the card's
 wider curve with their ring cut away, and cut the focus ring along every outer edge. The card
 container keeps its clip; its inset keeps the tiles clear of it.
-The press is `core/actions.ts`: `more-info`, `toggle`, `navigate`, `call-service` and `none`,
-with the same rule that a tile set to `none` is not drawn as a button: no role, no tab stop, no
-pressed state.
+The press is `core/actions.ts`, and §7 of the chips rules is the whole of it: the eight
+actions (`back`, `url`, `assist` and `perform-action` among them), templates anywhere in an
+action's `data` and `target`, `confirmation`, and `hold_action` and `double_tap_action`. The same
+rule holds that a tile with nothing to do on any gesture is not drawn as a button: no role, no tab
+stop, no pressed state.
+
+## 6a. The shape of a tile: `orientation` and `state_lines`
+
+`orientation: vertical` is every tile up to v1.17: glyph over name over state. `horizontal` puts
+the glyph beside a name-over-state block, centred on the tile's height: Apple Home's small tile,
+and Mushroom's horizontal template card. It is its own pair of numbers rather than the vertical
+tile on its side (`tileMetrics` in `layout.ts`):
+
+| Orientation  | Minimum width | Height at one state line | Under `flow: row` |
+| ------------ | ------------- | ------------------------ | ----------------- |
+| `vertical`   | 96            | 88                       | 64                |
+| `horizontal` | 148           | 56                       | 96                |
+
+56 is one sections row exactly: two 12 paddings and a name over one state line are 55, and one
+unit of air buys a tile that a grid row holds with nothing left over, so a column of horizontal
+tiles is a list of status rows with no strip of dashboard under it. 148 leaves the name 90 beside
+the glyph, more than a vertical tile's 72; two fit across a phone and the user's 425 glass column,
+three across a 500 card-mode section.
+
+`state_lines: 1 | 2 | 3` lets the state wrap before it ellipsizes, and adds a caption line (13
+units) to the tile's height for each line past the first. Card-wide rather than per tile, because
+a tile's height is its row's: a row of tiles that disagreed about it would no longer be a row.
+Every tile reserves all its lines whether its text needs them or not, so a one-line state beside a
+two-line one keeps its name level with its neighbour's. A line break in the text (`\n` in a
+template) is kept, so a template can say where its first line ends. The stylesheet is handed the
+same numbers as the floor (`--cw-tile-min`, `--cw-tile-height`), so the two cannot disagree about
+where a tile wraps.
+
+## 6b. The chosen tile: `selected`
+
+A tile's `selected`, usually a template read with `show`'s truthy rule, draws it washed in its
+colour at rest whatever the card's `wash`, with a ring in its own colour and its name at the
+heavier weight a chosen segment has. The ring is what makes it a selection under `wash: always`
+too, where every tile is washed. It is announced (`aria-pressed`) as well as drawn, so the colour
+is not the only thing carrying it. An unavailable tile is never selected: it has no colour to wash
+with, and the dim is already saying the one thing worth saying about it.
+
+```yaml
+type: custom:cupertino-plus-tiles
+flow: row
+tiles:
+  - name: 180°
+    icon: mdi:thermometer
+    color: orange
+    selected: "{{ is_state('input_select.top_oven_temp', '180') }}"
+    tap_action:
+      action: perform-action
+      perform_action: input_select.select_option
+      target: { entity_id: input_select.top_oven_temp }
+      data: { option: '180' }
+  # …one tile per preset
+```
 
 ## 7. Degradation
 
@@ -286,10 +348,9 @@ pressed state.
 - **Domains neither tint table knows fall back to `accent`**, the theme's primary: `switch`,
   `script`, `automation`, `button`. Under the default theme that is a light blue. A `color`
   on the tile or the card is the answer today.
-- **Three tap-action keys stay in YAML**, as on chips: a `call-service`'s `data` and
-  `target`, and the `entity` override.
+- **Some action keys stay in YAML**, as on chips: a service call's `data` and `target`, the
+  `entity` override, `confirmation`, and the whole of `hold_action` and `double_tap_action`.
 - **The spec's three flags are otherwise settled.** The size was settled by the render (§2),
   and `tintFor`'s tables by the render too: they suit tiles once a scene is overridden (§3).
   The third, the list editor, is the first item here.
-- **Out of scope**: a `columns:` setting, spacers, per-tile size, and `hold_action` and
-  `double_tap_action`, as everywhere in this library.
+- **Out of scope**: a `columns:` setting, spacers, and per-tile size.

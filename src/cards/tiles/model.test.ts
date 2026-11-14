@@ -4,8 +4,10 @@ import {
   DEFAULT_FLOW,
   DEFAULT_WASH,
   flowFor,
+  orientationFor,
   readTile,
   readTiles,
+  stateLinesFor,
   tileConfigs,
   tileFromForm,
   tileKeys,
@@ -213,7 +215,10 @@ describe('templates', () => {
       {},
     )
     expect(requests.map(r => r.template).sort()).toEqual(['{{ c }}', '{{ n }}', '{{ v }}'])
-    expect(requests[0]?.variables).toEqual({ config: { entity: 'cover.garage' } })
+    expect(requests[0]?.variables).toEqual({
+      config: { entity: 'cover.garage' },
+      entity: 'cover.garage',
+    })
   })
 
   it('gives an entity-less row no variables, matching the card-level colour', () => {
@@ -360,5 +365,63 @@ describe('flowFor', () => {
     expect(flowFor('')).toBe('wrap')
     expect(flowFor(false)).toBe('wrap')
     expect(flowFor(null)).toBe('wrap')
+  })
+})
+
+describe('selected', () => {
+  const resolve = (map: Record<string, string>) => (template: string) => map[template]
+
+  it('reads a template with the truthy rule, and asks for it', () => {
+    const rows = [
+      { entity: 'cover.garage', selected: '{{ a }}' },
+      { entity: 'cover.garage', selected: '{{ b }}' },
+    ]
+    const tiles = readTiles(
+      hassWith(GARAGE),
+      rows,
+      {},
+      resolve({ '{{ a }}': 'True', '{{ b }}': 'off' }),
+    )
+    expect(tiles.map(t => t.selected)).toEqual([true, false])
+    expect(tileTemplates(rows, {}).map(r => r.template)).toEqual(['{{ a }}', '{{ b }}'])
+  })
+
+  it('is false while its template has not answered, and for a tile without one', () => {
+    const tiles = readTiles(
+      hassWith(GARAGE),
+      [{ entity: 'cover.garage', selected: '{{ a }}' }, 'cover.garage'],
+      {},
+    )
+    expect(tiles.map(t => t.selected)).toEqual([false, false])
+  })
+
+  it('never selects a tile that is not reporting', () => {
+    const [tile] = readTiles(hassWith(), [{ entity: 'cover.garage', selected: 'true' }], {})
+    expect(tile?.selected).toBe(false)
+  })
+
+  it('round-trips through the panel, with a hold left untouched', () => {
+    const prior: TileConfig = {
+      entity: 'cover.garage',
+      selected: '{{ x }}',
+      hold_action: { action: 'more-info' },
+    }
+    expect(tileFromForm(prior, tileToForm(prior))).toEqual(prior)
+  })
+})
+
+describe('orientationFor and stateLinesFor', () => {
+  it('takes the two orientations and defaults to vertical', () => {
+    expect(orientationFor('horizontal')).toBe('horizontal')
+    expect(orientationFor('sideways')).toBe('vertical')
+  })
+
+  it('clamps the state lines to one to three, and reads a number written as text', () => {
+    expect(stateLinesFor(2)).toBe(2)
+    expect(stateLinesFor('3')).toBe(3)
+    expect(stateLinesFor(9)).toBe(3)
+    expect(stateLinesFor(0)).toBe(1)
+    expect(stateLinesFor(undefined)).toBe(1)
+    expect(stateLinesFor('many')).toBe(1)
   })
 })

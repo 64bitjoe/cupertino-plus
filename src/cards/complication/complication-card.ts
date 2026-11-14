@@ -392,7 +392,7 @@ class CupertinoComplicationCard extends CupertinoCard<ComplicationCardConfig> {
       }
 
       /* var(--cw-comp-on-tint), not a bare white: see onTintVar's comment in the .ts file
-         for why four of the ten tints need something other than white here. */
+         for why four of the eleven tints need something other than white here. */
       .cell.rectangular-header .head .name,
       .cell.rectangular-header .head .glyph {
         color: var(--cw-comp-on-tint);

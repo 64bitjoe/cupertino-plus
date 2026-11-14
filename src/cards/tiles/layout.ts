@@ -11,7 +11,7 @@
 
 import { columnsFor, gridColumnsToPx, rowsFor, type Floors } from '../../core/floors'
 import { groupRows, linesFor, INSET } from '../../core/wrapping'
-import type { TileFlow } from './model'
+import type { TileFlow, TileOrientation } from './model'
 
 export { groupRows, INSET }
 
@@ -64,6 +64,58 @@ export const TILE_HEIGHT = 88
  */
 export const TILE_ROW_MIN_WIDTH = 64
 
+/**
+ * What one more line of state costs a tile: the caption-2 line box the state is set in
+ * (`--cw-text-caption-2`, 13 units).
+ */
+export const STATE_LINE_HEIGHT = 13
+
+/**
+ * The horizontal tile's two numbers, at one state line.
+ *
+ * 56 tall because that is one sections row exactly, and it is not a coincidence the content
+ * almost lands there anyway: two 12 paddings and a name over one state line (18 + 13) are 55, so
+ * one unit of air buys a tile that a grid row holds with nothing left over, and a column of them
+ * reads as the list of status rows a Mushroom template card stack was. Each further state line
+ * adds its 13.
+ *
+ * 148 wide at the least because the text sits beside the glyph rather than under it: the glyph,
+ * its 10 gap and the two paddings are 58, which leaves a name 90, the vertical tile's "Living
+ * Room" with room to spare. Two fit across a phone's section and the user's 425 glass column,
+ * three across a 500 card-mode section (3 x 148 + 2 gaps = 460, inside its 468).
+ */
+export const HORIZONTAL_TILE_MIN_WIDTH = 148
+export const HORIZONTAL_TILE_HEIGHT = 56
+
+/** Under `flow: row`, where it only has to stay legible: the glyph, and a word's start. */
+export const HORIZONTAL_TILE_ROW_MIN_WIDTH = 96
+
+/** One tile's footprint for a given card: what `floorsFor` prices and the stylesheet draws. */
+export interface TileMetrics {
+  minWidth: number
+  rowMinWidth: number
+  height: number
+}
+
+/**
+ * The footprint for an orientation and a state-line count. The stylesheet is handed the same
+ * numbers as custom properties (`tiles-card.ts`), so the one table here is the only place they
+ * are written, and the floor and the grid cannot disagree about where a tile wraps.
+ */
+export const tileMetrics = (
+  orientation: TileOrientation = 'vertical',
+  stateLines = 1,
+): TileMetrics => {
+  const extra = (Math.max(1, stateLines) - 1) * STATE_LINE_HEIGHT
+  return orientation === 'horizontal'
+    ? {
+        minWidth: HORIZONTAL_TILE_MIN_WIDTH,
+        rowMinWidth: HORIZONTAL_TILE_ROW_MIN_WIDTH,
+        height: HORIZONTAL_TILE_HEIGHT + extra,
+      }
+    : { minWidth: TILE_MIN_WIDTH, rowMinWidth: TILE_ROW_MIN_WIDTH, height: TILE_HEIGHT + extra }
+}
+
 /** The gap between tiles, across and down. Must match `--cw-space-2`. */
 export const GAP = 8
 
@@ -96,26 +148,31 @@ export const floorsFor = (
   measured?: number,
   inset: number = INSET,
   flow: TileFlow = 'wrap',
+  metrics: TileMetrics = tileMetrics(),
 ): Floors => {
-  if (flow === 'row') return rowFloorsFor(tiles, inset)
+  if (flow === 'row') return rowFloorsFor(tiles, inset, metrics)
 
-  const across = Math.min(Math.max(tiles.length, 1), FLOOR_TILES_ACROSS)
-  const min_columns = columnsFor(across * TILE_MIN_WIDTH + (across - 1) * GAP + 2 * inset)
+  const { minWidth, height } = metrics
+  // A horizontal tile is wide enough that two of them can be wider than a narrow section: the
+  // floor asks for one across there, since the grid wraps them to a column happily.
+  const floorAcross = minWidth > TILE_MIN_WIDTH ? 1 : FLOOR_TILES_ACROSS
+  const across = Math.min(Math.max(tiles.length, 1), floorAcross)
+  const min_columns = columnsFor(across * minWidth + (across - 1) * GAP + 2 * inset)
 
   if (tiles.length === 0) return { min_columns, min_rows: 1 }
 
-  const usable = Math.max(TILE_MIN_WIDTH, (measured ?? gridColumnsToPx(min_columns)) - 2 * inset)
+  const usable = Math.max(minWidth, (measured ?? gridColumnsToPx(min_columns)) - 2 * inset)
 
   const lines = linesFor(
     tiles.map(tile => ({
-      width: TILE_MIN_WIDTH,
+      width: minWidth,
       ...(tile.break === true ? { break: true } : {}),
     })),
     usable,
     GAP,
   )
 
-  const content = lines * TILE_HEIGHT + (lines - 1) * GAP + 2 * inset
+  const content = lines * height + (lines - 1) * GAP + 2 * inset
 
   return { min_columns, min_rows: Math.max(1, rowsFor(content)) }
 }
@@ -131,15 +188,15 @@ export const floorsFor = (
  * a narrower section the same columns are narrower, and the stylesheet narrows the tiles below
  * the minimum rather than overflow.
  */
-const rowFloorsFor = (tiles: readonly TileBand[], inset: number): Floors => {
+const rowFloorsFor = (tiles: readonly TileBand[], inset: number, metrics: TileMetrics): Floors => {
   const rows = groupRows(tiles)
   const across = Math.max(1, ...rows.map(row => row.length))
-  const min_columns = columnsFor(across * TILE_ROW_MIN_WIDTH + (across - 1) * GAP + 2 * inset)
+  const min_columns = columnsFor(across * metrics.rowMinWidth + (across - 1) * GAP + 2 * inset)
 
   if (tiles.length === 0) return { min_columns, min_rows: 1 }
 
   const lines = rows.length
-  const content = lines * TILE_HEIGHT + (lines - 1) * GAP + 2 * inset
+  const content = lines * metrics.height + (lines - 1) * GAP + 2 * inset
 
   return { min_columns, min_rows: Math.max(1, rowsFor(content)) }
 }

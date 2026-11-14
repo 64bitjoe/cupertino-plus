@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { floorsFor, TILE_HEIGHT, TILE_MIN_WIDTH, TILE_ROW_MIN_WIDTH } from './layout'
+import {
+  floorsFor,
+  HORIZONTAL_TILE_HEIGHT,
+  STATE_LINE_HEIGHT,
+  TILE_HEIGHT,
+  TILE_MIN_WIDTH,
+  TILE_ROW_MIN_WIDTH,
+  tileMetrics,
+} from './layout'
 
 const tiles = (n: number, at?: number) =>
   Array.from({ length: n }, (_, i) => (i === at ? { break: true } : {}))
@@ -151,5 +159,46 @@ describe('floorsFor, one line per row', () => {
 
   it('leaves the wrapping floor as it was when told to wrap', () => {
     expect(floorsFor(tiles(4), 407, 0, 'wrap')).toEqual(floorsFor(tiles(4), 407, 0))
+  })
+})
+
+describe('tileMetrics', () => {
+  it('is the vertical tile v1.17 drew, by default', () => {
+    expect(tileMetrics()).toEqual({
+      minWidth: TILE_MIN_WIDTH,
+      rowMinWidth: TILE_ROW_MIN_WIDTH,
+      height: TILE_HEIGHT,
+    })
+  })
+
+  it('draws a horizontal tile one sections row tall at one state line', () => {
+    expect(HORIZONTAL_TILE_HEIGHT).toBe(56)
+    expect(tileMetrics('horizontal').height).toBe(56)
+  })
+
+  it('adds a caption line per extra state line', () => {
+    expect(tileMetrics('vertical', 2).height).toBe(TILE_HEIGHT + STATE_LINE_HEIGHT)
+    expect(tileMetrics('horizontal', 3).height).toBe(56 + 2 * STATE_LINE_HEIGHT)
+  })
+})
+
+describe('floorsFor, horizontal', () => {
+  it('asks for one grid row per line of glass tiles', () => {
+    // Two horizontal tiles across 425 of glass: one line, 56 tall, one row.
+    const floors = floorsFor([{}, {}], 425, 0, 'wrap', tileMetrics('horizontal'))
+    expect(floors.min_rows).toBe(1)
+  })
+
+  it('wraps a third horizontal tile onto a second line in a 425 column', () => {
+    const floors = floorsFor([{}, {}, {}], 425, 0, 'wrap', tileMetrics('horizontal'))
+    expect(floors.min_rows).toBe(2)
+  })
+
+  it('prices a taller tile when the state takes two lines', () => {
+    // 56 is one row exactly; 69 is past it.
+    const one = floorsFor([{}], 425, 0, 'wrap', tileMetrics('horizontal', 1))
+    const two = floorsFor([{}], 425, 0, 'wrap', tileMetrics('horizontal', 2))
+    expect(one.min_rows).toBe(1)
+    expect(two.min_rows).toBe(2)
   })
 })

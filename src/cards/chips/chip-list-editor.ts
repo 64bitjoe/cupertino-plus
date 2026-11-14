@@ -47,7 +47,7 @@ import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResul
 import { property, state } from 'lit/decorators.js'
 import { repeat } from 'lit/directives/repeat.js'
 
-import { ACTION_NAMES } from '../../core/actions'
+import { allActionRows, gestureHelper, gestureLabel } from '../../core/action-form'
 import { moveRow } from '../../core/entities-form'
 import { defineElement } from '../../core/register'
 import { isTemplate } from '../../core/templates'
@@ -93,14 +93,6 @@ const CONTENT_LABELS: Record<string, string> = {
   labeled: 'Icon, name and reading',
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  'more-info': 'Open more-info',
-  toggle: 'Toggle it',
-  navigate: 'Go to a view',
-  'call-service': 'Call a service',
-  none: 'Nothing',
-}
-
 const option = (labels: Record<string, string>) => (value: string) => ({
   value,
   label: labels[value] ?? value,
@@ -119,10 +111,6 @@ const CONTENT_SELECTOR = {
     mode: 'dropdown' as const,
     options: [CONTENT_INHERIT, ...CHIP_CONTENTS].map(option(CONTENT_LABELS)),
   },
-}
-
-const ACTION_SELECTOR = {
-  select: { mode: 'dropdown' as const, options: [...ACTION_NAMES].map(option(ACTION_LABELS)) },
 }
 
 /**
@@ -156,10 +144,9 @@ const iconSelector = (placeholder: string | undefined): { icon: { placeholder?: 
  * `model.ts` rather than from `context: { icon_entity: … }`, so that the promise the greyed-out
  * text makes is kept by the same code that would have to keep it.
  *
- * The last row is the argument the chosen action takes, and there is at most one: an action
- * that needs nothing gets no field, and a `navigation_path` is never shown beside a `toggle`
- * because a control offering an argument that will be ignored is a control that lies. Outside
- * templating mode, that one field is Home Assistant's own view picker rather than a path typed
+ * The press comes last: three dropdowns (tap, hold, double tap), each followed by the one
+ * argument its chosen action takes, if any — `actionRows` in `core/action-form.ts`. Outside
+ * templating mode, a path is Home Assistant's own view picker rather than a path typed
  * by hand — `NavigationSelector` in `core/types/ha.ts` has what was checked before using it. A
  * template cannot be typed into a picker, so templating mode keeps the plain text box instead.
  *
@@ -191,18 +178,8 @@ const chipSchema = (
     { name: 'name', selector: textSelector(inheritedName(hass, config.entity)) },
     ...(first ? [] : [{ name: 'break', selector: { boolean: {} } as const }]),
     { name: 'fill', selector: { boolean: {} } },
-    { name: 'action', selector: ACTION_SELECTOR },
+    ...allActionRows(data, templating),
   ]
-
-  if (data.action === 'navigate') {
-    rows.push({
-      name: 'navigation_path',
-      selector: templating ? { text: { placeholder: '/lovelace/0' } } : { navigation: {} },
-    })
-  }
-  if (data.action === 'call-service') {
-    rows.push({ name: 'service', selector: { text: { placeholder: 'script.goodnight' } } })
-  }
 
   if (templating) {
     rows.push({ name: 'value', selector: { text: { placeholder: "{{ states('sensor.a') }}" } } })
@@ -237,6 +214,7 @@ const LABELS: Record<string, string> = {
   name: 'Name',
   action: 'When pressed',
   navigation_path: 'Path',
+  url_path: 'Web address',
   service: 'Service',
   templating: 'Use templates',
   break: 'Start a new row',
@@ -258,7 +236,8 @@ const HELPERS: Record<string, string> = {
   name: 'The caption in the third content mode, and the screen-reader label in all of them.',
   action: 'A chip set to Nothing is not drawn as a button at all: no tab stop, no pressed state.',
   navigation_path: 'A dashboard path, as the URL bar shows it.',
-  service: 'As domain.service. Its data and target stay in YAML.',
+  url_path: 'Opens in a new tab, or the browser on the companion app.',
+  service: 'As domain.service. Its data and target stay in YAML, and either may be a template.',
   templating:
     'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
   break: 'This chip begins a new row. A row still wraps on its own if it runs out of width.',
@@ -453,10 +432,10 @@ class CupertinoChipsList extends LitElement {
   private readonly _colorCustom = new Set<string>()
 
   private readonly _computeLabel = (schema: HaFormSchema): string =>
-    LABELS[schema.name] ?? schema.name
+    LABELS[schema.name] ?? gestureLabel(schema.name) ?? schema.name
 
   private readonly _computeHelper = (schema: HaFormSchema): string | undefined =>
-    HELPERS[schema.name]
+    HELPERS[schema.name] ?? gestureHelper(schema.name)
 
   private readonly _computeAddLabel = (): string => ADD_LABEL
 
@@ -560,7 +539,7 @@ class CupertinoChipsList extends LitElement {
    * occurrence positionally, and the rules doc has always said such a config draws both chips
    * and is fully editable — this is the button that makes it reachable without the YAML tab.
    *
-   * The clone is deep enough for the one nested object a chip has (`tap_action`), so editing
+   * The clone is deep enough for the nested objects a chip has (its three actions), so editing
    * the copy's action cannot reach back and rewrite the original's.
    */
   private readonly _duplicate = (event: Event, index: number): void => {
@@ -574,6 +553,8 @@ class CupertinoChipsList extends LitElement {
 
     const copy: ChipConfig = { ...source }
     if (source.tap_action) copy.tap_action = { ...source.tap_action }
+    if (source.hold_action) copy.hold_action = { ...source.hold_action }
+    if (source.double_tap_action) copy.double_tap_action = { ...source.double_tap_action }
 
     const next = [...this.chips]
     next.splice(index + 1, 0, copy)

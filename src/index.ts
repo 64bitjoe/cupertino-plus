@@ -6,6 +6,7 @@
  */
 import { printBanner } from './core/register'
 
+import './cards/badge/badge'
 import './cards/battery/battery-card'
 import './cards/calendar/calendar-card'
 import './cards/chips/chips-card'
@@ -15,6 +16,7 @@ import './cards/weather/weather-card'
 
 printBanner()
 
+export { BADGE_TAG } from './cards/badge/badge'
 export { BATTERY_CARD_TAG } from './cards/battery/battery-card'
 export { CALENDAR_CARD_TAG } from './cards/calendar/calendar-card'
 export { CHIPS_CARD_TAG } from './cards/chips/chips-card'

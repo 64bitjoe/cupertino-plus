@@ -21,7 +21,7 @@ import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResul
 import { property, state } from 'lit/decorators.js'
 import { repeat } from 'lit/directives/repeat.js'
 
-import { ACTION_NAMES } from '../../core/actions'
+import { allActionRows, gestureHelper, gestureLabel } from '../../core/action-form'
 import { moveRow } from '../../core/entities-form'
 import { defineElement } from '../../core/register'
 import { isTemplate } from '../../core/templates'
@@ -47,30 +47,6 @@ export interface TilesChangedDetail {
  * tiles it is meant to replace, so there is none to hide.
  */
 const ANY_ENTITY = { entity: {} } as const
-
-const ACTION_LABELS: Record<string, string> = {
-  'more-info': 'Open more-info',
-  toggle: 'Toggle it',
-  navigate: 'Go to a view',
-  'call-service': 'Call a service',
-  none: 'Nothing',
-}
-
-const option = (labels: Record<string, string>) => (value: string) => ({
-  value,
-  label: labels[value] ?? value,
-})
-
-/**
- * A dropdown rather than the radio list `select` would choose for itself.
- *
- * Under six options `ha-selector-select` renders radios, and five of them inside a panel that
- * already holds other fields is a lot of room. The mode is a statement about the room a control
- * is in, and the room here is an accordion row in a dialog.
- */
-const ACTION_SELECTOR = {
-  select: { mode: 'dropdown' as const, options: [...ACTION_NAMES].map(option(ACTION_LABELS)) },
-}
 
 /**
  * A text field whose placeholder is a real inherited value, or none at all.
@@ -102,10 +78,9 @@ const iconSelector = (placeholder: string | undefined): { icon: { placeholder?: 
  * `model.ts` rather than from `context: { icon_entity: … }`, so that the promise the greyed-out
  * text makes is kept by the same code that would have to keep it.
  *
- * The last row is the argument the chosen action takes, and there is at most one: an action
- * that needs nothing gets no field, and a `navigation_path` is never shown beside a `toggle`
- * because a control offering an argument that will be ignored is a control that lies. Outside
- * templating mode, that one field is Home Assistant's own view picker rather than a path typed
+ * The press comes last: three dropdowns (tap, hold, double tap), each followed by the one
+ * argument its chosen action takes, if any — `actionRows` in `core/action-form.ts`. Outside
+ * templating mode, a path is Home Assistant's own view picker rather than a path typed
  * by hand — `NavigationSelector` in `core/types/ha.ts` has what was checked before using it. A
  * template cannot be typed into a picker, so templating mode keeps the plain text box instead.
  *
@@ -135,24 +110,18 @@ const tileSchema = (
       : { name: 'icon', selector: iconSelector(inheritedIcon(hass, config.entity)) },
     { name: 'name', selector: textSelector(inheritedName(hass, config.entity)) },
     ...(first ? [] : [{ name: 'break', selector: { boolean: {} } as const }]),
-    { name: 'action', selector: ACTION_SELECTOR },
+    ...allActionRows(data, templating),
   ]
-
-  if (data.action === 'navigate') {
-    rows.push({
-      name: 'navigation_path',
-      selector: templating ? { text: { placeholder: '/lovelace/0' } } : { navigation: {} },
-    })
-  }
-  if (data.action === 'call-service') {
-    rows.push({ name: 'service', selector: { text: { placeholder: 'script.goodnight' } } })
-  }
 
   if (templating) {
     rows.push({ name: 'value', selector: { text: { placeholder: "{{ states('sensor.a') }}" } } })
     rows.push({
       name: 'show',
       selector: { text: { placeholder: "{{ is_state('light.a','on') }}" } },
+    })
+    rows.push({
+      name: 'selected',
+      selector: { text: { placeholder: "{{ is_state('input_select.a','200') }}" } },
     })
   }
 
@@ -180,11 +149,13 @@ const LABELS: Record<string, string> = {
   name: 'Name',
   action: 'When pressed',
   navigation_path: 'Path',
+  url_path: 'Web address',
   service: 'Service',
   templating: 'Use templates',
   break: 'Start a new row',
   value: 'Reading',
   show: 'Show when',
+  selected: 'Selected when',
 }
 
 /**
@@ -200,12 +171,15 @@ const HELPERS: Record<string, string> = {
   name: 'The caption under the icon, and the screen-reader label.',
   action: 'A tile set to Nothing is not drawn as a button at all: no tab stop, no pressed state.',
   navigation_path: 'A dashboard path, as the URL bar shows it.',
-  service: 'As domain.service. Its data and target stay in YAML.',
+  url_path: 'Opens in a new tab, or the browser on the companion app.',
+  service: 'As domain.service. Its data and target stay in YAML, and either may be a template.',
   templating:
     'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
   break: 'This tile begins a new row. A row still wraps on its own if it runs out of width.',
   value: "Replaces what the tile prints. Falls back to the entity's own reading if it is empty.",
   show: 'The tile is drawn only while this is true. Hidden until it answers.',
+  selected:
+    'The tile is drawn filled with its colour while this is true, to mark the current choice.',
 }
 
 const ADD_LABEL = 'Add a tile'
@@ -377,7 +351,14 @@ class CupertinoTilesList extends LitElement {
    */
   private _isTemplating(config: TileConfig, key: string): boolean {
     if (this._templating.has(key)) return true
-    return [config.name, config.icon, config.color, config.value, config.show].some(isTemplate)
+    return [
+      config.name,
+      config.icon,
+      config.color,
+      config.value,
+      config.show,
+      config.selected,
+    ].some(isTemplate)
   }
 
   /**
@@ -392,10 +373,10 @@ class CupertinoTilesList extends LitElement {
   private readonly _colorCustom = new Set<string>()
 
   private readonly _computeLabel = (schema: HaFormSchema): string =>
-    LABELS[schema.name] ?? schema.name
+    LABELS[schema.name] ?? gestureLabel(schema.name) ?? schema.name
 
   private readonly _computeHelper = (schema: HaFormSchema): string | undefined =>
-    HELPERS[schema.name]
+    HELPERS[schema.name] ?? gestureHelper(schema.name)
 
   private readonly _computeAddLabel = (): string => ADD_LABEL
 
@@ -499,7 +480,7 @@ class CupertinoTilesList extends LitElement {
    * occurrence positionally, and the rules doc has always said such a config draws both tiles
    * and is fully editable — this is the button that makes it reachable without the YAML tab.
    *
-   * The clone is deep enough for the one nested object a tile has (`tap_action`), so editing
+   * The clone is deep enough for the nested objects a tile has (its three actions), so editing
    * the copy's action cannot reach back and rewrite the original's.
    */
   private readonly _duplicate = (event: Event, index: number): void => {
@@ -513,6 +494,8 @@ class CupertinoTilesList extends LitElement {
 
     const copy: TileConfig = { ...source }
     if (source.tap_action) copy.tap_action = { ...source.tap_action }
+    if (source.hold_action) copy.hold_action = { ...source.hold_action }
+    if (source.double_tap_action) copy.double_tap_action = { ...source.double_tap_action }
 
     const next = [...this.tiles]
     next.splice(index + 1, 0, copy)

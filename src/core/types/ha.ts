@@ -115,6 +115,12 @@ export interface HomeAssistant {
   locale: FrontendLocaleData
   language: string
   connection: HassConnection
+  /**
+   * Who is looking at the dashboard. Optional because the stand-in `hass` the showcase and the
+   * editor tests build has no user, and a card has to render without one. Read for the `user`
+   * a template is handed (`chips/model.ts`'s `templateRequest`).
+   */
+  user?: { id: string; name: string; is_admin?: boolean }
   localize(key: string, ...args: unknown[]): string
   callWS<T>(msg: Record<string, unknown>): Promise<T>
   callService(

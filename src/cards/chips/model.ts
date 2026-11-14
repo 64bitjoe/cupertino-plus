@@ -14,9 +14,11 @@
 import {
   ACTION_NAMES,
   DEFAULT_ACTION,
+  serviceOf,
   type ActionConfig,
   type ActionName,
 } from '../../core/actions'
+import { DOUBLE_TAP_PREFIX, HOLD_PREFIX } from '../../core/action-form'
 import {
   formatValue,
   iconFor,
@@ -49,6 +51,26 @@ import type { HomeAssistant } from '../../core/types/ha'
 export type ChipsContainer = CardContainer
 
 export const DEFAULT_CONTAINER: ChipsContainer = 'glass'
+
+/**
+ * Where a row's chips sit along it when they do not fill it: at its start (every chips card up
+ * to v1.17), centred, at its end, or spread so the first and last touch the edges (`justify`).
+ *
+ * Mushroom's chips card takes the same four words, and a centred row of media controls under a
+ * now-playing card is the case that asked for it. A `fill` spacer still takes all the room it
+ * can, so a row with one in it is laid out by the spacer and this changes nothing there.
+ */
+export const CHIP_ALIGNMENTS = ['start', 'center', 'end', 'justify'] as const
+
+export type ChipAlignment = (typeof CHIP_ALIGNMENTS)[number]
+
+export const DEFAULT_ALIGNMENT: ChipAlignment = 'start'
+
+/** The card's `alignment`, or the default for anything else; silent, as `container` is. */
+export const alignmentFor = (value: unknown): ChipAlignment =>
+  (CHIP_ALIGNMENTS as readonly unknown[]).includes(value)
+    ? (value as ChipAlignment)
+    : DEFAULT_ALIGNMENT
 
 /**
  * How much of a chip is drawn. `icon` is the glyph alone; `value` adds the reading; `labeled`
@@ -95,6 +117,9 @@ export interface ChipConfig {
    */
   fill?: boolean
   tap_action?: ActionConfig
+  /** YAML only, as `data` and `target` are: see `core/gestures.ts` for how a hold is told apart. */
+  hold_action?: ActionConfig
+  double_tap_action?: ActionConfig
 }
 
 export interface ChipView {
@@ -130,6 +155,9 @@ export interface ChipView {
    */
   spacer: boolean
   action: ActionConfig
+  /** Only when configured: a row with no hold runs no hold timer (`core/gestures.ts`). */
+  holdAction?: ActionConfig
+  doubleTapAction?: ActionConfig
 }
 
 export interface ChipDefaults {
@@ -209,6 +237,63 @@ export type TemplateResolver = (template: string, entity?: string) => string | u
 const TEMPLATED_FIELDS = ['name', 'icon', 'color', 'value', 'show'] as const
 
 /**
+ * The one way a template becomes a request, for the model registering it and the card looking
+ * its result up again: both call this, so the two keys cannot disagree.
+ *
+ * The variables are Mushroom's, so a template moved over from one of its cards reads the same
+ * names: `config.entity` and `entity` are the row's entity id, and `user` is the name of whoever
+ * is looking. `config.entity` came first and stays; `entity` and `user` arrived with the
+ * migration, where a template written `{{ is_state(entity, 'on') }}` had nothing to read.
+ *
+ * Each is present only when it has a value, and with neither the request carries no `variables`
+ * key at all. That is what used to be stated as "no entity means no variables" and is the same
+ * rule, widened by one: a request is keyed by exactly what it was rendered with, so two ways of
+ * writing nothing can never hash to two keys (`chipTemplates`' note has the bug that is about).
+ */
+export const templateRequest = (
+  template: string,
+  entity: string | undefined,
+  user: string | undefined,
+): TemplateRequest => {
+  const variables: Record<string, unknown> = {}
+  if (entity !== undefined) {
+    variables.config = { entity }
+    variables.entity = entity
+  }
+  if (user !== undefined) variables.user = user
+  return Object.keys(variables).length > 0 ? { template, variables } : { template }
+}
+
+/** The action fields that are one string, any of which may be a template. */
+const ACTION_TEXT_FIELDS = ['navigation_path', 'url_path', 'service', 'perform_action'] as const
+
+/**
+ * The action fields that are a tree, whose string leaves may be templates: a service's data
+ * and its target, at any depth (`entity_id: ['{{ … }}', light.hall]` is a leaf in a list).
+ */
+const ACTION_TREE_FIELDS = ['data', 'service_data', 'target'] as const
+
+const templatesIn = (value: unknown, out: string[]): void => {
+  if (isTemplate(value)) out.push(value)
+  else if (Array.isArray(value)) for (const item of value) templatesIn(item, out)
+  else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) templatesIn(item, out)
+  }
+}
+
+/** Every template one action holds, in its text fields and anywhere in its data and target. */
+export const actionTemplates = (action: ActionConfig | undefined): string[] => {
+  const out: string[] = []
+  if (!action) return out
+  for (const key of ACTION_TEXT_FIELDS) templatesIn(action[key], out)
+  for (const key of ACTION_TREE_FIELDS) templatesIn(action[key], out)
+  return out
+}
+
+/** The three gestures a row can configure, in the order `chipTemplates` registers them. */
+const ACTION_KEYS = ['tap_action', 'hold_action', 'double_tap_action'] as const
+
+/**
  * Every template a config asks for, ready for `TemplatePool.sync`.
  *
  * A field missed here is a field that never resolves, so this and the reading below have to
@@ -227,15 +312,18 @@ const TEMPLATED_FIELDS = ['name', 'icon', 'color', 'value', 'show'] as const
  * prior round of this card already found and fixed once: two ways of writing "no entity" that
  * do not hash to the same `requestKey`.
  */
-export const chipTemplates = (entities: unknown, defaults: ChipDefaults): TemplateRequest[] => {
+export const chipTemplates = (
+  entities: unknown,
+  defaults: ChipDefaults,
+  user?: string,
+): TemplateRequest[] => {
   const requests: TemplateRequest[] = []
 
-  if (isTemplate(defaults.color)) requests.push({ template: defaults.color })
+  if (isTemplate(defaults.color)) requests.push(templateRequest(defaults.color, undefined, user))
 
   for (const row of chipConfigs(entities)) {
-    const variables = row.entity !== undefined ? { config: { entity: row.entity } } : undefined
     const push = (template: string): void => {
-      requests.push(variables ? { template, variables } : { template })
+      requests.push(templateRequest(template, row.entity, user))
     }
 
     for (const field of TEMPLATED_FIELDS) {
@@ -243,14 +331,7 @@ export const chipTemplates = (entities: unknown, defaults: ChipDefaults): Templa
       if (isTemplate(raw)) push(raw)
     }
 
-    // Bound first rather than reached through `row.tap_action?.…`: a type predicate narrows
-    // the expression it was handed, not the object behind it, so the optional-chain version
-    // passes `isTemplate` and then fails to compile on `action.navigation_path`.
-    const action = row.tap_action
-    if (action) {
-      if (isTemplate(action.navigation_path)) push(action.navigation_path)
-      if (isTemplate(action.service)) push(action.service)
-    }
+    for (const key of ACTION_KEYS) for (const template of actionTemplates(row[key])) push(template)
   }
 
   return requests
@@ -354,10 +435,12 @@ export const readChip = (
       // extended here to a chip's whole content rather than only its visibility.
       spacer: name === undefined && icon === undefined && value === undefined,
       action: readAction(row.tap_action, field, row.entity, NO_TARGET_ACTION),
+      ...readGestures(row, field),
     }
   }
 
   const action = readAction(row.tap_action, field, row.entity, DEFAULT_ACTION)
+  const gestures = readGestures(row, field)
   const entity = hass?.states[row.entity]
 
   if (!hass || !entity) {
@@ -376,6 +459,7 @@ export const readChip = (
       fill: row.fill === true,
       spacer: false,
       action,
+      ...gestures,
     }
   }
 
@@ -403,6 +487,7 @@ export const readChip = (
     fill: row.fill === true,
     spacer: false,
     action,
+    ...gestures,
   }
 }
 
@@ -411,33 +496,93 @@ export const readChip = (
 export const NO_TARGET_ACTION: ActionConfig = { action: 'none' }
 
 /**
- * The action, with its one argument resolved if it was a template.
+ * The action, with every template in it resolved.
  *
  * Rebuilt rather than mutated: `row.tap_action` is the user's config object, and a card that
  * wrote a rendered path back into it would persist a template's output as though somebody had
  * typed it.
  *
+ * Every string field (the path, the URL, the service under either name) and every string leaf
+ * of `data` and `target`, however deep. A leaf whose template has not answered yet is left out
+ * rather than sent as written, because a service handed `'{{ states(…) }}'` as a brightness is
+ * a failed call where one without the key is the service's default; the same rule a field that
+ * is mid-resolution keeps everywhere else in this file. A leaf arrives as text, as every result
+ * does (see `TemplatePool`), and Home Assistant's service schemas coerce a number written as
+ * text, so `brightness_pct: '{{ 40 }}'` works.
+ *
  * `fallback` is what a row with no `tap_action` at all gets: `DEFAULT_ACTION` (more-info) for
  * an entity-bearing chip, exactly as before, and `NO_TARGET_ACTION` (none) for an entity-less
  * one, whose default press would otherwise open a more-info dialog for nothing.
  */
-export const readAction = (
+export function readAction(
   action: ActionConfig | undefined,
   field: (raw: string | undefined, entity: string | undefined) => string | undefined,
   entity: string | undefined,
   fallback: ActionConfig,
-): ActionConfig => {
+): ActionConfig
+export function readAction(
+  action: ActionConfig | undefined,
+  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
+  entity: string | undefined,
+  fallback: undefined,
+): ActionConfig | undefined
+export function readAction(
+  action: ActionConfig | undefined,
+  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
+  entity: string | undefined,
+  fallback: ActionConfig | undefined,
+): ActionConfig | undefined {
   if (!action) return fallback
-  if (!isTemplate(action.navigation_path) && !isTemplate(action.service)) return action
+  if (actionTemplates(action).length === 0) return action
 
   const next: ActionConfig = { ...action }
-  const path = field(action.navigation_path, entity)
-  const service = field(action.service, entity)
-  if (path === undefined) delete next.navigation_path
-  else next.navigation_path = path
-  if (service === undefined) delete next.service
-  else next.service = service
+  for (const key of ACTION_TEXT_FIELDS) {
+    const raw = action[key]
+    if (!isTemplate(raw)) continue
+    const result = field(raw, entity)
+    if (result === undefined) delete next[key]
+    else next[key] = result
+  }
+  for (const key of ACTION_TREE_FIELDS) {
+    const tree = action[key]
+    if (tree !== undefined) next[key] = resolveTree(tree, raw => field(raw, entity)) as typeof tree
+  }
   return next
+}
+
+/** Left out of an object or a list; see `readAction` on a leaf that has not answered. */
+const UNRESOLVED = Symbol('unresolved')
+
+const resolveTree = (value: unknown, resolve: (raw: string) => string | undefined): unknown => {
+  if (isTemplate(value)) return resolve(value) ?? UNRESOLVED
+  if (Array.isArray(value)) {
+    return value.map(item => resolveTree(item, resolve)).filter(item => item !== UNRESOLVED)
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(value)) {
+      const resolved = resolveTree(item, resolve)
+      if (resolved !== UNRESOLVED) out[key] = resolved
+    }
+    return out
+  }
+  return value
+}
+
+/**
+ * A row's hold and double tap, resolved, and present only when configured: a view with no
+ * `holdAction` key is a row whose press runs no hold timer at all.
+ */
+export const readGestures = (
+  row: { entity?: string; hold_action?: ActionConfig; double_tap_action?: ActionConfig },
+  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
+): { holdAction?: ActionConfig; doubleTapAction?: ActionConfig } => {
+  const hold = readAction(row.hold_action, field, row.entity, undefined)
+  const double = readAction(row.double_tap_action, field, row.entity, undefined)
+  return {
+    ...(hold && hold.action !== 'none' ? { holdAction: hold } : {}),
+    ...(double && double.action !== 'none' ? { doubleTapAction: double } : {}),
+  }
 }
 
 /**
@@ -579,10 +724,29 @@ export const chipToForm = (config: ChipConfig): Record<string, unknown> => ({
   show: config.show,
   break: config.break === true,
   fill: config.fill === true,
-  action:
-    config.tap_action?.action ?? (config.entity === undefined ? 'none' : DEFAULT_ACTION.action),
-  navigation_path: config.tap_action?.navigation_path,
-  service: config.tap_action?.service,
+  ...actionToForm(config.tap_action, config.entity),
+  ...gesturesToForm(config),
+})
+
+/**
+ * The tap action's three form fields, from the config. Shared with the tiles model.
+ *
+ * `perform-action` shows as Call a service, the same action under Home Assistant's newer name,
+ * with its `perform_action` in the Service field; `actionFromForm` writes it back under the name
+ * it came in with, so opening the panel does not rename a key nobody touched.
+ */
+export const actionToForm = (
+  action: ActionConfig | undefined,
+  entity: string | undefined,
+  prefix = '',
+): Record<string, unknown> => ({
+  [`${prefix}action`]:
+    action?.action === 'perform-action'
+      ? 'call-service'
+      : (action?.action ?? (entity === undefined ? 'none' : DEFAULT_ACTION.action)),
+  [`${prefix}navigation_path`]: action?.navigation_path,
+  [`${prefix}url_path`]: action?.url_path,
+  [`${prefix}service`]: action ? serviceOf(action) : undefined,
 })
 
 /**
@@ -651,7 +815,38 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
   const tapAction = staleDefault ? undefined : actionFromForm(prior.tap_action, data, bareDefault)
   if (tapAction !== undefined) next.tap_action = tapAction
 
-  return next
+  return { ...next, ...gesturesFromForm(prior, data) }
+}
+
+/**
+ * The hold and double tap, as the panel's fields. Both default to Nothing whatever the entity,
+ * because that is what an unconfigured gesture does: neither has a more-info fallback.
+ */
+export const gesturesToForm = (row: {
+  hold_action?: ActionConfig
+  double_tap_action?: ActionConfig
+}): Record<string, unknown> => ({
+  ...actionToForm(row.hold_action, undefined, HOLD_PREFIX),
+  ...actionToForm(row.double_tap_action, undefined, DOUBLE_TAP_PREFIX),
+})
+
+/**
+ * The hold and double tap, folded back. A gesture whose dropdown the form did not draw at all
+ * keeps what it had, so a caller passing a partial answer (a test, or an editor without the
+ * fields) cannot drop a gesture written in YAML. One left at Nothing writes no key.
+ */
+export const gesturesFromForm = (
+  prior: { hold_action?: ActionConfig; double_tap_action?: ActionConfig },
+  data: Record<string, unknown>,
+): { hold_action?: ActionConfig; double_tap_action?: ActionConfig } => {
+  const gesture = (action: ActionConfig | undefined, prefix: string) =>
+    data[`${prefix}action`] === undefined ? action : actionFromForm(action, data, 'none', prefix)
+  const hold = gesture(prior.hold_action, HOLD_PREFIX)
+  const doubleTap = gesture(prior.double_tap_action, DOUBLE_TAP_PREFIX)
+  return {
+    ...(hold !== undefined ? { hold_action: hold } : {}),
+    ...(doubleTap !== undefined ? { double_tap_action: doubleTap } : {}),
+  }
 }
 
 /**
@@ -673,27 +868,51 @@ export const actionFromForm = (
   prior: ActionConfig | undefined,
   data: Record<string, unknown>,
   bareDefault: ActionName,
+  prefix = '',
 ): ActionConfig | undefined => {
-  const named = text(data.action)
+  const field = (name: string) => text(data[`${prefix}${name}`])
+  const named = field('action')
+  // An action the dropdown does not offer (`fire-dom-event`, or one a later Home Assistant adds)
+  // shows as itself and comes back as itself: the panel cannot edit it, so it must not replace it.
+  if (prior && named === prior.action && !(ACTION_NAMES as readonly string[]).includes(named)) {
+    return prior
+  }
   const action: ActionName = (ACTION_NAMES as readonly string[]).includes(named ?? '')
     ? (named as ActionName)
     : bareDefault
 
-  const next: ActionConfig = { action }
+  // Written back under the name it came in with: see `actionToForm`.
+  const renamed = action === 'call-service' && prior?.action === 'perform-action'
+  const next: ActionConfig = { action: renamed ? 'perform-action' : action }
 
-  // Carried through every action, because it is the one override that applies to all of them.
+  // Carried through every action, because they are the overrides that apply to all of them.
   if (prior?.entity !== undefined) next.entity = prior.entity
+  if (prior?.confirmation !== undefined) next.confirmation = prior.confirmation
 
   if (action === 'navigate') {
-    const path = text(data.navigation_path)
+    const path = field('navigation_path')
     if (path !== undefined) next.navigation_path = path
   }
 
+  if (action === 'url') {
+    const url = field('url_path')
+    if (url !== undefined) next.url_path = url
+  }
+
   if (action === 'call-service') {
-    const service = text(data.service)
-    if (service !== undefined) next.service = service
+    const service = field('service')
+    if (service !== undefined) {
+      if (renamed) next.perform_action = service
+      else next.service = service
+    }
     if (prior?.data !== undefined) next.data = prior.data
+    if (prior?.service_data !== undefined) next.service_data = prior.service_data
     if (prior?.target !== undefined) next.target = prior.target
+  }
+
+  if (action === 'assist' && prior?.action === 'assist') {
+    if (prior.pipeline_id !== undefined) next.pipeline_id = prior.pipeline_id
+    if (prior.start_listening !== undefined) next.start_listening = prior.start_listening
   }
 
   return action === bareDefault && Object.keys(next).length === 1 ? undefined : next

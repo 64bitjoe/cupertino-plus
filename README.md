@@ -133,14 +133,19 @@ the row reads as one band rather than as a ragged line.
        alt="A row of six glass chips on a light dashboard: 21.4°C, 41%, Locked, Not home, On, and a dimmed chip with a dash for a sensor that is not reporting">
 </p>
 
-A press opens more-info by default, and per chip it can toggle, navigate to another view, call
-a service, or be turned off entirely — a chip that does nothing is drawn as a chip that does
+A press opens more-info by default, and per chip it can toggle, navigate to another view, go
+back, open a web page, call a service (`call-service` or Home Assistant's newer `perform-action`),
+open Assist, or be turned off entirely; a hold and a double tap can each do any of those too,
+set from the same panel,
+any action can ask for Home Assistant's confirmation dialog, and a template can reach any string
+in it, a service's `data` and `target` included — a chip that does nothing is drawn as a chip that does
 nothing, with no button role and no tab stop. The row wraps onto a second line rather than
 hiding a chip, and the card asks Home Assistant for exactly the height that takes: it arrives
 with the Layout tab's **Auto height** on, so it sits at the height of its chips with no strip of
 empty dashboard under it, and nothing to set in `grid_options`. Put it over a busy
 wallpaper and the translucency has nothing predictable behind it; `container: card` is the
-answer, and gives the pills an ordinary card surface to sit on.
+answer, and gives the pills an ordinary card surface to sit on. `alignment: center` (or `end`,
+or `justify`) moves a row's chips along it.
 
 The rules, including the two containers and what a press can be made to do, are in
 [`docs/chips-widget-rules.md`](docs/chips-widget-rules.md).
@@ -170,11 +175,41 @@ A tile does not need an entity: with a name, an icon and a `navigate` press it i
 to another view, and leaves its state line empty (a dash there is kept for an entity that is
 not reporting). Name, icon, colour, state and
 visibility can each be a template. A press opens more-info by default on a tile with an
-entity (one without defaults to no action), and per tile can
-toggle, navigate, call a service, or do nothing.
+entity (one without defaults to no action), and takes every action and gesture a chip does.
+
+For a column of status rows rather than a grid of shortcuts, `orientation: horizontal` puts the
+glyph beside the name and draws each tile one grid row tall, and `state_lines: 2` (or 3) lets a
+long status wrap instead of ellipsizing. `selected`, usually a template, fills one tile with its
+colour at rest, the way a segmented control marks the current choice: a row of oven presets
+that shows which one is set.
 
 The rules, including why tiles carry a colour where chips refuse one, are in
 [`docs/tiles-widget-rules.md`](docs/tiles-widget-rules.md).
+
+### The badge
+
+One chip, as a Home Assistant badge: the same glass pill at the 36px height the frontend gives
+its own badges, so it sits in a row of theirs. It takes a chip's keys (`entity`, `name`, `icon`,
+`color`, `value`, `show`, `content`, and every action) and any of them can be a template, so a
+"Lights on" count is one `value`. Add it from the badge picker, or as
+`type: custom:cupertino-plus-badge`. A `show` that answers false hides it, gap and all.
+
+## Coming from Mushroom
+
+The tiles, chips and badge cover what the Mushroom template card, chips card and template badge
+are used for, and read most of the same YAML:
+
+| Mushroom                                   | Cupertino Plus                                    |
+| ------------------------------------------ | ------------------------------------------------- |
+| `template-card` `primary`                  | a tile's `name`                                   |
+| `secondary`, `multiline_secondary`         | a tile's `value`, and the card's `state_lines: 2` |
+| `layout: horizontal`                       | `orientation: horizontal`                         |
+| `icon_color: amber` (and every other name) | `color: amber`, mapped onto the palette           |
+| chips `alignment: center`                  | chips `alignment: center`                         |
+| back chip                                  | a chip with `tap_action: { action: back }`        |
+| `template-badge`                           | `custom:cupertino-plus-badge`                     |
+| `perform-action`, `hold_action`, …         | the same keys, unchanged                          |
+| `{{ entity }}`, `{{ user }}` in a template | the same variables, beside `config.entity`        |
 
 ## Configuring
 
@@ -184,7 +219,7 @@ footprint**, and the card re-lays itself out for whatever box you drag it into. 
 tiles cards are the exception that proves it: they default to Auto height, so their footprint is
 their content until you drag one.
 
-The six types, if you do want to paste config:
+The seven types, if you do want to paste config:
 
 | Card         | Type                                 | Asks for                                    |
 | ------------ | ------------------------------------ | ------------------------------------------- |
@@ -194,6 +229,7 @@ The six types, if you do want to paste config:
 | Weather      | `custom:cupertino-plus-weather`      | one weather entity                          |
 | Chips        | `custom:cupertino-plus-chips`        | entities, and what a press on each one does |
 | Tiles        | `custom:cupertino-plus-tiles`        | which shortcuts, and what each one opens    |
+| Badge        | `custom:cupertino-plus-badge`        | an entity or a template, as a view badge    |
 
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.

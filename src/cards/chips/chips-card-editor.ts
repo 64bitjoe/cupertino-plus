@@ -12,8 +12,10 @@ import type { ChipsChangedDetail } from './chip-list-editor'
 import {
   chipConfigs,
   CHIP_CONTENTS,
+  CHIP_ALIGNMENTS,
   COLOR_CUSTOM,
   COLOR_SELECTOR,
+  DEFAULT_ALIGNMENT,
   DEFAULT_CONTAINER,
   DEFAULT_CONTENT,
 } from './model'
@@ -24,6 +26,13 @@ const CONTENT_LABELS: Record<string, string> = {
   icon: 'Icon only',
   value: 'Icon and reading',
   labeled: 'Icon, name and reading',
+}
+
+const ALIGNMENT_LABELS: Record<string, string> = {
+  start: 'Start',
+  center: 'Centre',
+  end: 'End',
+  justify: 'Spread across the row',
 }
 
 const CONTAINER_LABELS: Record<string, string> = {
@@ -53,6 +62,15 @@ const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
     rows.push({ name: 'color_custom', selector: { text: { placeholder: '#ff8800' } } })
   }
   rows.push({
+    name: 'alignment',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: CHIP_ALIGNMENTS.map(value => ({ value, label: ALIGNMENT_LABELS[value] ?? value })),
+      },
+    },
+  })
+  rows.push({
     name: 'container',
     selector: {
       select: {
@@ -71,6 +89,7 @@ const LABELS: Record<string, string> = {
   content: 'Chip content',
   color: 'Row colour',
   color_custom: 'Custom colour',
+  alignment: 'Alignment',
   container: 'Background',
 }
 
@@ -78,6 +97,7 @@ const HELPERS: Record<string, string> = {
   content: 'The default for every chip. A chip can say otherwise in its own panel above.',
   color: 'Tints every glyph in the row. A chip can say otherwise in its own panel above.',
   color_custom: 'Any CSS colour: a hex value, an rgb(), or a var() from your theme.',
+  alignment: 'Where the chips sit along a row they do not fill.',
   container:
     'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
 }
@@ -128,7 +148,7 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
 
   /** Shown rather than blank: an unset dropdown reads as broken, not as a default. */
   protected override defaults(): Partial<ChipsCardConfig> {
-    return { content: DEFAULT_CONTENT, container: DEFAULT_CONTAINER }
+    return { content: DEFAULT_CONTENT, alignment: DEFAULT_ALIGNMENT, container: DEFAULT_CONTAINER }
   }
 
   protected override label(schema: HaFormSchema): string {

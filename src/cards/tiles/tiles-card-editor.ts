@@ -10,7 +10,16 @@ import { COLOR_CUSTOM, COLOR_SELECTOR, DEFAULT_CONTAINER } from '../chips/model'
 // time this editor renders it, and this is the only thing that reaches it.
 import './tile-list-editor'
 import type { TilesChangedDetail } from './tile-list-editor'
-import { DEFAULT_FLOW, DEFAULT_WASH, TILE_FLOWS, TILE_WASHES, tileConfigs } from './model'
+import {
+  DEFAULT_FLOW,
+  DEFAULT_ORIENTATION,
+  DEFAULT_WASH,
+  MAX_STATE_LINES,
+  TILE_FLOWS,
+  TILE_ORIENTATIONS,
+  TILE_WASHES,
+  tileConfigs,
+} from './model'
 
 export const TILES_EDITOR_TAG = 'cupertino-plus-tiles-editor'
 
@@ -22,6 +31,11 @@ const CONTAINER_LABELS: Record<string, string> = {
 const FLOW_LABELS: Record<string, string> = {
   wrap: 'Wrap onto more lines',
   row: 'One line per row',
+}
+
+const ORIENTATION_LABELS: Record<string, string> = {
+  vertical: 'Icon above the name',
+  horizontal: 'Icon beside the name',
 }
 
 const WASH_LABELS: Record<string, string> = {
@@ -62,7 +76,25 @@ const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
       },
     },
   })
-  // Last of the three, because it is the one question that is not about paint.
+  // The shape of a tile, and then how many lines its state may take, which is the one thing
+  // about a tile's height a user decides.
+  rows.push({
+    name: 'orientation',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: TILE_ORIENTATIONS.map(value => ({
+          value,
+          label: ORIENTATION_LABELS[value] ?? value,
+        })),
+      },
+    },
+  })
+  rows.push({
+    name: 'state_lines',
+    selector: { number: { min: 1, max: MAX_STATE_LINES, step: 1, mode: 'slider' } },
+  })
+  // Last, because it is the one question that is not about the tile itself.
   rows.push({
     name: 'flow',
     selector: {
@@ -80,6 +112,8 @@ const LABELS: Record<string, string> = {
   color_custom: 'Custom colour',
   container: 'Background',
   wash: 'Colour wash',
+  orientation: 'Tile shape',
+  state_lines: 'Lines of state',
   flow: 'Rows',
 }
 
@@ -89,6 +123,10 @@ const HELPERS: Record<string, string> = {
   container:
     'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
   wash: 'When a tile fills with its colour. Its glyph always carries the colour either way.',
+  orientation:
+    'Beside the name is a shorter, wider tile: one grid row tall, for a column of status rows.',
+  state_lines:
+    'How many lines the state may wrap onto before it is cut short. Every tile grows to fit.',
   flow: 'What a row too long for the card does. One line per row narrows its tiles to fit instead; a break still starts a new row.',
 }
 
@@ -129,7 +167,13 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
    * through on the first edit, as Home Assistant's own editors do with theirs.
    */
   protected override defaults(): Partial<TilesCardConfig> {
-    return { container: DEFAULT_CONTAINER, wash: DEFAULT_WASH, flow: DEFAULT_FLOW }
+    return {
+      container: DEFAULT_CONTAINER,
+      wash: DEFAULT_WASH,
+      orientation: DEFAULT_ORIENTATION,
+      state_lines: 1,
+      flow: DEFAULT_FLOW,
+    }
   }
 
   protected override label(schema: HaFormSchema): string {

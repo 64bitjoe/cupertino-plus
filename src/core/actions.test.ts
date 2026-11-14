@@ -190,3 +190,89 @@ describe('isPressable', () => {
     expect(isPressable({ action: 'none' })).toBe(false)
   })
 })
+
+describe('runAction, the newer actions', () => {
+  /** Records every event a press raises, by type, with its detail. */
+  const recording = () => {
+    const seen: { type: string; detail: unknown }[] = []
+    const target = new EventTarget()
+    for (const type of ['hass-action', 'hass-more-info', 'haptic']) {
+      target.addEventListener(type, event =>
+        seen.push({ type, detail: (event as CustomEvent).detail }),
+      )
+    }
+    return { seen, target }
+  }
+
+  it("calls a perform-action under Home Assistant's newer names", () => {
+    const calls: ServiceCall[] = []
+    const config: ActionConfig = {
+      action: 'perform-action',
+      perform_action: 'light.turn_on',
+      data: { brightness_pct: 40 },
+    }
+    runAction(stubHass(calls), stubElement([]), config, 'light.hall')
+    expect(calls).toEqual([{ domain: 'light', service: 'turn_on', data: { brightness_pct: 40 } }])
+  })
+
+  it('reads the pre-2023 service_data when data is absent', () => {
+    const calls: ServiceCall[] = []
+    const config: ActionConfig = {
+      action: 'call-service',
+      service: 'script.night',
+      service_data: { a: 1 },
+    }
+    runAction(stubHass(calls), stubElement([]), config, undefined)
+    expect(calls).toEqual([{ domain: 'script', service: 'night', data: { a: 1 } }])
+  })
+
+  it('asks the companion app for a light haptic on a service call', () => {
+    const { seen, target } = recording()
+    runAction(stubHass([]), target, { action: 'toggle' }, 'light.hall')
+    expect(seen).toEqual([{ type: 'haptic', detail: 'light' }])
+  })
+
+  it('goes back through the router window', () => {
+    const back = vi.fn()
+    vi.stubGlobal('window', { name: 'ha-main-window', history: { back } })
+    runAction(stubHass([]), stubElement([]), { action: 'back' }, undefined)
+    expect(back).toHaveBeenCalledOnce()
+  })
+
+  it('hands url and assist to Home Assistant as a tap, with the entity', () => {
+    const { seen, target } = recording()
+    const url: ActionConfig = { action: 'url', url_path: 'https://example.com' }
+    runAction(stubHass([]), target, url, 'light.hall')
+    runAction(stubHass([]), target, { action: 'assist' }, undefined)
+    expect(seen).toEqual([
+      {
+        type: 'hass-action',
+        detail: { config: { entity: 'light.hall', tap_action: url }, action: 'tap' },
+      },
+      {
+        type: 'hass-action',
+        detail: { config: { tap_action: { action: 'assist' } }, action: 'tap' },
+      },
+    ])
+  })
+
+  it('hands any action with a confirmation to Home Assistant, and calls nothing itself', () => {
+    const calls: ServiceCall[] = []
+    const { seen, target } = recording()
+    const config: ActionConfig = { action: 'toggle', confirmation: { text: 'Sure?' } }
+    runAction(stubHass(calls), target, config, 'lock.front')
+    expect(calls).toEqual([])
+    expect(seen.map(e => e.type)).toEqual(['hass-action'])
+  })
+
+  it('runs a confirmation: false action itself, as no confirmation', () => {
+    const calls: ServiceCall[] = []
+    runAction(
+      stubHass(calls),
+      stubElement([]),
+      { action: 'toggle', confirmation: false },
+      'light.a',
+    )
+    expect(calls).toHaveLength(1)
+  })
+})

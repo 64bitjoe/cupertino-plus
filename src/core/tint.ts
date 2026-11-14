@@ -13,9 +13,15 @@
 import type { HassEntity } from './types/ha'
 
 /**
- * The closed palette a card's `color:` may name. Ten because that is what `tokens.ts` carries
- * under `--cw-*`: nine of Apple's system colours plus `accent`, which is the theme's own
- * primary rather than a fixed hue, for the entity that fits none of the nine.
+ * The closed palette a card's `color:` may name. Eleven because that is what `tokens.ts` carries
+ * under `--cw-*`: ten of Apple's system colours plus `accent`, which is the theme's own primary
+ * rather than a fixed hue, for the entity that fits none of the ten.
+ *
+ * `grey` is the newest, and the one that is not a hue at all. It arrived with the Mushroom
+ * migration, where it is how every "off" template on the dashboard says off: twelve oven,
+ * dishwasher and litter-box cards colour an idle state grey. Without a token it fell through to
+ * CSS's own `grey`, a fixed #808080 that ignores the theme; Apple's systemGray has a dark
+ * variant of its own, and sits on the same footing as the other ten.
  */
 export const TINTS = [
   'red',
@@ -27,6 +33,7 @@ export const TINTS = [
   'indigo',
   'purple',
   'pink',
+  'grey',
   'accent',
 ] as const
 
@@ -46,10 +53,52 @@ export const isTint = (value: string): value is TintName =>
   (TINTS as readonly string[]).includes(value)
 
 /**
+ * Other cards' colour names, mapped onto this palette.
+ *
+ * Mushroom, and Home Assistant's own tile card after it, take a palette of Material names
+ * (`amber`, `deep-orange`, `blue-grey`, `disabled` …), and a config moved over from either kept
+ * them. Without this table each one fell through to CSS: `grey` and `white` became fixed colours
+ * that ignore the theme (white on a light dashboard is nothing at all), and `amber`, which is not
+ * a CSS colour, was dropped without a word. So a name from that set lands on the nearest of ours
+ * instead, and stays a token: it follows the theme and dark mode exactly as the palette does.
+ *
+ * Nearest by eye rather than by a colour-distance formula, against Mushroom's own values: its
+ * amber (#ffc107) is Apple's yellow to within a few degrees, its cyan is our teal, its
+ * deep-purple our indigo. Three are worth stating. `white` and `black` become the label ink,
+ * because a tint that is white in a dark theme should not be white on a light one, where it
+ * would vanish into the card; the label is white in dark and near-black in light, which is what
+ * a user writing `white` on a dark dashboard was actually looking at. `disabled` and `blue-grey`
+ * are grey. `primary` is the theme's primary, which is what `accent` already means here.
+ *
+ * Not in `TINTS`, and not offered by the editors: these are for reading a config somebody else
+ * wrote, not for writing a new one. A name a user picks from the dropdown is one of ours.
+ */
+const ALIASES: Record<string, string> = {
+  gray: 'var(--cw-grey)',
+  'blue-grey': 'var(--cw-grey)',
+  'blue-gray': 'var(--cw-grey)',
+  'dark-grey': 'var(--cw-grey)',
+  'dark-gray': 'var(--cw-grey)',
+  disabled: 'var(--cw-grey)',
+  amber: 'var(--cw-yellow)',
+  lime: 'var(--cw-green)',
+  'light-green': 'var(--cw-green)',
+  'deep-orange': 'var(--cw-orange)',
+  brown: 'var(--cw-orange)',
+  cyan: 'var(--cw-teal)',
+  'light-blue': 'var(--cw-blue)',
+  'deep-purple': 'var(--cw-indigo)',
+  primary: 'var(--cw-accent)',
+  white: 'var(--cw-label)',
+  black: 'var(--cw-label)',
+}
+
+/**
  * A configured colour, resolved.
  *
- * A palette name becomes its token, so it stays theme-correct and dark-mode-correct. Anything
- * else is returned **verbatim** — `#ff8800`, `var(--my-token)`, `rgb(…)` — because parsing CSS
+ * A palette name becomes its token, so it stays theme-correct and dark-mode-correct, and so does
+ * one of another card's names that `ALIASES` maps onto the palette. Anything else is returned
+ * **verbatim** — `#ff8800`, `var(--my-token)`, `rgb(…)` — because parsing CSS
  * is not this library's job and the CSSOM already does it: the caller hands the result to
  * `element.style.setProperty`, which validates and silently drops what it cannot read. That is
  * why a bad colour is a chip with no tint rather than a broken rule, and why a config value
@@ -60,7 +109,11 @@ export const isTint = (value: string): value is TintName =>
 export const colorValue = (value: string | undefined): string | undefined => {
   const trimmed = value?.trim()
   if (!trimmed) return undefined
-  return isTint(trimmed) ? tintVar(trimmed) : trimmed
+  // Lower-cased before either lookup: a template often builds the name (`{{ 'Amber' if … }}`),
+  // and a CSS colour keyword is case-insensitive anyway, so `Grey` meaning grey surprises nobody.
+  const name = trimmed.toLowerCase()
+  if (isTint(name)) return tintVar(name)
+  return ALIASES[name] ?? trimmed
 }
 
 /**

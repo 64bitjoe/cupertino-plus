@@ -31,14 +31,14 @@ export { TINTS, tintFor, tintVar, type TintName } from '../../core/tint'
  *
  * Two faces paint content straight onto `tintVar(tint)` rather than drawing it as a thin
  * arc or an icon: `rectangular-header`'s strip and `rectangular-bleed`'s whole card. Both
- * need an ink that stays legible on every one of the ten tints, in both themes, and white
- * is not that ink for all ten. Checked against WCAG's contrast formula rather than by eye,
+ * need an ink that stays legible on every one of the eleven tints, in both themes, and white
+ * is not that ink for all eleven. Checked against WCAG's contrast formula rather than by eye,
  * against both the light and dark value of every tint in `tokens.ts`: white on
  * `--cw-yellow` comes out at 1.4-1.5:1 (light/dark), which fails even the 3:1 floor a
  * large glyph is held to, and `--cw-orange`, `--cw-green` and `--cw-teal` are not far
- * behind at 2.0-2.6:1. The other six tints -- `red` clears 3:1 by a hair at 3.41-3.55:1,
- * `blue`/`indigo`/`purple`/`pink` clear it comfortably, and `accent` is the theme's own
- * colour and unknowable here -- keep white.
+ * behind at 2.0-2.6:1. The other seven tints -- `red` clears 3:1 by a hair at 3.41-3.55:1,
+ * `blue`/`indigo`/`purple`/`pink` clear it comfortably, `grey` clears it at 3.3:1 in both
+ * themes, and `accent` is the theme's own colour and unknowable here -- keep white.
  *
  * The four that don't get `#1d1d1f`, a fixed near-black, rather than `var(--cw-label)`:
  * `--cw-label` is white in dark mode, which is exactly the failure this function exists

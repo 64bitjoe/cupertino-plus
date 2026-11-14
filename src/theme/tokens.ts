@@ -68,7 +68,7 @@ export const tokens = css`
        two colours rather than as a length. Half the fill's weight, in each theme. */
     --cw-track: rgba(0, 0, 0, 0.1);
 
-    /* cards/complication/tint.ts's NEEDS_DARK_ON_TINT hard-codes which four of these ten
+    /* cards/complication/tint.ts's NEEDS_DARK_ON_TINT hard-codes which four of these eleven
        fail a 3:1 white-text contrast check — worked out against the exact hex values
        below, in both themes, not against the tint names in the abstract. Change a value
        here (this block or the :host([dark]) one further down) and that judgement is
@@ -88,6 +88,10 @@ export const tokens = css`
     --cw-indigo: #5856d6;
     --cw-purple: #af52de;
     --cw-pink: #ff2d55;
+    /* Apple's systemGray, the one neutral in the palette: how a template says "off" without
+       reaching for CSS's own grey, which is one fixed value in both themes. The same hex in
+       dark, as Apple's is; white text on it clears 3:1 (3.3), so onTintVar keeps white. */
+    --cw-grey: #8e8e93;
 
     /* ---- Surface ----------------------------------------------------------- */
     --cw-surface: var(--ha-card-background, var(--card-background-color, #fff));
@@ -178,6 +182,7 @@ export const tokens = css`
     --cw-indigo: #5e5ce6;
     --cw-purple: #bf5af2;
     --cw-pink: #ff375f;
+    --cw-grey: #8e8e93;
 
     --cw-surface: var(--ha-card-background, var(--card-background-color, #1c1c1e));
 

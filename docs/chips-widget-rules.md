@@ -316,7 +316,7 @@ tidiness; `docs/images/chips-icons.png` measured 43 before it was added.
 ## 7. What a press does
 
 The config is Home Assistant's own, deliberately: YAML already written against other custom
-chip cards transfers unchanged, and so does the muscle memory of whoever wrote it. Five actions,
+chip cards transfers unchanged, and so does the muscle memory of whoever wrote it. Eight actions,
 `more-info` by default for a chip with an entity — **`none` for a chip without one** (§1a),
 since opening a more-info dialog for an entity that does not exist is not a sensible default to
 fall back to — and `core/actions.ts` is a dispatch table taking
@@ -331,13 +331,43 @@ installation's actual dashboards — rather than a path typed by hand, outside t
 **Use templates** mode; a template cannot be typed into a picker, so that mode keeps the plain
 text field instead.
 
-| `action`       | Behaviour                                              |
-| -------------- | ------------------------------------------------------ |
-| `more-info`    | Fires `hass-more-info` — **the default**               |
-| `toggle`       | `homeassistant.toggle` against the chip's entity       |
-| `navigate`     | `cwNavigate` with `navigation_path`                    |
-| `call-service` | `hass.callService` with `service`, `data` and `target` |
-| `none`         | Nothing, and no pressable affordance is drawn          |
+| `action`                           | Behaviour                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| `more-info`                        | Fires `hass-more-info` — **the default**                                |
+| `toggle`                           | `homeassistant.toggle` against the chip's entity                        |
+| `navigate`                         | `cwNavigate` with `navigation_path`                                     |
+| `back`                             | The browser's back, on the router's window (this library's own)         |
+| `url`                              | Home Assistant opens `url_path`                                         |
+| `call-service` or `perform-action` | `hass.callService` with `service` or `perform_action`, `data`, `target` |
+| `assist`                           | Home Assistant's voice dialog, with `pipeline_id` and `start_listening` |
+| `none`                             | Nothing, and no pressable affordance is drawn                           |
+
+`perform-action` is the name Home Assistant's own editor has written since 2024.8, so YAML copied
+from a native card arrives with it; both names are read for both actions, and `service_data` is
+read where `data` is absent, as Home Assistant does. `fire-dom-event` is accepted too, for
+browser_mod.
+
+`url`, `assist` and `fire-dom-event` are run **by Home Assistant**, not here: the card fires
+`hass-action`, which the frontend's root has listened for since 2024.1, with the action already
+resolved. So is any action carrying a **`confirmation`** (`true`, or `text`, `title`,
+`confirm_text`, `dismiss_text`, `exemptions`): the dialog, its translated service name and its
+per-user exemptions are the frontend's, and a second copy here would drift from them.
+
+**Templates reach every string in an action**: the path, the URL, the service under either
+name, and any string leaf of `data` and `target` at any depth. A leaf still waiting for its first
+render is left out of the call rather than sent as written. Results arrive as text, which Home
+Assistant's service schemas coerce, so `brightness_pct: "{{ 40 }}"` works.
+
+**`hold_action` and `double_tap_action`** take the same shape. The panel draws each as a
+dropdown under the tap's (When held, When double-tapped), defaulting to Nothing, with the one
+argument row its action takes; the field names carry an `on_hold_` or `on_double_tap_` prefix so
+they never collide with the config keys they stand for. Their `data`, `target` and
+`confirmation` stay YAML, carried through an edit like the tap's, and one set back to Nothing
+writes no key.
+`core/gestures.ts` tells the three apart on Home Assistant's timings, a hold at 500ms and a second
+tap within 250ms. A tap is still the browser's click, so a chip with neither runs no timer and
+taps exactly as before; only a chip with a double tap waits the 250ms to know a tap was single.
+A chip whose tap is `none` but which holds or double-taps is still drawn as a button.
 
 ```yaml
 type: custom:cupertino-plus-chips
@@ -389,8 +419,17 @@ Three rules that are easy to miss and cost a bug each:
 Enter and Space activate, matching every other card here. The accessible name is the chip's name
 and its reading — `Hall, 21.4°C` — never the glyph.
 
-`hold_action`, `double_tap_action`, `url` and `assist` are out of scope. All four are additive
-to this same config shape; none of them changes anything above if they arrive later.
+The keyboard has a tap and nothing else: Enter and Space run `tap_action`, and a chip's hold and
+double tap are pointer gestures only. A screen reader's activation is a click, so it is a tap
+too.
+
+## 7a. Where a row's chips sit: `alignment`
+
+`alignment: start | center | end | justify`, Mushroom's four words, on the card. It applies to
+each row, so a wrapped row's second line lines up as its first does, and `justify` spreads a
+row's chips so the first and last touch its edges. A `fill` spacer still takes every spare unit
+it can, so in a row with one, `alignment` changes nothing. The floor does not read it: where the
+chips sit along a line does not change how many lines there are.
 
 ## 8. Degradation
 

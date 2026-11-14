@@ -125,7 +125,7 @@ one (`range.test.ts`, "gives a climate entity no range of its own").
 icon straight onto `item.tint`, which the ring and `inline` faces never do — there the tint is
 a thin arc or a small glyph, not the surface under a paragraph. That difference was checked
 against WCAG's contrast formula rather than by eye, against both the light and dark value of
-every tint in `tokens.ts`, and white failed on four of the ten:
+every tint in `tokens.ts`, and white failed on four of the eleven:
 
 | Tint                               | White-on-tint contrast   | Passes 3:1? |
 | ---------------------------------- | ------------------------ | ----------- |
@@ -133,6 +133,7 @@ every tint in `tokens.ts`, and white failed on four of the ten:
 | `orange`, `green`, `teal`          | 2.0–2.6:1                | no          |
 | `red`                              | 3.41–3.55:1              | by a hair   |
 | `blue`, `indigo`, `purple`, `pink` | comfortably above 3:1    | yes         |
+| `grey`                             | 3.3:1                    | yes         |
 | `accent`                           | unknowable at build time | see §2      |
 
 3:1 is WCAG's floor for large, bold text, which is what these two chromes set — but `yellow`,

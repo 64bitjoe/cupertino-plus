@@ -82,3 +82,15 @@ export const cwNavigate = (path: string): void => {
     }),
   )
 }
+
+/**
+ * Back one page, as the browser's own back button would: the `back` action.
+ *
+ * On the router's window for `cwNavigate`'s reason, and with no event to fire: the router
+ * already listens for `popstate`, which `history.back()` raises once the browser has moved.
+ * A dashboard opened straight onto a subview has nothing behind it in this tab, and then this
+ * does nothing, which is what the browser's own back button does there too.
+ */
+export const cwBack = (): void => {
+  routerWindow().history.back()
+}

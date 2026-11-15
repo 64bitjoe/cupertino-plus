@@ -7,7 +7,30 @@ import {
   pictureFor,
   VALUE_DASH,
 } from '../../core/entity-view'
-import { isTemplate, type TemplateRequest } from '../../core/templates'
+import {
+  areaSummary,
+  areaSummaryText,
+  roomSummaryOptions,
+  roomWatchedIds,
+  SUMMARY_SEPARATOR,
+  type RoomKeys,
+} from '../../core/area-summary'
+import { roomFromForm, roomToForm } from '../../core/area-form'
+import {
+  DEFAULT_SUMMARY_STYLE,
+  glyphLabel,
+  splitSummary,
+  summaryStyleFor,
+  type TileGlyph,
+} from './glyphs'
+import {
+  hasRowTemplates,
+  isTemplate,
+  type TemplateRequest,
+  templateRequest,
+  truthy,
+  type TemplateResolver,
+} from '../../core/templates'
 import { colorValue, tintFor, tintVar, type TintName } from '../../core/tint'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
 import {
@@ -15,33 +38,25 @@ import {
   actionToForm,
   gesturesFromForm,
   gesturesToForm,
-  chipConfigs,
-  chipKeys,
-  chipRows,
-  chipTemplates,
-  chipWatchedIds,
-  NO_TARGET_ACTION,
-  readAction,
-  readGestures,
-  templateRequest,
-  text,
-  truthy,
-  type TemplateResolver,
-} from '../chips/model'
+} from '../../core/action-form'
+import { rowKeys, configRows, text } from '../../core/rows'
+import { NO_TARGET_ACTION, readAction, readGestures } from '../../core/action-config'
+import { chipConfigs, chipTemplates, chipWatchedIds } from '../chips/model'
+import { oneOf } from '../../core/one-of'
 
 /**
  * What a tile is, and how a config row becomes one.
  *
  * Deliberately the chips model's sibling rather than a copy of it. What a row IS (entity or
  * none, bare string or object, templates in the same five fields) is the same question, so the
- * row-reading, the template request, the keys and the action form are the chips model's own
- * functions, imported. What differs is what a tile draws: always icon, name and state, so no
+ * row-reading is the chips model's own, imported, and the template request, the keys and the
+ * action form are `core/`'s (`templates.ts`, `rows.ts`, `action-form.ts`), shared by both. What differs is what a tile draws: always icon, name and state, so no
  * `content`; a grid whose rows already share their width, so no `fill`; and an entity-less
  * tile is a navigation tile, never a spacer.
  */
 
 /** One tile's configuration: a chip's, less `content` and `fill`, plus `selected`. */
-export interface TileConfig {
+export interface TileConfig extends RoomKeys {
   entity?: string
   name?: string
   icon?: string
@@ -54,6 +69,11 @@ export interface TileConfig {
    * its current segment. Read with `show`'s `truthy`, so `{{ is_state(…) }}` works as written.
    */
   selected?: string
+  /**
+   * How a room tile tells its summary: `words` on its state line (the default), or `icons`, a row
+   * of status glyphs under the text with only the readings left as words (`glyphs.ts`).
+   */
+  summary_style?: string
   break?: boolean
   tap_action?: ActionConfig
   hold_action?: ActionConfig
@@ -71,6 +91,11 @@ export interface TileView {
    * with no entity and no value, which draws an empty line of the same height (see `readTile`).
    */
   value: string
+  /**
+   * A room tile's status glyphs, under `summary_style: icons`, in the summary's order; empty for
+   * every other tile. Not yet fitted to a width: the element does that with `fitGlyphs`.
+   */
+  glyphs: TileGlyph[]
   color: string | undefined
   unavailable: boolean
   visible: boolean
@@ -127,8 +152,7 @@ export const DEFAULT_WASH: TileWash = 'hover'
  * odd one out. The fallback is also harmless in a way a failed press is not: the tiles still
  * draw and still wash, just on hover.
  */
-export const washFor = (value: unknown): TileWash =>
-  (TILE_WASHES as readonly unknown[]).includes(value) ? (value as TileWash) : DEFAULT_WASH
+export const washFor = (value: unknown): TileWash => oneOf(TILE_WASHES, value, DEFAULT_WASH)
 
 /**
  * How a configured row meets a line too narrow for it: it wraps onto more lines (`wrap`, the
@@ -150,8 +174,7 @@ export type TileFlow = (typeof TILE_FLOWS)[number]
 export const DEFAULT_FLOW: TileFlow = 'wrap'
 
 /** The card's `flow`, or the default for anything else; silent, as `washFor` is. */
-export const flowFor = (value: unknown): TileFlow =>
-  (TILE_FLOWS as readonly unknown[]).includes(value) ? (value as TileFlow) : DEFAULT_FLOW
+export const flowFor = (value: unknown): TileFlow => oneOf(TILE_FLOWS, value, DEFAULT_FLOW)
 
 /**
  * Which way a tile reads: glyph over name over state (`vertical`, every tile up to v1.17), or
@@ -171,9 +194,7 @@ export const DEFAULT_ORIENTATION: TileOrientation = 'vertical'
 
 /** The card's `orientation`, or the default for anything else; silent, as `washFor` is. */
 export const orientationFor = (value: unknown): TileOrientation =>
-  (TILE_ORIENTATIONS as readonly unknown[]).includes(value)
-    ? (value as TileOrientation)
-    : DEFAULT_ORIENTATION
+  oneOf(TILE_ORIENTATIONS, value, DEFAULT_ORIENTATION)
 
 /**
  * How many lines a tile's state may take before it ellipsizes: one, as it always has, or up to
@@ -192,11 +213,38 @@ export const stateLinesFor = (value: unknown): number => {
 /** A tile with no icon is a shortcut, not an unreadable sensor, so it is not an eye. */
 export const TILE_FALLBACK_ICON = 'mdi:apps'
 
+/** A room with no icon of its own in its area settings. */
+export const ROOM_FALLBACK_ICON = 'mdi:sofa'
+
+/**
+ * Whether a row is a room tile drawing glyphs. The card asks it of every configured row rather
+ * than of what is drawn, so the tiles' height is the config's and not whatever a room has to say
+ * this minute: a room going quiet must not shrink the grid under somebody's thumb.
+ */
+const drawsGlyphs = (row: TileConfig): boolean =>
+  row.entity === undefined &&
+  row.area !== undefined &&
+  summaryStyleFor(row.summary_style) === 'icons'
+
+/** Whether any tile in the card draws a glyph row, and so whether every tile reserves one. */
+export const tilesHaveGlyphs = (tiles: unknown): boolean => tileConfigs(tiles).some(drawsGlyphs)
+
 /** Rows are read exactly as chips are; the extra keys a chip may carry are simply never read. */
 export const tileConfigs = (tiles: unknown): TileConfig[] => chipConfigs(tiles)
 
-/** Every entity id this card depends on; an entity-less tile contributes nothing. */
-export const tileWatchedIds = (tiles: unknown): string[] => chipWatchedIds(tiles)
+/**
+ * Every entity id this card depends on. A room tile depends on everything in its room, which
+ * only `hass` knows, so the list is taken against the `hass` being drawn; a device moving room
+ * repaints through the registry check in `base-card.ts` rather than through this list.
+ */
+export const tileWatchedIds = (tiles: unknown, hass?: HomeAssistant): string[] => {
+  const rooms = hass
+    ? tileConfigs(tiles).flatMap(row =>
+        row.entity === undefined && row.area !== undefined ? roomWatchedIds(hass, row) : [],
+      )
+    : []
+  return [...new Set([...chipWatchedIds(tiles), ...rooms])]
+}
 
 /**
  * Every template a config asks for. The rule (`variables` only when the row has an entity, none
@@ -253,12 +301,21 @@ export const readTile = (
   // Scenes and Cats shortcuts read it as three broken tiles. That is why only this branch
   // changes.
   if (row.entity === undefined) {
+    const area = row.area !== undefined ? hass?.areas?.[row.area] : undefined
+    const items =
+      row.area !== undefined ? areaSummary(hass, row.area, roomSummaryOptions(row, resolve)) : []
+    // Under `icons` the statuses leave the line for the glyph row, and the readings stay.
+    const split = drawsGlyphs(row) ? splitSummary(items) : { words: items, glyphs: [] }
     return {
       entityId: undefined,
-      name: name ?? '',
-      icon: icon ?? TILE_FALLBACK_ICON,
+      name: name ?? area?.name ?? row.area ?? '',
+      icon:
+        icon ?? area?.icon ?? (row.area !== undefined ? ROOM_FALLBACK_ICON : TILE_FALLBACK_ICON),
       picture: undefined,
-      value: value() ?? '',
+      value: [areaSummaryText(split.words), value() ?? '']
+        .filter(part => part !== '')
+        .join(SUMMARY_SEPARATOR),
+      glyphs: split.glyphs,
       color: configured(),
       unavailable: false,
       visible,
@@ -279,6 +336,7 @@ export const readTile = (
       icon: icon ?? TILE_FALLBACK_ICON,
       picture: undefined,
       value: VALUE_DASH,
+      glyphs: [],
       color: undefined,
       unavailable: true,
       visible,
@@ -296,6 +354,7 @@ export const readTile = (
     icon: icon ?? iconFor(entity),
     picture: icon === undefined && !unavailable ? pictureFor(entity) : undefined,
     value: unavailable ? VALUE_DASH : (value() ?? formatValue(hass, entity)),
+    glyphs: [],
     // Configured, then card default, then what the entity is. The dim is the signal that a tile
     // is not reporting, so an unavailable tile gets no tint at all.
     color: unavailable ? undefined : (configured() ?? tintVar(tileTintFor(entity))),
@@ -308,11 +367,32 @@ export const readTile = (
   }
 }
 
+/**
+ * What a screen reader hears for a tile: its name, its state line, and under `icons` what each
+ * glyph means, since a glyph cannot be pressed or read on its own. "Den, 21°, Occupied, 2 Lights On".
+ */
+export const tileLabel = (tile: TileView): string => {
+  const readable = tile.unavailable ? 'unavailable' : tile.value
+  return (
+    [tile.name, readable, glyphLabel(tile.glyphs)].filter(part => part !== '').join(', ') || 'Tile'
+  )
+}
+
+/** The tile fields that may hold a template, in the order the editor shows them. */
+const TILE_TEMPLATED_FIELDS = ['name', 'icon', 'color', 'value', 'show', 'selected'] as const
+
+/**
+ * Whether a tile holds a template in any field or any of its three actions, so its editor panel
+ * opens in templating mode: a templated `tap_action` path counts as much as a templated name.
+ */
+export const tileHasTemplates = (row: TileConfig): boolean =>
+  hasRowTemplates(row, TILE_TEMPLATED_FIELDS)
+
 /** Stable per-row keys for the editor's list. */
-export const tileKeys = (rows: readonly TileConfig[]): string[] => chipKeys(rows)
+export const tileKeys = (rows: readonly TileConfig[]): string[] => rowKeys(rows)
 
 /** Rows as they should be written back: a row saying nothing beyond its id flattens to the id. */
-export const tileRows = (rows: readonly TileConfig[]): (string | TileConfig)[] => chipRows(rows)
+export const tileRows = (rows: readonly TileConfig[]): (string | TileConfig)[] => configRows(rows)
 
 export const tileToForm = (config: TileConfig): Record<string, unknown> => ({
   entity: config.entity,
@@ -322,6 +402,8 @@ export const tileToForm = (config: TileConfig): Record<string, unknown> => ({
   value: config.value,
   show: config.show,
   selected: config.selected,
+  ...roomToForm(config),
+  ...(config.area !== undefined ? { summary_style: summaryStyleFor(config.summary_style) } : {}),
   break: config.break === true,
   ...actionToForm(config.tap_action, config.entity),
   ...gesturesToForm(config),
@@ -338,6 +420,12 @@ export const tileFromForm = (prior: TileConfig, data: Record<string, unknown>): 
     const value = text(data[key])
     if (value !== undefined) next[key] = value
   }
+
+  Object.assign(next, roomFromForm(data))
+  // Written only when it departs from the default, and only for a room: a tile that loses its
+  // area loses a style that would have nothing to style.
+  const style = summaryStyleFor(data.summary_style)
+  if (next.area !== undefined && style !== DEFAULT_SUMMARY_STYLE) next.summary_style = style
 
   if (data.break === true) next.break = true
 

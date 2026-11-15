@@ -20,6 +20,7 @@ import type { Widget } from './catalog'
 import type { EditorPanel } from './editor'
 import { icon } from './icon'
 import {
+  LARGE,
   MEDIUM,
   ODD_FOOTPRINTS,
   SMALL,
@@ -106,6 +107,15 @@ export function previews(
         MEDIUM,
         boxed(footprintBox(MEDIUM, sectionWidth), slotCard('preview:medium', widget.tag)),
       )}
+      ${
+        widget.large
+          ? preview(
+              'Large',
+              LARGE,
+              boxed(footprintBox(LARGE, sectionWidth), slotCard('preview:large', widget.tag)),
+            )
+          : nothing
+      }
       ${preview('Drag to resize', undefined, dragBox(slotCard('preview:drag', widget.tag), onDrag))}
     </div>
   `

@@ -28,6 +28,7 @@
  * calendar; this follows it rather than reinventing it.
  */
 
+import type { ActionConfig } from './actions'
 import type { HomeAssistant } from './types/ha'
 
 /** What Home Assistant pushes back. `error` and `level` arrive only with `report_errors`. */
@@ -61,6 +62,18 @@ export const isTemplate = (value: unknown): value is string =>
   typeof value === 'string' && (value.includes('{{') || value.includes('{%'))
 
 /**
+ * What a rendered `show` means. Home Assistant may hand back a real boolean or Python's
+ * `True`/`False` as a string; both arrive here as text. The falsy set is deliberately generous
+ * (a user writing `{{ 'off' }}` means off), and `undefined` is false: hidden until it answers.
+ * Here rather than in any one card's model, because a room's own icons read it from
+ * `core/area-summary.ts` too.
+ */
+const FALSY = new Set(['', 'false', 'none', 'null', '0', 'off', 'unavailable', 'unknown'])
+
+export const truthy = (result: string | undefined): boolean =>
+  result !== undefined && !FALSY.has(result.trim().toLowerCase())
+
+/**
  * The identity of a request: the template AND its variables.
  *
  * Both halves are load-bearing. Without the template there is no dedupe; without the
@@ -70,6 +83,93 @@ export const isTemplate = (value: unknown): value is string =>
  */
 export const requestKey = (request: TemplateRequest): string =>
   JSON.stringify([request.template, request.variables ?? null])
+
+/**
+ * How a template's result reaches a model.
+ *
+ * A function rather than a pool, so a model stays pure and node-testable: the card owns the
+ * subscription and passes its `read` in. `entity` is the row the template belongs to, which has
+ * to be part of the lookup for the same reason it is part of `requestKey` — two rows sharing
+ * `{{ states(config.entity) }}` have two different answers.
+ */
+export type TemplateResolver = (template: string, entity?: string) => string | undefined
+
+/**
+ * The one way a template becomes a request, for the model registering it and the card looking
+ * its result up again: both call this, so the two keys cannot disagree.
+ *
+ * The variables are Mushroom's, so a template moved over from one of its cards reads the same
+ * names: `config.entity` and `entity` are the row's entity id, and `user` is the name of whoever
+ * is looking. `config.entity` came first and stays; `entity` and `user` arrived with the
+ * migration, where a template written `{{ is_state(entity, 'on') }}` had nothing to read.
+ *
+ * Each is present only when it has a value, and with neither the request carries no `variables`
+ * key at all. That is what used to be stated as "no entity means no variables" and is the same
+ * rule, widened by one: a request is keyed by exactly what it was rendered with, so two ways of
+ * writing nothing can never hash to two keys (`chipTemplates`' note has the bug that is about).
+ */
+export const templateRequest = (
+  template: string,
+  entity: string | undefined,
+  user: string | undefined,
+): TemplateRequest => {
+  const variables: Record<string, unknown> = {}
+  if (entity !== undefined) {
+    variables.config = { entity }
+    variables.entity = entity
+  }
+  if (user !== undefined) variables.user = user
+  return Object.keys(variables).length > 0 ? { template, variables } : { template }
+}
+
+/** The action fields that are one string, any of which may be a template. */
+export const ACTION_TEXT_FIELDS = [
+  'navigation_path',
+  'url_path',
+  'service',
+  'perform_action',
+] as const
+
+/**
+ * The action fields that are a tree, whose string leaves may be templates: a service's data
+ * and its target, at any depth (`entity_id: ['{{ … }}', light.hall]` is a leaf in a list).
+ */
+export const ACTION_TREE_FIELDS = ['data', 'service_data', 'target'] as const
+
+/** The three gestures a row can configure, in the order the models register their templates. */
+export const ACTION_KEYS = ['tap_action', 'hold_action', 'double_tap_action'] as const
+
+const templatesIn = (value: unknown, out: string[]): void => {
+  if (isTemplate(value)) out.push(value)
+  else if (Array.isArray(value)) for (const item of value) templatesIn(item, out)
+  else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) templatesIn(item, out)
+  }
+}
+
+/** Every template one action holds, in its text fields and anywhere in its data and target. */
+export const actionTemplates = (action: ActionConfig | undefined): string[] => {
+  const out: string[] = []
+  if (!action) return out
+  for (const key of ACTION_TEXT_FIELDS) templatesIn(action[key], out)
+  for (const key of ACTION_TREE_FIELDS) templatesIn(action[key], out)
+  return out
+}
+
+/** A row that may carry the three gestures, each an action that may hold templates. */
+type ActionRow = { [Key in (typeof ACTION_KEYS)[number]]?: ActionConfig | undefined }
+
+/**
+ * Whether a row holds a template in any of `fields` or anywhere in its three actions: what
+ * decides that an editor panel opens with its templating switch on, so a config written in YAML
+ * opens showing what it says rather than a picker that cannot represent it.
+ */
+export const hasRowTemplates = <Row extends ActionRow>(
+  row: Row,
+  fields: readonly (keyof Row)[],
+): boolean =>
+  fields.some(field => isTemplate(row[field])) ||
+  ACTION_KEYS.some(key => actionTemplates(row[key]).length > 0)
 
 interface Slot {
   token: object
@@ -86,6 +186,14 @@ export class TemplatePool {
   /** The last result for a request, or `undefined` before the first push. */
   public read(key: string): string | undefined {
     return this._slots.get(key)?.result
+  }
+
+  /**
+   * A model's `TemplateResolver` over this pool, for one viewer: rebuilds each key with the same
+   * `templateRequest` the registration used, so the two cannot disagree about it.
+   */
+  public resolver(user: string | undefined): TemplateResolver {
+    return (template, entity) => this.read(requestKey(templateRequest(template, entity, user)))
   }
 
   /**

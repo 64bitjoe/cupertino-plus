@@ -7,23 +7,23 @@ import {
   type TemplateResult,
 } from 'lit'
 
+import { Memo, registriesOf } from '../../core/area-summary'
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
-import { isPressable, runAction, type ActionConfig } from '../../core/actions'
-import { Gestures } from '../../core/gestures'
+import { runAction } from '../../core/actions'
+import { Gestures, pressesAnything, pressHandlers, type PressHandlers } from '../../core/gestures'
 import { contentCardSize, contentGridOptions, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
-import { requestKey, TemplatePool } from '../../core/templates'
+import { TemplatePool } from '../../core/templates'
 import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import { bandFor, floorsFor, groupRows, INSET, rowHeightFor, type ChipBand } from './layout'
+import { FLOATING_DEFAULT_CONTAINER } from '../../core/container'
 import {
   alignmentFor,
   chipConfigs,
   chipTemplates,
-  templateRequest,
   type ChipAlignment,
-  chipWatchedIds,
-  DEFAULT_CONTAINER,
+  chipsCardWatchedIds,
   DEFAULT_CONTENT,
   readChips,
   type ChipContent,
@@ -391,12 +391,26 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    */
   private readonly _templates = new TemplatePool(() => this.requestUpdate())
 
+  /** A room row's chips change when an entity or device moves room; see `base-card.ts`. */
+  protected override readonly watchesRegistries: boolean = true
+
   /** Hold and double tap, for the chips that configure them; see `core/gestures.ts`. */
   private readonly _gestures = new Gestures()
 
   /** Who is looking, for a template's `user`; see `templateRequest`. */
   private get _user(): string | undefined {
     return this.hass?.user?.name
+  }
+
+  /**
+   * Reopened on the way back in. `disconnectedCallback` closes the subscriptions, and only
+   * `willUpdate` opens them, so a card Home Assistant detaches and re-attaches (a view switch,
+   * a conditional card) would otherwise wait for a watched state to change, and a row of
+   * nothing but templates would never come back to life.
+   */
+  public override connectedCallback(): void {
+    super.connectedCallback()
+    this.requestUpdate()
   }
 
   public override disconnectedCallback(): void {
@@ -416,10 +430,17 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
       this.hass,
       chipTemplates(this._config.entities, this._defaults, this._user),
     )
+    this._views = { config: this._config, chips: this._readChips() }
   }
 
+  /** The watched ids, rebuilt only when the rows or the registries change. */
+  private readonly _watched = new Memo<string[]>()
+
   protected override watchedEntities(): string[] {
-    return chipWatchedIds(this._config?.entities)
+    const entities = this._config?.entities
+    return this._watched.get([entities, ...registriesOf(this.hass)], () =>
+      chipsCardWatchedIds(entities, this.hass),
+    )
   }
 
   /** The card-level defaults every row inherits from. */
@@ -435,12 +456,28 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * `templateRequest`, so they cannot: the mismatch `chipTemplates`'s note describes was two
    * hand-written copies of that rule, and there is one now.
    */
+  private _readChips(): ChipView[] {
+    if (!this.hass || !this._config) return []
+    return readChips(
+      this.hass,
+      this._config.entities,
+      this._defaults,
+      this._templates.resolver(this._user),
+    )
+  }
+
+  /**
+   * The chips the last update read, for the config they were read against. `getGridOptions` and
+   * `getCardSize` are asked far more often than the card renders (the sections grid asks on
+   * every render of its section), and reading every row again for each, a room's registry walk
+   * included, is the cost this saves.
+   */
+  private _views: { config: ChipsCardConfig; chips: ChipView[] } | undefined
+
   private get _chips(): ChipView[] {
     if (!this.hass || !this._config) return []
-    const user = this._user
-    return readChips(this.hass, this._config.entities, this._defaults, (template, entity) =>
-      this._templates.read(requestKey(templateRequest(template, entity, user))),
-    )
+    if (this._views?.config === this._config) return this._views.chips
+    return this._readChips()
   }
 
   /**
@@ -502,6 +539,9 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    */
   private _floorMax: { key: string; floors: Floors } | undefined
 
+  /** The config's part of `_floorMax`'s key, stringified once per config rather than per ask. */
+  private readonly _configKey = new Memo<string>()
+
   /**
    * The card's own width in design units, once it has actually been measured.
    *
@@ -520,7 +560,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
    * `glass` insets by nothing (see the stylesheet's note), `card` by the shared inset.
    */
   private get _floorInset(): number {
-    return (this._config?.container ?? DEFAULT_CONTAINER) === 'glass' ? 0 : INSET
+    return (this._config?.container ?? FLOATING_DEFAULT_CONTAINER) === 'glass' ? 0 : INSET
   }
 
   private _floorFor(band: ChipBand[]): Floors {
@@ -530,12 +570,10 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     // The measured width is part of the identity, not just an input. Without it here the
     // high-water mark below would hold the pre-measurement estimate — the very over-count this
     // is meant to correct — and the card would never shrink to the width it actually got.
-    const key = JSON.stringify([
-      this._config?.entities ?? null,
-      this._config?.content ?? null,
-      width === undefined ? null : Math.round(width),
-      inset,
-    ])
+    const config = this._configKey.get([this._config], () =>
+      JSON.stringify([this._config?.entities ?? null, this._config?.content ?? null]),
+    )
+    const key = `${config}|${width === undefined ? '' : Math.round(width)}|${inset}`
 
     if (!this._floorMax || this._floorMax.key !== key) {
       this._floorMax = { key, floors }
@@ -580,70 +618,36 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
   }
 
   public override getGridOptions(): LovelaceGridOptions {
-    return contentGridOptions(super.getGridOptions(), this._floorFor(this._floorBand))
+    return contentGridOptions(super.getGridOptions(), this._floorsWithTitle)
   }
 
   public override getCardSize(): number {
-    return contentCardSize(this._floorFor(this._floorBand))
+    return contentCardSize(this._floorsWithTitle)
+  }
+
+  private get _floorsWithTitle(): Floors {
+    const floors = this._floorFor(this._floorBand)
+    return { ...floors, min_rows: floors.min_rows + this.titleRows() }
   }
 
   /**
-   * The handlers are bound unconditionally and guard inside, rather than being bound only for
-   * a pressable chip. A conditional `@click=${cond ? handler : nothing}` is the shape that
-   * reads better and the one to avoid here: an event binding is not an attribute binding, and
-   * feeding it a sentinel is a different code path in lit-html from feeding it a function.
-   * Guarding inside is one branch either way and cannot be got subtly wrong.
+   * A heading over the rows, for a subclass that has one: the room card's room name. Nothing
+   * here, so the chips card itself draws exactly what it always has.
    */
-  private _run(chip: ChipView, action: ActionConfig | undefined) {
-    return (): void => {
-      if (!this.hass || !isPressable(action)) return
-      runAction(this.hass, this, action, chip.entityId)
-    }
+  protected renderTitle(): TemplateResult | typeof nothing {
+    return nothing
   }
 
-  /**
-   * The click is the tap; `Gestures` holds it back only for a chip with a double tap to wait
-   * for, and swallows it when it was the release of a hold. A chip with neither taps on the
-   * click itself, exactly as before either existed.
-   */
-  private _click(chip: ChipView) {
-    return (event: Event): void => {
-      const double = chip.doubleTapAction
-      this._gestures.click(
-        event.currentTarget as object,
-        this._run(chip, chip.action),
-        double ? this._run(chip, double) : undefined,
-      )
-    }
+  /** The grid rows `renderTitle` takes, which the floors add to the chips' own. */
+  protected titleRows(): number {
+    return 0
   }
 
-  private _down(chip: ChipView) {
-    return (event: Event): void => {
-      const hold = chip.holdAction
-      this._gestures.down(event.currentTarget as object, hold ? this._run(chip, hold) : undefined)
-    }
-  }
-
-  private _cancel(event: Event): void {
-    this._gestures.cancel(event.currentTarget as object)
-  }
-
-  /** A long press on a touch screen opens the context menu, unless a hold has claimed it. */
-  private _menu(chip: ChipView) {
-    return (event: Event): void => {
-      if (chip.holdAction) event.preventDefault()
-    }
-  }
-
-  private _key(chip: ChipView) {
-    return (event: KeyboardEvent): void => {
-      if (!isPressable(chip.action)) return
-      // Space scrolls the dashboard otherwise, and Enter would submit a form the card may be
-      // sitting inside.
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      this._run(chip, chip.action)()
-    }
+  /** The chip's press listeners: `pressHandlers`, firing against its entity. */
+  private _press(chip: ChipView): PressHandlers {
+    return pressHandlers(this._gestures, chip, action => {
+      if (this.hass) runAction(this.hass, this, action, chip.entityId)
+    })
   }
 
   /**
@@ -662,10 +666,8 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     }
 
     // A chip whose tap is `none` but which holds or double-taps is still a button to a pointer.
-    const pressable =
-      isPressable(chip.action) ||
-      chip.holdAction !== undefined ||
-      chip.doubleTapAction !== undefined
+    const pressable = pressesAnything(chip)
+    const press = this._press(chip)
     // Ordinary entity-bearing chips always have both a name and a reading, so this produces
     // the exact same string it always did for them: `${chip.name}, ${...}`. The `filter` and
     // fallback only matter for an entity-less chip, where either half can resolve empty — an
@@ -706,13 +708,13 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         tabindex=${pressable ? 0 : nothing}
         aria-label=${pressable ? label : nothing}
         title=${chip.name}
-        @click=${this._click(chip)}
-        @pointerdown=${this._down(chip)}
-        @pointerup=${this._cancel}
-        @pointerleave=${this._cancel}
-        @pointercancel=${this._cancel}
-        @contextmenu=${this._menu(chip)}
-        @keydown=${this._key(chip)}
+        @click=${press.click}
+        @pointerdown=${press.down}
+        @pointerup=${press.cancel}
+        @pointerleave=${press.cancel}
+        @pointercancel=${press.cancel}
+        @contextmenu=${press.menu}
+        @keydown=${press.key}
       >
         <span class="pill">
           ${
@@ -732,11 +734,18 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
     if (!this._config || !this.hass) return nothing
 
     const chips = this._chips.filter(chip => chip.visible)
-    const container = this._config.container ?? DEFAULT_CONTAINER
+    const container = this._config.container ?? FLOATING_DEFAULT_CONTAINER
     const klass = container === 'glass' ? 'glass' : 'surface'
 
     if (chips.length === 0) {
-      return html`<ha-card class=${klass}><div class="empty">${NO_ENTITIES}</div></ha-card>`
+      // "No Entities" only for a card that was given none. One whose rows are all hidden, or a
+      // room with nothing to say, is a quiet card rather than an empty one, and draws only its
+      // title, if it has one.
+      const configured = chipConfigs(this._config.entities).length > 0
+      return html`<ha-card class=${klass}>
+        ${this.renderTitle()}
+        ${configured ? nothing : html`<div class="empty">${NO_ENTITIES}</div>`}
+      </ha-card>`
     }
 
     const band = bandFor(chips)
@@ -756,6 +765,7 @@ class CupertinoChipsCard extends CupertinoCard<ChipsCardConfig> {
         style=${`--cw-chip-row:${rowHeightFor(band)}`}
         aria-label=${`${chips.length} chips`}
       >
+        ${this.renderTitle()}
         <div class="chips align-${alignmentFor(this._config.alignment)}">
           ${groupRows(chips).map(
             row => html`<div class="row">${row.map(chip => this._renderChip(chip, band))}</div>`,

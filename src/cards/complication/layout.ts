@@ -46,6 +46,8 @@
  */
 
 import { columnsFor, rowsFor, type Floors } from '../../core/floors'
+import { bentoFloorBox } from './bento'
+import { GAP, GRAPH_MIN, INLINE_ROW, LABEL_GAP, RECT_BLOCK } from './metrics'
 import { isRectangular, type ComplicationStyle } from './style'
 
 export type { Floors }
@@ -63,6 +65,14 @@ export interface Pack {
   ring: number
   /** Whether each cell has room for its name under it. */
   labels: boolean
+  /**
+   * How many of the entities are drawn. Always all of them, except on the graph face in a box
+   * too small for every graph even side by side: there the ones that do not fit are left out
+   * whole rather than drawn without their graph. See `packGraph`.
+   */
+  shown: number
+  /** The graph face only: cells too narrow for the high and low beside the reading. */
+  compact: boolean
 }
 
 // ---- Geometry, in design units. Each names its twin in the stylesheet. ------
@@ -79,27 +89,25 @@ const INSET = 16
  */
 const BORDER = 1
 
-/**
- * Must match `--cw-comp-gap`: the space between cells, rings across and down or blocks
- * stacked in the rectangular styles. Not spent on `inline`, which is deliberately not one
- * of these — `.grid.inline` overrides the gap to 0 and separates its strips with a
- * `border-top` hairline instead, which is why `floorsFor`'s inline branch below has no
- * gap term in it while the rectangular one does.
+/*
+ * `GAP`, `LABEL_GAP`, `INLINE_ROW`, `RECT_BLOCK` and `GRAPH_MIN` live in `metrics.ts`, which the
+ * stylesheet reads too, so the lengths priced here are the lengths drawn. `GAP` is not spent on
+ * `inline`: `.grid.inline` overrides the gap to 0 and separates its strips with a `border-top`
+ * hairline instead, which is why `floorsFor`'s inline branch below has no gap term in it while
+ * the rectangular one does.
  */
-const GAP = 14
 
 /**
  * The caption's own line height, and the gap above it.
  *
  * `LABEL` must match `--cw-text-caption-2`'s line height — the caption is a single line,
- * `white-space: nowrap`, so there is no second line to budget for. `LABEL_GAP` must match
- * the `gap` on `.cell`, the flex column that stacks the ring and the caption under it. Named
+ * `white-space: nowrap`, so there is no second line to budget for. `LABEL_GAP` (`metrics.ts`)
+ * is the `gap` on `.cell`, the flex column that stacks the ring and the caption under it. Named
  * separately, rather than folded into one constant, because each measures a different rule
  * in the stylesheet, and a reader checking one against its CSS twin should not have to
  * subtract the other out first.
  */
 const LABEL = 13
-const LABEL_GAP = 6
 
 /**
  * The widest name worth captioning: measured, as the battery card's `LABEL_WIDTH` was, in
@@ -126,14 +134,28 @@ const LABEL_WIDTH = 64
 const RING_MIN = 40
 const RING_MAX = 96
 
-/** Must match `.cell.inline`'s `min-height`. The inline grid's own gap is 0 — the hairline
- * between strips is a `border-top`, not a track gap — so this is the whole per-row cost. */
-const INLINE_ROW = 44
+/**
+ * The graph face's comfortable block, which `floorsFor` asks for: the name, the reading with its
+ * high and low, and a graph tall enough to read a shape in.
+ */
+const GRAPH_BLOCK = 148
 
-/** Must match `.cell.block`'s `min-height`, the rectangular family's shared floor. The three
- * rectangular styles differ only in chrome (`isRectangular`), never in how tall a block asks
- * to be, so one constant serves all three. */
-const RECT_BLOCK = 104
+/**
+ * A graph block's narrowest cell, beside `GRAPH_MIN` (`metrics.ts`), its least height: the least
+ * room a graph block can have and still draw name, reading and a line — the Lock Screen's small
+ * rectangular widget, roughly. Below this a block is left out rather than drawn without its graph.
+ */
+const GRAPH_MIN_WIDTH = 96
+
+/** Narrower than this, a graph cell drops the high and low beside its reading. */
+const GRAPH_EXTREMES_WIDTH = 180
+
+/** The corner face's smallest cell: a reading and a quarter-arc need about this much. */
+const CORNER_MIN = 72
+
+/** How tall one block of a stacking style asks to be. */
+const blockFor = (style: ComplicationStyle): number =>
+  style === 'rectangular-graph' ? GRAPH_BLOCK : RECT_BLOCK
 
 /**
  * The width a stacking style needs before its single column starts truncating names and
@@ -162,12 +184,32 @@ export const packFor = (style: ComplicationStyle, count: number, box: Box, scale
   const width = Math.max(0, (box.width - 2 * BORDER) / scale - 2 * INSET)
   const height = Math.max(0, (box.height - 2 * BORDER) / scale - 2 * INSET)
 
+  if (style === 'rectangular-graph') return packGraph(n, width, height)
+
+  // The corner face: two across, each entity tucked into the outer corner of its cell.
+  if (style === 'corner') {
+    const columns = Math.min(n, 2)
+    const rows = Math.ceil(n / columns)
+    const cell = Math.min(
+      (width - (columns - 1) * GAP) / columns,
+      (height - (rows - 1) * GAP) / rows,
+    )
+    return {
+      columns,
+      rows,
+      ring: Math.max(CORNER_MIN, Math.floor(cell)),
+      labels: false,
+      shown: n,
+      compact: false,
+    }
+  }
+
   // The stacking styles: one entity per row, full width, no ring to size. `isRectangular`
   // covers the three block chromes; `inline` stacks the same way for a different reason
   // (a strip meant to sit among other strips, not a cell of its own) but the geometry is
   // identical, so one branch draws both.
   if (isRectangular(style) || style === 'inline') {
-    return { columns: 1, rows: n, ring: 0, labels: true }
+    return { columns: 1, rows: n, ring: 0, labels: true, shown: n, compact: false }
   }
 
   // Across before down: the widest row the box can hold at the minimum ring, capped by the
@@ -181,14 +223,45 @@ export const packFor = (style: ComplicationStyle, count: number, box: Box, scale
 
   // Same both-halves test the battery card makes: a name needs a cell wide enough to hold
   // it, and a cell tall enough to have somewhere to put it under the ring.
-  const labels = cellWidth >= LABEL_WIDTH && cellHeight >= RING_MIN + LABEL_GAP + LABEL
+  // The bezel face carries its name around its own rim, so it never asks for a caption row.
+  const labels =
+    style !== 'bezel' && cellWidth >= LABEL_WIDTH && cellHeight >= RING_MIN + LABEL_GAP + LABEL
   const caption = labels ? LABEL_GAP + LABEL : 0
 
   // Floored to a whole design unit: the ring is handed to CSS as a length, and a fraction of
   // a unit multiplied by the scale factor is a row that can round its way over the inset.
   const ring = Math.max(RING_MIN, Math.floor(Math.min(RING_MAX, cellWidth, cellHeight - caption)))
 
-  return { columns, rows, ring, labels }
+  return { columns, rows, ring, labels, shown: n, compact: false }
+}
+
+/**
+ * The graph face, which unlike every other face reflows rather than only stacking: a graph is
+ * worthless squeezed below `GRAPH_MIN`, so when the box cannot stack every block at that height
+ * it puts them side by side — two small Lock Screen-sized graphs per row — and only if even that
+ * cannot hold them all does it draw the ones that fit and leave the rest out whole. What it never
+ * draws is an entity whose block has been cut off below its name, which is what stacking did.
+ *
+ * `floorsFor` still asks for the comfortable single column, so in Home Assistant this mostly
+ * matters while a card is being dragged, or under a saved size that predates an added entity.
+ */
+const packGraph = (n: number, width: number, height: number): Pack => {
+  const fitsRows = (rows: number) => rows * GRAPH_MIN + (rows - 1) * GAP <= height
+  const maxColumns = Math.max(1, Math.min(n, Math.floor((width + GAP) / (GRAPH_MIN_WIDTH + GAP))))
+
+  let columns = maxColumns
+  for (let c = 1; c <= maxColumns; c += 1) {
+    if (fitsRows(Math.ceil(n / c))) {
+      columns = c
+      break
+    }
+  }
+  const rowsThatFit = Math.max(1, Math.floor((height + GAP) / (GRAPH_MIN + GAP)))
+  const shown = Math.min(n, columns * rowsThatFit)
+  const rows = Math.ceil(shown / columns)
+  const cellWidth = (width - (columns - 1) * GAP) / columns
+
+  return { columns, rows, ring: 0, labels: true, shown, compact: cellWidth < GRAPH_EXTREMES_WIDTH }
 }
 
 // ---- Floors ---------------------------------------------------------------------
@@ -207,8 +280,17 @@ export const floorsFor = (style: ComplicationStyle, count: number): Floors => {
   const n = Math.max(1, count)
 
   if (isRectangular(style)) {
-    const content = n * RECT_BLOCK + (n - 1) * GAP + 2 * INSET
+    const content = n * blockFor(style) + (n - 1) * GAP + 2 * INSET
     return { min_columns: columnsFor(STACK_MIN_WIDTH), min_rows: Math.max(3, rowsFor(content)) }
+  }
+
+  if (style === 'corner') {
+    const across = Math.min(n, 2)
+    const rows = Math.ceil(n / across)
+    return {
+      min_columns: columnsFor(across * CORNER_MIN + (across - 1) * GAP + 2 * INSET),
+      min_rows: Math.max(3, rowsFor(rows * CORNER_MIN + (rows - 1) * GAP + 2 * INSET)),
+    }
   }
 
   if (style === 'inline') {
@@ -231,5 +313,17 @@ export const floorsFor = (style: ComplicationStyle, count: number): Floors => {
   return {
     min_columns: columnsFor(neededWidth),
     min_rows: Math.max(3, rowsFor(neededHeight)),
+  }
+}
+
+/**
+ * A bento card's floor: two columns of the minimum square, and rows enough for every entity at
+ * Small. No inset term, because a bento card draws no panel — each cell carries its own.
+ */
+export const bentoFloors = (count: number): Floors => {
+  const box = bentoFloorBox(count)
+  return {
+    min_columns: columnsFor(box.width + 2 * BORDER),
+    min_rows: Math.max(2, rowsFor(box.height + 2 * BORDER)),
   }
 }

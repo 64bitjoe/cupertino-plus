@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { HomeAssistant } from './types/ha'
-import { isTemplate, requestKey, TemplatePool } from './templates'
+import type { ActionConfig } from './actions'
+import { hasRowTemplates, isTemplate, requestKey, templateRequest, TemplatePool } from './templates'
 
 /**
  * A connection that records every subscribe and hands back the push callback, so a test can
@@ -229,5 +230,39 @@ describe('TemplatePool', () => {
 
       expect(pool.read(requestKey({ template: 'T' }))).toBeUndefined()
     })()
+  })
+})
+
+describe('hasRowTemplates', () => {
+  it('reads only the fields it is given', () => {
+    const row: { name: string; icon: string; tap_action?: ActionConfig } = {
+      name: '{{ n }}',
+      icon: 'mdi:x',
+    }
+    expect(hasRowTemplates(row, ['name'])).toBe(true)
+    expect(hasRowTemplates(row, ['icon'])).toBe(false)
+  })
+
+  it('counts every gesture, at any depth', () => {
+    expect(
+      hasRowTemplates(
+        { hold_action: { action: 'call-service', target: { entity_id: ['{{ e }}'] } } },
+        [],
+      ),
+    ).toBe(true)
+    expect(hasRowTemplates({ tap_action: { action: 'toggle' } }, [])).toBe(false)
+  })
+})
+
+describe('TemplatePool.resolver', () => {
+  it('looks a result up under the key templateRequest builds', () => {
+    const pool = new TemplatePool(() => {})
+    const reads: string[] = []
+    pool.read = (key: string) => {
+      reads.push(key)
+      return 'answer'
+    }
+    expect(pool.resolver('Joe')('{{ x }}', 'light.a')).toBe('answer')
+    expect(reads).toEqual([requestKey(templateRequest('{{ x }}', 'light.a', 'Joe'))])
   })
 })

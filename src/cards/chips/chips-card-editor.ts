@@ -1,44 +1,49 @@
 import { html, nothing, type TemplateResult } from 'lit'
 
 import { CupertinoCardEditor } from '../../core/card-editor'
+import {
+  FLOATING_CONTAINER_FIELD,
+  FLOATING_CONTAINER_HELPER,
+  FLOATING_DEFAULT_CONTAINER,
+} from '../../core/container'
 import { defineElement } from '../../core/register'
-import { isTint } from '../../core/tint'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { ChipsCardConfig } from './chips-card'
 // Imported for the side effect as well as the type: the list element has to be defined by the
 // time this editor renders it, and this is the only thing that reaches it.
 import './chip-list-editor'
 import type { ChipsChangedDetail } from './chip-list-editor'
+import { COLOR_CUSTOM, COLOR_SELECTOR, foldColor, splitColor } from '../../core/color-form'
 import {
   chipConfigs,
   CHIP_CONTENTS,
   CHIP_ALIGNMENTS,
-  COLOR_CUSTOM,
-  COLOR_SELECTOR,
   DEFAULT_ALIGNMENT,
-  DEFAULT_CONTAINER,
   DEFAULT_CONTENT,
 } from './model'
 
 export const CHIPS_EDITOR_TAG = 'cupertino-plus-chips-editor'
 
-const CONTENT_LABELS: Record<string, string> = {
+export const CONTENT_LABELS: Record<string, string> = {
   icon: 'Icon only',
   value: 'Icon and reading',
   labeled: 'Icon, name and reading',
 }
 
-const ALIGNMENT_LABELS: Record<string, string> = {
+export const ALIGNMENT_LABELS: Record<string, string> = {
   start: 'Start',
   center: 'Centre',
   end: 'End',
   justify: 'Spread across the row',
 }
 
-const CONTAINER_LABELS: Record<string, string> = {
-  glass: 'Glass — floats on the dashboard',
-  card: 'Card — draws its own surface',
-}
+/** A dropdown over `values`, each shown by its label: the shape every select row here takes. */
+export const dropdown = (values: readonly string[], labels: Record<string, string>) => ({
+  select: {
+    mode: 'dropdown' as const,
+    options: values.map(value => ({ value, label: labels[value] ?? value })),
+  },
+})
 
 /**
  * The card-level fields, as a function of the current form data rather than a constant list:
@@ -47,41 +52,14 @@ const CONTAINER_LABELS: Record<string, string> = {
  */
 const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
   const rows: HaFormSchema[] = [
-    {
-      name: 'content',
-      selector: {
-        select: {
-          mode: 'dropdown',
-          options: CHIP_CONTENTS.map(value => ({ value, label: CONTENT_LABELS[value] ?? value })),
-        },
-      },
-    },
+    { name: 'content', selector: dropdown(CHIP_CONTENTS, CONTENT_LABELS) },
     { name: 'color', selector: COLOR_SELECTOR },
   ]
   if (data.color === COLOR_CUSTOM) {
     rows.push({ name: 'color_custom', selector: { text: { placeholder: '#ff8800' } } })
   }
-  rows.push({
-    name: 'alignment',
-    selector: {
-      select: {
-        mode: 'dropdown',
-        options: CHIP_ALIGNMENTS.map(value => ({ value, label: ALIGNMENT_LABELS[value] ?? value })),
-      },
-    },
-  })
-  rows.push({
-    name: 'container',
-    selector: {
-      select: {
-        mode: 'dropdown',
-        options: ['glass', 'card'].map(value => ({
-          value,
-          label: CONTAINER_LABELS[value] ?? value,
-        })),
-      },
-    },
-  })
+  rows.push({ name: 'alignment', selector: dropdown(CHIP_ALIGNMENTS, ALIGNMENT_LABELS) })
+  rows.push(FLOATING_CONTAINER_FIELD)
   return rows
 }
 
@@ -98,8 +76,7 @@ const HELPERS: Record<string, string> = {
   color: 'Tints every glyph in the row. A chip can say otherwise in its own panel above.',
   color_custom: 'Any CSS colour: a hex value, an rgb(), or a var() from your theme.',
   alignment: 'Where the chips sit along a row they do not fill.',
-  container:
-    'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
+  container: FLOATING_CONTAINER_HELPER,
 }
 
 /**
@@ -148,7 +125,11 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
 
   /** Shown rather than blank: an unset dropdown reads as broken, not as a default. */
   protected override defaults(): Partial<ChipsCardConfig> {
-    return { content: DEFAULT_CONTENT, alignment: DEFAULT_ALIGNMENT, container: DEFAULT_CONTAINER }
+    return {
+      content: DEFAULT_CONTENT,
+      alignment: DEFAULT_ALIGNMENT,
+      container: FLOATING_DEFAULT_CONTAINER,
+    }
   }
 
   protected override label(schema: HaFormSchema): string {
@@ -163,25 +144,11 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
    * The dropdown holds a palette name, `''`, or the `COLOR_CUSTOM` sentinel; `color_custom`
    * holds the literal when it does. Split here rather than have `fromForm` guess: this is the
    * one place that knows both the config's `color` and the sentinel at once.
-   *
-   * A config naming a real palette colour clears `_colorCustom` before it is read, however
-   * that config arrived — including a YAML edit, which reaches this editor only through
-   * `setConfig` and never through `fromForm`. Left unclear, a card switched to `Custom…` and
-   * back to a plain `color: red` in YAML would still show "Custom…" here with "red" pre-filled
-   * into the text box: a valid palette name misrepresented as a custom one. So a genuine tint
-   * always wins and clears the flag; only then does the flag get to speak for an otherwise
-   * empty colour, which is what lets picking "Custom…" and typing nothing yet still show the
-   * text box.
+   * `splitColor` has why a genuine tint clears the remembered flag.
    */
   protected override toForm(config: ChipsCardConfig): Record<string, unknown> {
     const data: Record<string, unknown> = { ...config }
-    const configured = typeof config.color === 'string' ? config.color : ''
-    if (configured && isTint(configured)) {
-      this._colorCustom = false
-    } else if (this._colorCustom || configured) {
-      data.color = COLOR_CUSTOM
-      data.color_custom = configured
-    }
+    this._colorCustom = splitColor(data, this._colorCustom)
     return data
   }
 
@@ -199,9 +166,7 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
     // Remembered the same way `toForm` reads it back, and for the same reason: this is the
     // only moment the editor learns the dropdown wants the text box, and nothing about a still
     // empty `color_custom` belongs in the config.
-    this._colorCustom = folded.color === COLOR_CUSTOM
-    if (folded.color === COLOR_CUSTOM) folded.color = folded.color_custom
-    delete folded.color_custom
+    this._colorCustom = foldColor(folded)
     return super.fromForm(config, folded, formFields)
   }
 
@@ -222,7 +187,7 @@ class CupertinoChipsCardEditor extends CupertinoCardEditor<ChipsCardConfig> {
     return html`
       <cupertino-plus-chips-list
         .hass=${this.hass}
-        .chips=${chipConfigs(this._config.entities)}
+        .rows=${chipConfigs(this._config.entities)}
         @chips-changed=${this._chipsChanged}
       ></cupertino-plus-chips-list>
     `

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { defineConfig } from 'vite'
+import MagicString from 'magic-string'
+import { defineConfig, type Plugin } from 'vite'
 
 const { version } = JSON.parse(readFileSync('./package.json', 'utf8')) as { version: string }
 
@@ -33,6 +34,34 @@ const LICENCE_BANNER = `/*! cupertino-plus v${version} | Copyright (C) 2026 Kiri
 const SITE_BASE = process.env.SITE_BASE ?? '/cupertino-plus/'
 
 /**
+ * Minifies the stylesheets inside `css` tagged templates, which no JS minifier touches: their
+ * comments (the reasoning this codebase writes beside its CSS) and runs of whitespace went out
+ * to every dashboard verbatim, about a fifth of the bundle. Only for builds; the dev server keeps
+ * them readable. A template literal cannot hold a raw backtick, so the match cannot run past its
+ * own end, and `${…}` interpolations are left as they are.
+ */
+const minifyCssTemplates = (): Plugin => ({
+  name: 'cupertino-minify-css-templates',
+  apply: 'build',
+  transform(code, id) {
+    if (!id.endsWith('.ts') || !code.includes('css`')) return null
+    const out = new MagicString(code)
+    for (const match of code.matchAll(/(?<!`)\bcss`([^`]*)`/g)) {
+      const body = match[1] ?? ''
+      const start = (match.index ?? 0) + 4
+      const slim = body
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s*([{};,>])\s*/g, '$1')
+        .replace(/:\s+/g, ':')
+        .trim()
+      if (slim !== body) out.overwrite(start, start + body.length, slim)
+    }
+    return out.hasChanged() ? { code: out.toString(), map: out.generateMap({ hires: true }) } : null
+  },
+})
+
+/**
  * Three jobs, one config:
  *
  *   `vite`                    -> the showcase, with HMR and no Home Assistant needed.
@@ -48,6 +77,7 @@ export default defineConfig(({ command, mode }) => {
   const site = mode === 'site'
 
   return {
+    plugins: [minifyCssTemplates()],
     define: {
       __CW_VERSION__: JSON.stringify(version),
     },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FrontendLocaleData } from '../../core/types/ha'
-import { timePreferences } from './datetime'
+import { timePreferences } from '../../core/time-preferences'
 import { TIME_DASH, itemTime, moreLabel, widgetDate, type FormatContext } from './format'
 
 const ctx: FormatContext = { locale: 'en-GB', timeZone: 'Europe/Warsaw', hour12: true }

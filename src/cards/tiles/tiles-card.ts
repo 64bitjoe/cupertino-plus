@@ -7,25 +7,28 @@ import {
   type TemplateResult,
 } from 'lit'
 
+import { Memo, registriesOf } from '../../core/area-summary'
 import { CupertinoCard, type CupertinoCardConfig } from '../../core/base-card'
-import { isPressable, runAction, type ActionConfig } from '../../core/actions'
-import { Gestures } from '../../core/gestures'
+import { runAction } from '../../core/actions'
+import { Gestures, pressesAnything, pressHandlers, type PressHandlers } from '../../core/gestures'
 import { contentCardSize, contentGridOptions, type Floors } from '../../core/floors'
 import { registerCard } from '../../core/register'
-import { requestKey, TemplatePool } from '../../core/templates'
-import { templateRequest } from '../chips/model'
+import { TemplatePool } from '../../core/templates'
 import type { CardSizing } from '../../core/size'
 import type { LovelaceCardEditor, LovelaceGridOptions } from '../../core/types/ha'
 import type { CardContainer } from '../../core/container'
-import { DEFAULT_CONTAINER } from '../chips/model'
+import { FLOATING_DEFAULT_CONTAINER } from '../../core/container'
 import { TILES_EDITOR_TAG } from './tiles-card-editor'
-import { floorsFor, groupRows, INSET, tileMetrics, type TileBand } from './layout'
+import { fitGlyphs, glyphBudget, glyphLabel } from './glyphs'
+import { floorsFor, groupRows, INSET, tileMetrics, tileWidthFor, type TileBand } from './layout'
 import {
   flowFor,
   orientationFor,
   readTiles,
   stateLinesFor,
   tileConfigs,
+  tileLabel,
+  tilesHaveGlyphs,
   tileTemplates,
   tileWatchedIds,
   washFor,
@@ -395,6 +398,84 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         height: calc(28px * var(--cw-scale));
       }
 
+      /* A room's status glyphs (summary_style: icons), under the state line: the small
+         tinted pills under a room in the Home app. Every number is glyphs.ts', which prices
+         each pill before it is drawn and folds what will not fit into a "+N", so nothing here
+         decides what fits. The row's own height is fixed, and its pills wrap rather than
+         shrink, so a pill the arithmetic got wrong drops whole onto a hidden second line
+         instead of being cut in half at the tile's edge. A tile with no glyphs in a card that
+         has them keeps the empty row, so names line up across a line of tiles. */
+      .glyphs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: calc(4px * var(--cw-scale));
+        height: calc(18px * var(--cw-scale));
+        margin-top: calc(4px * var(--cw-scale));
+        overflow: hidden;
+      }
+
+      /* Icon-only, the pill is a circle round its 12 icon (3 + 12 + 3); with a count it is
+         4 + icon + 2 + figures + 6. Tinted at the Home app's low alpha so the hue is in the
+         icon and the pill only gathers it; the figure is the label colour, for a figure in
+         yellow on a light wallpaper does not read. Tabular, so a 2 becoming a 3 moves nothing. */
+      .pill {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        gap: calc(2px * var(--cw-scale));
+        box-sizing: border-box;
+        min-width: calc(18px * var(--cw-scale));
+        height: calc(18px * var(--cw-scale));
+        padding: 0 calc(3px * var(--cw-scale));
+        border-radius: var(--cw-radius-pill);
+        background: color-mix(in srgb, var(--cw-pill-tint) 14%, transparent);
+        color: var(--cw-pill-tint);
+        font: var(--cw-text-caption-2);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      :host([dark]) .pill {
+        background: color-mix(in srgb, var(--cw-pill-tint) 22%, transparent);
+      }
+
+      .pill ha-icon {
+        --mdc-icon-size: calc(12px * var(--cw-scale));
+        display: inline-flex;
+        width: var(--mdc-icon-size);
+        height: var(--mdc-icon-size);
+      }
+
+      .pill.counted {
+        padding: 0 calc(6px * var(--cw-scale)) 0 calc(4px * var(--cw-scale));
+      }
+
+      .pill .count {
+        color: var(--cw-label);
+      }
+
+      /* An alert keeps its figure red too: it is the one pill that must not read as calm. */
+      .pill.alert .count {
+        color: inherit;
+      }
+
+      .pill.more {
+        padding: 0 calc(6px * var(--cw-scale));
+        background: var(--cw-fill);
+        color: var(--cw-label-secondary);
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
       .tile.unknown {
         opacity: 0.55;
       }
@@ -436,12 +517,21 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
   /** The card's template subscriptions; see the chips card for why `requestUpdate`. */
   private readonly _templates = new TemplatePool(() => this.requestUpdate())
 
+  /** A room tile changes when an entity or device moves room; see `base-card.ts`. */
+  protected override readonly watchesRegistries: boolean = true
+
   /** Hold and double tap, for the tiles that configure them; see `core/gestures.ts`. */
   private readonly _gestures = new Gestures()
 
   /** Who is looking, for a template's `user`; see `templateRequest`. */
   private get _user(): string | undefined {
     return this.hass?.user?.name
+  }
+
+  /** Reopens the template subscriptions on re-attach; see the chips card. */
+  public override connectedCallback(): void {
+    super.connectedCallback()
+    this.requestUpdate()
   }
 
   public override disconnectedCallback(): void {
@@ -454,10 +544,17 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     super.willUpdate(changed)
     if (!this.hass || !this._config) return
     this._templates.sync(this.hass, tileTemplates(this._config.tiles, this._defaults, this._user))
+    this._views = { config: this._config, tiles: this._readTiles() }
   }
 
+  /** The watched ids, rebuilt only when the tiles or the registries change. */
+  private readonly _watched = new Memo<string[]>()
+
   protected override watchedEntities(): string[] {
-    return tileWatchedIds(this._config?.tiles)
+    const tiles = this._config?.tiles
+    return this._watched.get([tiles, ...registriesOf(this.hass)], () =>
+      tileWatchedIds(tiles, this.hass),
+    )
   }
 
   /** The card-level defaults every row inherits from. */
@@ -471,12 +568,26 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
    * byte for byte, or the lookup silently misses and the field falls back forever. Both build it
    * with `templateRequest`, which is what makes that agreement structural rather than careful.
    */
+  private _readTiles(): TileView[] {
+    if (!this.hass || !this._config) return []
+    return readTiles(
+      this.hass,
+      this._config.tiles,
+      this._defaults,
+      this._templates.resolver(this._user),
+    )
+  }
+
+  /**
+   * The tiles the last update read, for the config they were read against, so `getGridOptions`
+   * and `getCardSize` (asked on every render of the section) reuse them; see the chips card.
+   */
+  private _views: { config: TilesCardConfig; tiles: TileView[] } | undefined
+
   private get _tiles(): TileView[] {
     if (!this.hass || !this._config) return []
-    const user = this._user
-    return readTiles(this.hass, this._config.tiles, this._defaults, (template, entity) =>
-      this._templates.read(requestKey(templateRequest(template, entity, user))),
-    )
+    if (this._views?.config === this._config) return this._views.tiles
+    return this._readTiles()
   }
 
   /** The footprint this config draws at, for the floor and the stylesheet alike. */
@@ -484,6 +595,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     return tileMetrics(
       orientationFor(this._config?.orientation),
       stateLinesFor(this._config?.state_lines),
+      tilesHaveGlyphs(this._config?.tiles),
     )
   }
 
@@ -507,6 +619,9 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
    */
   private _floorMax: { key: string; floors: Floors } | undefined
 
+  /** The config's part of `_floorMax`'s key, stringified once per config rather than per ask. */
+  private readonly _configKey = new Memo<string>()
+
   /** The card's own width in design units once measured, else undefined (assume narrow). */
   private get _floorWidth(): number | undefined {
     return this.isMeasured ? this.boxWidth / this.scaleFactor : undefined
@@ -514,7 +629,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
 
   /** What the card actually pads by: glass insets by nothing, card by the shared inset. */
   private get _floorInset(): number {
-    return (this._config?.container ?? DEFAULT_CONTAINER) === 'glass' ? 0 : INSET
+    return (this._config?.container ?? FLOATING_DEFAULT_CONTAINER) === 'glass' ? 0 : INSET
   }
 
   private _floorFor(band: TileBand[]): Floors {
@@ -526,13 +641,10 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     // The measured width is part of the identity, or the high-water mark would hold the
     // pre-measurement estimate and the card would never shrink to the width it actually got.
     // The metrics are too: a card switched to horizontal must be allowed to get shorter.
-    const key = JSON.stringify([
-      this._config?.tiles ?? null,
-      width === undefined ? null : Math.round(width),
-      inset,
-      flow,
-      metrics,
-    ])
+    const config = this._configKey.get([this._config], () =>
+      JSON.stringify([this._config?.tiles ?? null, metrics]),
+    )
+    const key = `${config}|${width === undefined ? '' : Math.round(width)}|${inset}|${flow}`
 
     if (!this._floorMax || this._floorMax.key !== key) {
       this._floorMax = { key, floors }
@@ -563,57 +675,11 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     return contentCardSize(this._floorFor(this._floorBand))
   }
 
-  /** Bound unconditionally and guarded inside; see the chips card for why. */
-  private _run(tile: TileView, action: ActionConfig | undefined) {
-    return (): void => {
-      if (!this.hass || !isPressable(action)) return
-      runAction(this.hass, this, action, tile.entityId)
-    }
-  }
-
-  /**
-   * The click is the tap, as it always was; `Gestures` only holds it back when the tile has a
-   * double tap to wait for, or swallows it when it was the release of a hold. A tile with
-   * neither runs no timer and taps on the click itself.
-   */
-  private _click(tile: TileView) {
-    return (event: Event): void => {
-      const run = this._run(tile, tile.action)
-      const double = tile.doubleTapAction
-      this._gestures.click(
-        event.currentTarget as object,
-        run,
-        double ? this._run(tile, double) : undefined,
-      )
-    }
-  }
-
-  private _down(tile: TileView) {
-    return (event: Event): void => {
-      const hold = tile.holdAction
-      this._gestures.down(event.currentTarget as object, hold ? this._run(tile, hold) : undefined)
-    }
-  }
-
-  private _cancel(event: Event): void {
-    this._gestures.cancel(event.currentTarget as object)
-  }
-
-  /** A long press on a touch screen opens the context menu, unless a hold has claimed it. */
-  private _menu(tile: TileView) {
-    return (event: Event): void => {
-      if (tile.holdAction) event.preventDefault()
-    }
-  }
-
-  /** Enter and Space are a tap: a keyboard has no hold, and its double press is two taps. */
-  private _key(tile: TileView) {
-    return (event: KeyboardEvent): void => {
-      if (!isPressable(tile.action)) return
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      this._run(tile, tile.action)()
-    }
+  /** The tile's press listeners: `pressHandlers`, firing against its entity. */
+  private _press(tile: TileView): PressHandlers {
+    return pressHandlers(this._gestures, tile, action => {
+      if (this.hass) runAction(this.hass, this, action, tile.entityId)
+    })
   }
 
   /**
@@ -621,13 +687,10 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
    * tile whose tap is `none` but which holds or double-taps is still one, since a pointer can
    * press it; its Enter key does nothing, as its tap does.
    */
-  private _renderTile(tile: TileView): TemplateResult {
-    const pressable =
-      isPressable(tile.action) ||
-      tile.holdAction !== undefined ||
-      tile.doubleTapAction !== undefined
-    const readable = tile.unavailable ? 'unavailable' : tile.value
-    const label = [tile.name, readable].filter(part => part !== '').join(', ') || 'Tile'
+  private _renderTile(tile: TileView, glyphs: number | undefined): TemplateResult {
+    const pressable = pressesAnything(tile)
+    const press = this._press(tile)
+    const label = tileLabel(tile)
 
     return html`
       <div
@@ -640,13 +703,13 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         aria-label=${pressable ? label : nothing}
         aria-pressed=${pressable && tile.selected ? 'true' : nothing}
         title=${tile.name}
-        @click=${this._click(tile)}
-        @pointerdown=${this._down(tile)}
-        @pointerup=${this._cancel}
-        @pointerleave=${this._cancel}
-        @pointercancel=${this._cancel}
-        @contextmenu=${this._menu(tile)}
-        @keydown=${this._key(tile)}
+        @click=${press.click}
+        @pointerdown=${press.down}
+        @pointerup=${press.cancel}
+        @pointerleave=${press.cancel}
+        @pointercancel=${press.cancel}
+        @contextmenu=${press.menu}
+        @keydown=${press.key}
       >
         ${
           tile.picture
@@ -657,8 +720,40 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
         <div class="text">
           <div class="name">${tile.name}</div>
           <div class="state">${tile.value || NO_STATE}</div>
+          ${glyphs === undefined ? nothing : this._renderGlyphs(tile, glyphs)}
         </div>
       </div>
+    `
+  }
+
+  /**
+   * The glyph row, fitted to `budget` by `fitGlyphs`. Hidden from a screen reader, which hears
+   * what each glyph means instead: in the tile's label when it is a button, and otherwise in
+   * a visually hidden line, since a tile that is not a button is read from its text.
+   */
+  private _renderGlyphs(tile: TileView, budget: number): TemplateResult {
+    const { shown, more } = fitGlyphs(tile.glyphs, budget)
+    const spoken = glyphLabel(tile.glyphs)
+    return html`
+      <div class="glyphs" aria-hidden="true">
+        ${shown.map(
+          glyph => html`
+            <span
+              class="pill ${glyph.count !== undefined || glyph.text !== undefined ? 'counted' : ''} ${
+                glyph.alert ? 'alert' : ''
+              }"
+              style=${`--cw-pill-tint:${glyph.tint}`}
+              ><ha-icon .icon=${glyph.icon}></ha-icon>${
+                (glyph.text ?? glyph.count) !== undefined
+                  ? html`<span class="count">${glyph.text ?? glyph.count}</span>`
+                  : nothing
+              }</span
+            >
+          `,
+        )}
+        ${more > 0 ? html`<span class="pill more">+${more}</span>` : nothing}
+      </div>
+      ${spoken !== '' ? html`<span class="visually-hidden">${spoken}</span>` : nothing}
     `
   }
 
@@ -666,7 +761,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     if (!this._config || !this.hass) return nothing
 
     const tiles = this._tiles.filter(tile => tile.visible)
-    const container = this._config.container ?? DEFAULT_CONTAINER
+    const container = this._config.container ?? FLOATING_DEFAULT_CONTAINER
     const klass = container === 'glass' ? 'glass' : 'surface'
 
     if (tiles.length === 0) {
@@ -680,7 +775,23 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
     const columns = Math.max(...rows.map(row => row.length))
     const orientation = orientationFor(this._config.orientation)
     const lines = stateLinesFor(this._config.state_lines)
-    const { minWidth, height } = this._metrics
+    const metrics = this._metrics
+    const { minWidth, height } = metrics
+    // The glyph row's budget, from the width a tile is actually drawn at: the card's measured
+    // line, shared out by the stylesheet's own rule. Undefined when no tile draws glyphs, so
+    // the other cards draw no empty row.
+    const width = this._floorWidth
+    const glyphs = tilesHaveGlyphs(this._config.tiles)
+      ? glyphBudget(
+          tileWidthFor(
+            width === undefined ? undefined : width - 2 * this._floorInset,
+            columns,
+            flowFor(this._config.flow),
+            metrics,
+          ),
+          orientation,
+        )
+      : undefined
     return html`
       <ha-card class=${klass} aria-label=${`${tiles.length} tiles`}>
         <div
@@ -692,7 +803,7 @@ class CupertinoTilesCard extends CupertinoCard<TilesCardConfig> {
           };--cw-state-lines:${lines}`}
         >
           ${rows.map(
-            row => html`<div class="row">${row.map(tile => this._renderTile(tile))}</div>`,
+            row => html`<div class="row">${row.map(tile => this._renderTile(tile, glyphs))}</div>`,
           )}
         </div>
       </ha-card>

@@ -1,34 +1,34 @@
 /**
- * The tiles card's tile list, as one control.
+ * The tiles card's tile list, as one control: a `SortablePanelList` (`core/panel-list.ts`, which
+ * has the long arguments) of tile rows.
  *
- * A third copy of the chips card's list editor, adapted, and deliberately not shared with it:
- * extracting one sortable-panel-list from the battery, chips and tiles editors is a refactor of
- * two shipped editors that nothing below the DOM tests, and doing it while writing a third
- * consumer would make a bug in the extraction indistinguishable from a bug in this card. The
- * three working editors are the specification for that follow-up, which is recorded in the
- * rules doc. Until then `chips/chip-list-editor.ts` carries the long arguments (why an element
- * of its own rather than `ha-form` rows, which Home Assistant elements may be rendered and why
- * the add control waits for `ha-entity-picker`); this file says only where it differs.
- *
- * It differs by what a tile is. There is no content dropdown, because a tile always draws icon,
+ * A tile row differs from a chip's by what a tile is. There is no content dropdown, because a tile always draws icon,
  * name and state, and no fill switch, because a tile grid already shares each row. An entity-less
  * tile is a navigation tile rather than a spacer, so a blank tile is a real thing to add and the
  * panel opens in template mode for it.
  */
 
-import { mdiContentCopy, mdiDrag, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
-import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit'
-import { property, state } from 'lit/decorators.js'
-import { repeat } from 'lit/directives/repeat.js'
-
 import { allActionRows, gestureHelper, gestureLabel } from '../../core/action-form'
-import { moveRow } from '../../core/entities-form'
+import { roomHelper, roomLabel, roomRows } from '../../core/area-form'
+import {
+  iconSelector,
+  SortablePanelList,
+  textSelector,
+  type PanelSummary,
+} from '../../core/panel-list'
 import { defineElement } from '../../core/register'
-import { isTemplate } from '../../core/templates'
-import { isTint } from '../../core/tint'
 import type { HaFormSchema, HomeAssistant } from '../../core/types/ha'
-import { COLOR_CUSTOM, COLOR_SELECTOR, inheritedIcon, inheritedName } from '../chips/model'
-import { readTile, tileFromForm, tileKeys, tileRows, tileToForm, type TileConfig } from './model'
+import { COLOR_CUSTOM, COLOR_SELECTOR } from '../../core/color-form'
+import { inheritedIcon, inheritedName } from '../chips/model'
+import {
+  readTile,
+  tileFromForm,
+  tileHasTemplates,
+  tileKeys,
+  tileRows,
+  tileToForm,
+  type TileConfig,
+} from './model'
 
 export const TILES_LIST_TAG = 'cupertino-plus-tiles-list'
 
@@ -47,23 +47,6 @@ export interface TilesChangedDetail {
  * tiles it is meant to replace, so there is none to hide.
  */
 const ANY_ENTITY = { entity: {} } as const
-
-/**
- * A text field whose placeholder is a real inherited value, or none at all.
- *
- * `exactOptionalPropertyTypes` makes `{ text: { placeholder: undefined } }` a type error — the
- * flag treats an optional property as either present with a real value or entirely absent,
- * never present-and-undefined — so a tile with nothing to inherit (no entity) gets the key left
- * out altogether. That is also the honest answer, not a workaround for the type: there IS no
- * placeholder to promise for an entity-less tile's Icon or Name, because the card draws
- * nothing for either field left empty on one, exactly as it draws nothing for the tile as a
- * whole when every field is.
- */
-const textSelector = (placeholder: string | undefined): { text: { placeholder?: string } } =>
-  placeholder !== undefined ? { text: { placeholder } } : { text: {} }
-
-const iconSelector = (placeholder: string | undefined): { icon: { placeholder?: string } } =>
-  placeholder !== undefined ? { icon: { placeholder } } : { icon: {} }
 
 /**
  * One tile's fields: what the tile *is*, and then what a press *does*.
@@ -99,6 +82,9 @@ const tileSchema = (
 ): readonly HaFormSchema[] => {
   const rows: HaFormSchema[] = [
     { name: 'entity', selector: ANY_ENTITY },
+    // A room is a tile with no entity, so the area row is offered only to one: on an entity
+    // tile it would be a field that does nothing.
+    ...(config.entity === undefined ? roomRows(data, { style: true, hass }) : []),
     templating
       ? { name: 'color', selector: { text: {} } }
       : { name: 'color', selector: COLOR_SELECTOR },
@@ -129,17 +115,6 @@ const tileSchema = (
 
   return rows
 }
-
-/**
- * The add control, as a plain field, for as long as the real picker is undefined.
- *
- * It excludes what the list already holds, the same as the picker below does. Without it the
- * control offers a tile that is already there, `_addTile` refuses it, and the only thing the
- * user sees is a field that filled itself in and did nothing.
- */
-const addSchema = (taken: readonly string[]): readonly HaFormSchema[] => [
-  { name: 'entity', selector: { entity: { exclude_entities: [...taken] } } },
-]
 
 const LABELS: Record<string, string> = {
   entity: 'Entity',
@@ -172,7 +147,8 @@ const HELPERS: Record<string, string> = {
   action: 'A tile set to Nothing is not drawn as a button at all: no tab stop, no pressed state.',
   navigation_path: 'A dashboard path, as the URL bar shows it.',
   url_path: 'Opens in a new tab, or the browser on the companion app.',
-  service: 'As domain.service. Its data and target stay in YAML, and either may be a template.',
+  service:
+    'As domain.service. Its target and data have their own rows below; either may be a template.',
   templating:
     'Swaps the icon and colour pickers for text boxes, so you can write a template in them.',
   break: 'This tile begins a new row. A row still wraps on its own if it runs out of width.',
@@ -191,528 +167,64 @@ const ADD_HELPER =
   'name, icon or reading of its own below, with a template or a plain one, to make a ' +
   'shortcut that only goes somewhere.'
 
-class CupertinoTilesList extends LitElement {
-  /**
-   * Home Assistant's own furniture, not ours: no `--cw-*` token appears here, for the reason
-   * `CupertinoCardEditor` gives — a widget that looks like a phone's should still have a config
-   * panel that looks like the dialog it is sitting in. The rules below are the battery list's,
-   * kept identical on purpose: two list controls in one library that were spaced differently
-   * would read as two libraries.
-   */
-  static override styles: CSSResultGroup = css`
-    :host {
-      display: block;
-    }
+class CupertinoTilesList extends SortablePanelList<TileConfig> {
+  protected readonly eventName = 'tiles-changed'
+  protected readonly detailKey = 'tiles'
+  protected readonly addLabel = ADD_LABEL
+  protected override readonly addBlankLabel = ADD_BLANK_LABEL
+  protected readonly addHint = ADD_HELPER
+  protected readonly emptyText = 'No tiles yet. The card will say so too.'
 
-    .tiles {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    /* Aligned to the top rather than centred: the panel grows downwards when it is opened,
-       and a handle that centred itself against an expanded panel would drift away from the row
-       it drags. 48px is ha-expansion-panel's own summary height. */
-    .tile {
-      display: flex;
-      align-items: flex-start;
-    }
-
-    .handle {
-      display: flex;
-      align-items: center;
-      height: 48px;
-      padding-inline-end: 8px;
-      color: var(--secondary-text-color);
-      cursor: grab;
-    }
-
-    /* Otherwise a drag that starts on the glyph is a drag of the glyph, and the row stays
-       where it is. */
-    .handle > * {
-      pointer-events: none;
-    }
-
-    ha-expansion-panel {
-      flex: 1;
-      min-width: 0;
-    }
-
-    ha-expansion-panel ha-icon {
-      color: var(--secondary-text-color);
-    }
-
-    .remove {
-      --ha-icon-button-size: 36px;
-      color: var(--secondary-text-color);
-    }
-
-    .fields {
-      display: block;
-      padding: 8px 0 16px;
-    }
-
-    .add {
-      margin-top: 16px;
-    }
-
-    /* A plain element rather than an HA custom one: unlike ha-entity-picker, whose fallback
-       while undefined is documented at the top of this file, nothing else here needs this
-       button to exist before it can be pressed, so there is no reason to risk it rendering as
-       nothing during the same window ha-entity-picker sometimes does.
-
-       Drawn as a real outlined button on its own line rather than the bare text link this was
-       first shipped as. Sitting inline beside the picker's own solid button, a borderless link
-       read as that button's caption rather than as the second of two ways to add a tile, and
-       the feature was reported missing twice by somebody looking straight at it. Outlined
-       rather than solid keeps the ordinary path visually primary. */
-    .blank {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      margin-top: 8px;
-      padding: 0 16px;
-      height: 40px;
-      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.4));
-      border-radius: 9999px;
-      background: none;
-      color: var(--primary-color);
-      font: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-
-    .blank:hover {
-      background: color-mix(in srgb, var(--primary-color) 8%, transparent);
-    }
-
-    .blank:focus-visible {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-    }
-
-    /* The add control's own line rather than the helper of whichever of the two controls is
-       standing there: the button mode draws no helper, and a hint that came and went with the
-       control would be a hint nobody reads. */
-    .hint {
-      margin: 6px 0 0;
-      color: var(--secondary-text-color);
-      font-size: 12px;
-    }
-
-    .empty {
-      margin: 0 0 16px;
-      color: var(--secondary-text-color);
-      font-size: 13px;
-    }
-  `
-
-  @property({ attribute: false }) public hass?: HomeAssistant
-
-  /** Normalised by the editor into config objects. A row may have no entity: a blank tile is a navigation shortcut. */
-  @property({ attribute: false }) public tiles: readonly TileConfig[] = []
-
-  /**
-   * Whether `ha-entity-picker` has been defined yet, and so whether the add control can be
-   * the button. It resolves itself; see the note at the top of the file.
-   */
-  @state() private _pickerReady = customElements.get('ha-entity-picker') !== undefined
-
-  /**
-   * Which panels are open, by row key.
-   *
-   * Held here rather than left to each `ha-expansion-panel`, because this element re-renders
-   * from the config on every keystroke: an `expanded` that only lived in the panel would be
-   * whatever the recycled DOM node happened to have. By key and not by position so a dragged
-   * row keeps its panel open, which is also why the rows are keyed below.
-   */
-  private readonly _open = new Set<string>()
-
-  /**
-   * Which tiles are showing their template fields, by row key.
-   *
-   * A view of a row rather than a property of one, so it writes no config key — the same
-   * arrangement `_open` already uses for which panels are expanded. `icon` is an icon picker
-   * and `color` is a dropdown, and a template cannot be typed into either; this switch swaps
-   * both for plain text boxes and reveals the two fields that only make sense as templates.
-   */
-  private readonly _templating = new Set<string>()
-
-  /**
-   * On by default for a tile whose config already holds a template, so a config written in
-   * YAML opens showing what it actually says rather than a picker that cannot represent it.
-   * `_addBlank` seeds this set for the same reason on a freshly added blank tile — templates
-   * and literals are the only way an entity-less row ever gets content, so it opens ready for
-   * one — but it is a starting point rather than a rule: the switch can still be turned off
-   * afterwards for a tile that only ever wanted a plain icon and name.
-   */
-  private _isTemplating(config: TileConfig, key: string): boolean {
-    if (this._templating.has(key)) return true
-    return [
-      config.name,
-      config.icon,
-      config.color,
-      config.value,
-      config.show,
-      config.selected,
-    ].some(isTemplate)
+  protected keysFor(rows: readonly TileConfig[]): string[] {
+    return tileKeys(rows)
   }
 
-  /**
-   * Which tiles are showing the custom-colour text box, by row key.
-   *
-   * A view of a row, exactly like `_templating` above: selecting "Custom…" from the Colour
-   * dropdown has nothing to write into the config until a value is typed into the field beside
-   * it. Without holding that choice somewhere of its own, the very re-render the dropdown's own
-   * change causes would find `color` still unset, decide the row was never in custom mode, and
-   * the field the user just asked for would never appear.
-   */
-  private readonly _colorCustom = new Set<string>()
-
-  private readonly _computeLabel = (schema: HaFormSchema): string =>
-    LABELS[schema.name] ?? gestureLabel(schema.name) ?? schema.name
-
-  private readonly _computeHelper = (schema: HaFormSchema): string | undefined =>
-    HELPERS[schema.name] ?? gestureHelper(schema.name)
-
-  private readonly _computeAddLabel = (): string => ADD_LABEL
-
-  public override connectedCallback(): void {
-    super.connectedCallback()
-    if (this._pickerReady) return
-    void customElements.whenDefined('ha-entity-picker').then(() => {
-      this._pickerReady = true
-    })
+  protected configRows(rows: readonly TileConfig[]): (string | TileConfig)[] {
+    return tileRows(rows)
   }
 
-  private _emit(rows: readonly TileConfig[]): void {
-    this.dispatchEvent(
-      new CustomEvent<TilesChangedDetail>('tiles-changed', {
-        detail: { tiles: tileRows(rows) },
-        bubbles: true,
-        composed: true,
-      }),
-    )
+  /** Any templated field or action; see `tileHasTemplates`. */
+  protected hasTemplates(config: TileConfig): boolean {
+    return tileHasTemplates(config)
   }
 
-  /**
-   * One row's form reported. It carries the whole row, so it replaces the whole row.
-   *
-   * `tileFromForm` never drops a row any more — clearing the Entity field turns a tile into a
-   * navigation or templated tile rather than deleting it, so every edit here replaces the row in
-   * place. The trash icon (`_remove`) is the only way this control removes one.
-   */
-  private readonly _rowChanged = (
-    event: CustomEvent<{ value: Record<string, unknown> }>,
+  protected toForm(config: TileConfig): Record<string, unknown> {
+    return tileToForm(config)
+  }
+
+  protected fromForm(prior: TileConfig, value: Record<string, unknown>): TileConfig {
+    return tileFromForm(prior, value)
+  }
+
+  protected formSchema(
+    config: TileConfig,
+    data: Record<string, unknown>,
+    templating: boolean,
     index: number,
-    key: string,
-  ): void => {
-    event.stopPropagation()
-
-    const prior = this.tiles[index]
-    if (!prior) return
-
-    // The switch is a view of the row, not a fact about its config: read it into `_templating`
-    // and then remove it, so it never reaches `tileFromForm` or the config beyond it.
-    const value = { ...event.detail.value }
-    if (typeof value.templating === 'boolean') {
-      if (value.templating) this._templating.add(key)
-      else this._templating.delete(key)
-    }
-    delete value.templating
-
-    // Remembered the same way as the switch above, and for the same reason: the dropdown
-    // reporting `COLOR_CUSTOM` is the only moment this editor learns the row wants the text
-    // box, and nothing about a still-empty `color_custom` belongs in the config.
-    if (value.color === COLOR_CUSTOM) this._colorCustom.add(key)
-    else this._colorCustom.delete(key)
-
-    // The dropdown and its custom field are two controls for one key. Folded here rather than
-    // in `tileFromForm`, which is a rule about the config and should not know that the editor
-    // draws this as two things.
-    if (value.color === COLOR_CUSTOM) value.color = value.color_custom
-    delete value.color_custom
-
-    const row = tileFromForm(prior, value)
-    const next = [...this.tiles]
-    next[index] = row
-
-    // The panel stays open across the rename that a changed entity amounts to. Only for a row
-    // whose key is its own entity id: a `#1` suffix or a `#<index>` blank-tile key is positional
-    // (see `tileKeys`), and the new one is not this row's to guess — the same cost that
-    // function's own note already accepts for a dragged duplicate, extended here to a blank tile
-    // that gains or loses its entity.
-    if (
-      prior.entity !== undefined &&
-      key === prior.entity &&
-      prior.entity !== row.entity &&
-      row.entity !== undefined &&
-      this._open.delete(key)
-    ) {
-      this._open.add(row.entity)
-    }
-
-    this._emit(next)
-  }
-
-  private readonly _remove = (event: Event, index: number, key: string): void => {
-    // `ha-expansion-panel` toggles on any click inside its summary unless the event has been
-    // defaulted away: `_toggleContainer` opens with `if (e.defaultPrevented) return`. Without
-    // this the row would be deleted and the panel above it would open.
-    event.preventDefault()
-    event.stopPropagation()
-
-    this._open.delete(key)
-    const next = [...this.tiles]
-    next.splice(index, 1)
-    this._emit(next)
+  ): readonly HaFormSchema[] {
+    return tileSchema(this.hass, config, data, templating, index === 0)
   }
 
   /**
-   * A copy of one tile, inserted directly below it.
-   *
-   * Deliberately allowed to produce two tiles pointing at one entity, which is the one thing
-   * the add picker refuses: that refusal is about a picker offering a candidate it would then
-   * reject, not about the config being invalid. `tileKeys` has always keyed the second
-   * occurrence positionally, and the rules doc has always said such a config draws both tiles
-   * and is fully editable — this is the button that makes it reachable without the YAML tab.
-   *
-   * The clone is deep enough for the nested objects a tile has (its three actions), so editing
-   * the copy's action cannot reach back and rewrite the original's.
+   * Name and glyph as the card is drawing them right now, so a row is recognisable by the same
+   * two things it has on the dashboard. `tile.name` is only ever blank for an entity-less row,
+   * and `readTile` always has a glyph (`TILE_FALLBACK_ICON`).
    */
-  private readonly _duplicate = (event: Event, index: number): void => {
-    // `ha-expansion-panel` opens on any click in its summary that has not been defaulted away
-    // -- the same reason `_remove` starts with these two lines.
-    event.preventDefault()
-    event.stopPropagation()
-
-    const source = this.tiles[index]
-    if (!source) return
-
-    const copy: TileConfig = { ...source }
-    if (source.tap_action) copy.tap_action = { ...source.tap_action }
-    if (source.hold_action) copy.hold_action = { ...source.hold_action }
-    if (source.double_tap_action) copy.double_tap_action = { ...source.double_tap_action }
-
-    const next = [...this.tiles]
-    next.splice(index + 1, 0, copy)
-    this._emit(next)
-  }
-
-  private readonly _moved = (event: CustomEvent<{ oldIndex: number; newIndex: number }>): void => {
-    event.stopPropagation()
-    this._emit(moveRow(this.tiles, event.detail.oldIndex, event.detail.newIndex))
-  }
-
-  /**
-   * The native picker in `addButton` mode reports the id it was given, as a bare string.
-   *
-   * Nothing to reset afterwards: in that mode the picker passes `undefined` down as its value
-   * whatever it holds, so it goes back to being a button by itself.
-   */
-  private readonly _addPicked = (event: CustomEvent<{ value?: string }>): void => {
-    event.stopPropagation()
-    this._addTile(event.detail.value)
-  }
-
-  /** The same thing through the `ha-form` field, which reports the row as an object. */
-  private readonly _addFromField = (
-    event: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
-    event.stopPropagation()
-    const entity = event.detail.value.entity
-    this._addTile(typeof entity === 'string' ? entity : undefined)
-  }
-
-  /**
-   * Nothing happens for the empty value a cleared picker reports, and a duplicate is refused.
-   *
-   * Refused rather than allowed, even though the card itself draws a config that names one
-   * entity twice and `tileKeys` keeps this control working on one: neither control offers a
-   * candidate that is already in the list, and adding it anyway would produce a row whose
-   * panel closes when its twin is dragged past it. Somebody who genuinely wants two tiles for
-   * one entity can write the second in YAML, and everything here still edits it.
-   *
-   * The new tile's panel opens itself, because a tile that has just been added is the one
-   * whose press somebody is most likely about to set.
-   */
-  private _addTile(entity: string | undefined): void {
-    if (entity === undefined || entity === '') return
-    if (this.tiles.some(tile => tile.entity === entity)) return
-
-    this._open.add(entity)
-    this._emit([...this.tiles, { entity }])
-  }
-
-  /**
-   * A tile with nothing selected: a navigation tile, drawn with an empty state line. Opened
-   * straight into template mode (`_templating`'s own note has why) and expanded immediately,
-   * for the same reason `_addTile` opens an entity-bearing tile's panel: the row just added is
-   * the one somebody is most likely about to fill in.
-   *
-   * The key it seeds both sets with has to be the one `tileKeys` will actually give this row
-   * once it renders: a fresh entity-less row is keyed by its own index (see `tileKeys`), and
-   * appending to the end means that index is exactly the list's current length.
-   */
-  private readonly _addBlank = (): void => {
-    const key = `#${this.tiles.length}`
-    this._open.add(key)
-    this._templating.add(key)
-    this._emit([...this.tiles, {}])
-  }
-
-  private readonly _toggled = (event: CustomEvent<{ expanded: boolean }>, key: string): void => {
-    if (event.detail.expanded) this._open.add(key)
-    else this._open.delete(key)
-  }
-
-  private _renderTile(config: TileConfig, index: number, key: string): TemplateResult {
-    // Name and glyph as the card is drawing them right now, overrides included, so a row is
-    // recognisable in the editor by the same two things it has on the dashboard.
+  protected panelSummary(config: TileConfig): PanelSummary {
     const tile = readTile(this.hass, config)
-    const templating = this._isTemplating(config, key)
-    const data = tileToForm(config)
-
-    // Split on the way in, undone in `_rowChanged`: the dropdown holds a palette name, `''`,
-    // or the `COLOR_CUSTOM` sentinel, and `color_custom` holds the literal. Moot in templating
-    // mode, where `color` is already a plain text box showing the config's raw value.
-    //
-    // `_colorCustom.has(key)` alone carries a row that has just been switched into custom mode
-    // but has nothing typed into it yet — the config has no colour to show, so the value-based
-    // check below cannot see it. But a config that now names a real palette colour is never
-    // "type your own" mode, however it got there: `setConfig` is called again for every later
-    // change, including one made in the YAML tab that never goes through `_rowChanged` at all.
-    // Left uncleared, a tile switched to `Custom…` and back to a plain `color: red` in YAML
-    // would still show "Custom…" here with "red" pre-filled into the text box — a valid
-    // palette name misrepresented as a custom one. So a genuine tint always wins and clears
-    // the flag; only then does the flag get to speak for an otherwise-empty colour.
-    if (!templating) {
-      const configured = typeof data.color === 'string' ? data.color : ''
-      if (configured && isTint(configured)) {
-        this._colorCustom.delete(key)
-      } else if (this._colorCustom.has(key) || configured) {
-        data.color = COLOR_CUSTOM
-        data.color_custom = configured
-      }
+    return {
+      header: tile.name !== '' ? tile.name : 'Blank tile',
+      secondary: config.entity ?? 'No entity',
+      icon: tile.icon,
     }
-    data.templating = templating
-
-    // `tile.name` is only ever blank for an entity-less row — an entity-bearing one always has
-    // at least its own id to fall back on (`readTile`'s own contract) — so these two fallbacks
-    // only ever fire there, and only until something is configured.
-    const header = tile.name !== '' ? tile.name : 'Blank tile'
-    const secondary = config.entity ?? 'No entity'
-    // `readTile` always has a glyph: a tile with no icon of its own draws `TILE_FALLBACK_ICON`.
-    const icon = tile.icon
-
-    return html`
-      <div class="tile">
-        <div class="handle">
-          <ha-svg-icon .path=${mdiDrag}></ha-svg-icon>
-        </div>
-        <ha-expansion-panel
-          outlined
-          .header=${header}
-          .secondary=${secondary}
-          .expanded=${this._open.has(key)}
-          @expanded-changed=${(event: CustomEvent<{ expanded: boolean }>) =>
-            this._toggled(event, key)}
-        >
-          <ha-icon slot="leading-icon" .icon=${icon}></ha-icon>
-          <ha-icon-button
-            slot="icons"
-            class="remove"
-            .path=${mdiContentCopy}
-            .label=${`Duplicate ${header}`}
-            @click=${(event: Event) => this._duplicate(event, index)}
-          ></ha-icon-button>
-          <ha-icon-button
-            slot="icons"
-            class="remove"
-            .path=${mdiTrashCanOutline}
-            .label=${`Remove ${header}`}
-            @click=${(event: Event) => this._remove(event, index, key)}
-          ></ha-icon-button>
-          <ha-form
-            class="fields"
-            .hass=${this.hass}
-            .data=${data}
-            .schema=${tileSchema(this.hass, config, data, templating, index === 0)}
-            .computeLabel=${this._computeLabel}
-            .computeHelper=${this._computeHelper}
-            @value-changed=${(event: CustomEvent<{ value: Record<string, unknown> }>) =>
-              this._rowChanged(event, index, key)}
-          ></ha-form>
-        </ha-expansion-panel>
-      </div>
-    `
   }
 
-  protected override render(): TemplateResult | typeof nothing {
-    if (!this.hass) return nothing
+  protected fieldLabel(name: string): string {
+    return LABELS[name] ?? roomLabel(name) ?? gestureLabel(name) ?? name
+  }
 
-    // Only the tiles that actually have one: excluding `undefined` from the picker's exclusion
-    // list would be harmless (nothing in an installation is ever named "undefined"), but it is
-    // one more reason not to bother reasoning about, and the type is honest either way.
-    const taken = this.tiles.flatMap(tile => (tile.entity !== undefined ? [tile.entity] : []))
-    const keys = tileKeys(this.tiles)
-
-    return html`
-      ${
-        this.tiles.length === 0
-          ? html`<p class="empty">No tiles yet. The card will say so too.</p>`
-          : nothing
-      }
-      <!-- The wrapper is required rather than tidy: ha-sortable makes its FIRST child
-           sortable, so without one the rows would not be the things being dragged. The rows
-           are keyed so that a drag moves the row rather than rewriting every row's contents,
-           which is what keeps an open panel open and the caret where it was. ha-sortable rolls
-           its own DOM change back on drop and leaves the reordering to this render, so the key
-           is the whole of what makes a drag land. -->
-      <ha-sortable handle-selector=".handle" @item-moved=${this._moved}>
-        <div class="tiles">
-          ${repeat(
-            this.tiles,
-            (_tile, index) => keys[index] as string,
-            (tile, index) => this._renderTile(tile, index, keys[index] as string),
-          )}
-        </div>
-      </ha-sortable>
-      <div class="add">
-        ${
-          this._pickerReady
-            ? // Home Assistant's own add control, and the reason for the wait above: with
-              // `add-button` the picker renders as a button whose press opens the list, all
-              // inside the one element. No domain list is passed, because this card takes any
-              // entity there is.
-              html`
-                <ha-entity-picker
-                  add-button
-                  .hass=${this.hass}
-                  .addButtonLabel=${ADD_LABEL}
-                  .excludeEntities=${taken}
-                  @value-changed=${this._addPicked}
-                ></ha-entity-picker>
-              `
-            : html`
-                <ha-form
-                  .hass=${this.hass}
-                  .data=${{}}
-                  .schema=${addSchema(taken)}
-                  .computeLabel=${this._computeAddLabel}
-                  @value-changed=${this._addFromField}
-                ></ha-form>
-              `
-        }
-        <button type="button" class="blank" @click=${this._addBlank}>
-          <ha-svg-icon .path=${mdiPlus}></ha-svg-icon>${ADD_BLANK_LABEL}
-        </button>
-        <p class="hint">${ADD_HELPER}</p>
-      </div>
-    `
+  protected fieldHelper(name: string): string | undefined {
+    return HELPERS[name] ?? roomHelper(name, 'tile') ?? gestureHelper(name)
   }
 }
 

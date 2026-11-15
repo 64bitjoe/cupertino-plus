@@ -1,8 +1,13 @@
 import type { FrontendLocaleData, HassEntity, HomeAssistant } from '../src/core/types/ha'
 import { BATTERY_STATES } from './battery-devices'
 import { CHIP_STATES, TEMPLATE_RESULTS } from './chip-fixtures'
-import { COMPLICATION_STATES } from './complication-entities'
-import { TILE_STATES } from './tile-fixtures'
+import { COMPLICATION_STATES, fixtureHistory, fixtureStatistics } from './complication-entities'
+import { ENTITY_AREAS, FIXTURE_AREAS, TILE_STATES } from './tile-fixtures'
+import {
+  ACTIVITY_TEMPLATE_RESULTS,
+  activityHistory,
+  LIVE_ACTIVITY_STATES,
+} from './live-activity-fixtures'
 import {
   WEATHER_DAILY_FORECASTS,
   WEATHER_HOURLY_FORECASTS,
@@ -107,7 +112,14 @@ const STATES: Record<string, HassEntity> = {
    * `weather/subscribe_forecast`, answered below alongside the calendar and to-do
    * subscriptions.
    */
-  ...fixtureStates(BATTERY_STATES, COMPLICATION_STATES, CHIP_STATES, TILE_STATES, WEATHER_STATES),
+  ...fixtureStates(
+    BATTERY_STATES,
+    COMPLICATION_STATES,
+    CHIP_STATES,
+    TILE_STATES,
+    WEATHER_STATES,
+    LIVE_ACTIVITY_STATES,
+  ),
 }
 
 /**
@@ -284,8 +296,13 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
   return {
     states: { ...STATES },
     entities: Object.fromEntries(
-      Object.keys(STATES).map(id => [id, { entity_id: id, hidden: false }]),
+      Object.keys(STATES).map(id => [
+        id,
+        { entity_id: id, hidden: false, area_id: ENTITY_AREAS[id] ?? null },
+      ]),
     ),
+    areas: FIXTURE_AREAS,
+    devices: {},
     /*
      * No panels, and the empty object is the honest answer rather than a gap: the showcase is
      * a page with cards on it, not a Home Assistant, so there is no `/calendar` and no
@@ -342,7 +359,7 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
         // answer for pushes an error, which is the branch worth being able to see.
         if (message.type === 'render_template') {
           const template = String(message.template)
-          const result = TEMPLATE_RESULTS[template]
+          const result = TEMPLATE_RESULTS[template] ?? ACTIVITY_TEMPLATE_RESULTS[template]
           queueMicrotask(() =>
             callback(
               (result === undefined
@@ -367,6 +384,37 @@ export function createMockHass({ dark, timeFormat }: MockHassOptions): HomeAssis
         return Object.fromEntries(
           ids.map(id => [id, id in REGISTRY_OPTIONS ? { options: REGISTRY_OPTIONS[id] } : null]),
         ) as never
+      }
+      // The complication card's sparkline, for an entity with a `state_class`; see
+      // `fixtureStatistics`. An entity without one answers nothing, as in Home Assistant.
+      if (message.type === 'recorder/statistics_during_period') {
+        const ids = Array.isArray(message.statistic_ids) ? (message.statistic_ids as string[]) : []
+        return fixtureStatistics(
+          STATES,
+          ids,
+          Date.parse(String(message.start_time)),
+          Date.parse(String(message.end_time)),
+          String(message.period),
+        ) as never
+      }
+      // The complication card's sparkline; see `fixtureHistory`.
+      if (message.type === 'history/history_during_period') {
+        const ids = Array.isArray(message.entity_ids) ? (message.entity_ids as string[]) : []
+        // A refresh asking only for what changed since its last fetch: nothing has, since the
+        // mock's states hold still, and a fresh made-up curve would be drawn on the end.
+        const sinceOnly = message.include_start_time_state === false
+        // The Live Activity card's "was it running just before?" check; see `activityHistory`.
+        return {
+          ...(sinceOnly
+            ? {}
+            : fixtureHistory(
+                STATES,
+                ids,
+                Date.parse(String(message.start_time)),
+                Date.parse(String(message.end_time)),
+              )),
+          ...activityHistory(ids, Date.parse(String(message.start_time))),
+        } as never
       }
       return undefined as never
     },

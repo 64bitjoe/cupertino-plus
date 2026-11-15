@@ -320,6 +320,135 @@ tiles:
   # …one tile per preset
 ```
 
+## 6c. Room tiles: `area`
+
+The status line under a room in the Home app. A tile with an `area` and no entity takes its
+name and icon from the area and its state line from what is in the room, worked out by
+`core/area-summary.ts`:
+
+```yaml
+- area: kitchen
+  color: pink
+  tap_action: { action: navigate, navigation_path: /home-os/kitchen }
+```
+
+| Part          | Says                              | From                                                    |
+| ------------- | --------------------------------- | ------------------------------------------------------- |
+| `alerts`      | Leak, Smoke, Gas, CO, Lock Jammed | moisture, smoke, gas, CO, safety, tamper sensors        |
+| `open`        | Door Open, 2 Windows Open, 3 Open | door, window, garage, gate and opening contacts; covers |
+| `locks`       | Unlocked, 2 Unlocked              | locks                                                   |
+| `occupancy`   | Occupied, or Motion               | occupancy and presence, then motion                     |
+| `climate`     | Heating to 70°, Cooling to 68°    | a thermostat that is running                            |
+| `temperature` | 72°                               | one chosen sensor (below)                               |
+| `humidity`    | 45%                               | one chosen sensor                                       |
+| `lights`      | Light On, 3 Lights On             | lights, groups left out                                 |
+| `media`       | Playing                           | media players                                           |
+
+**What is in a room** is Home Assistant's rule: the entity's area, or its device's. Hidden
+entities, config and diagnostic entities, and groups are left out: a group and its members are
+one lamp counted twice.
+
+**The parts and their order** are `summary`, a list; the default is the Home app's own line,
+`alerts, open, locks, occupancy, temperature, lights`. A part with nothing to say is left out,
+so a quiet room reads `72°` and an empty one reads nothing. The order is the list's own: the
+panel's **Show** is Home Assistant's reorderable multi-select (chips with drag handles, an Add
+button for the rest), since a checkbox list cannot say an order. **Alerts always come first**,
+whatever the order: a leak must never be the last word, or the glyph folded into a "+2".
+
+**The temperature is never guessed.** It comes from the tile's `temperature_entity`, else the
+sensor chosen in the area's own settings in Home Assistant, else not at all. Tried against a
+real house first: a kitchen holds the fridge and the freezer, a den a PC's chip temperature, a
+mud room a litter robot, and neither a mean nor a median of those is a room. `humidity_entity`
+is the same for humidity.
+
+**A `value` is added after the summary**, so a template can say what no registry knows (who is
+in the room, from a phone's area sensor) without rewriting the rest.
+
+**Leave out** (`exclude`) is a list of entities in the room that never count: the garage door
+that is always open, the motion sensor in the fish tank. The panel offers only the room's own.
+**Also count** (`include`) is the opposite: entities from other rooms that count as this one's
+(the hall lock for the entrance), sorted into parts by the same domain and device-class rules,
+and counted once however often they are listed.
+
+**Your own icons** (`extras`) are a list of small records, each edited in a dialog (Home
+Assistant's object selector, with a drag handle for their order):
+
+```yaml
+- area: kitchen
+  exclude: [light.kitchen_counter]
+  include: [lock.hall_door]
+  extras:
+    - entity: sensor.bin_day
+      state: today # one state, or several with commas
+      icon: mdi:trash-can
+      color: green
+      name: Bins Out # the words, and what VoiceOver reads
+    - entity: sensor.dryer
+      show: "{{ is_state(entity, 'running') }}" # decides alone, over state
+      text: "{{ state_attr(entity, 'minutes') }}m" # a few characters beside the glyph
+```
+
+| Key      | Default                                                                   |
+| -------- | ------------------------------------------------------------------------- |
+| `entity` | none; needed unless `show` is given                                       |
+| `icon`   | the entity's own                                                          |
+| `color`  | the entity's own tint; a palette name or any CSS colour                   |
+| `state`  | shows while active: anything but off, closed, locked, idle, standby, away |
+| `show`   | a template, read with `show`'s rule; `entity` is the icon's entity        |
+| `name`   | the entity's name                                                         |
+| `text`   | none; drawn where a count would go                                        |
+
+They come after the built-in parts, in their own order: as glyphs under `summary_style: icons`,
+as words on the state line otherwise (`name`, then `text`), and as pills in a chip row or on the
+room card, where a press opens their entity. `icon`, `color`, `show`, `name` and `text` may be
+templates. All three keys are shared by room tiles, room chip rows and the room card
+(`core/area-form.ts` draws the same rows in each panel).
+
+The tile repaints when anything in its room changes, when a device or an entity moves room
+(or an entity is hidden or given a config or diagnostic category: any edit to the area, device
+or entity registry), and when an entity it borrows or an icon of its own reads changes. The
+registry walk behind that is done once per registry edit, not once per room per state push:
+`core/area-summary.ts` keeps one map of every area's entities until a registry is replaced, and
+the card keeps its watched list, and the tiles its last update read for `getGridOptions()`, the
+same way (§7b of the chips rules has the detail).
+
+### `summary_style`: words or icons
+
+`words` (the default, and every room tile before the key) writes the whole summary on the state
+line. `icons` splits it, `tiles/glyphs.ts`: the readings (`temperature`, `humidity`, then the
+`value`) stay as words on the state line, and every status part becomes a glyph in a row under
+it, the small tinted pills under a room in the Home app.
+
+```yaml
+- area: den
+  summary_style: icons # the panel's "Show them as"
+```
+
+- **Which, and in what order.** Only parts with something to say, in the summary's order, so
+  alerts come first. Each is tinted as the room chips are (`PART_TINTS`): alerts red, open and
+  locks orange, occupancy blue, lights yellow, media indigo; a cooling thermostat blue.
+- **Counts.** `alerts`, `open`, `locks`, `lights` and `media` carry their count beside the glyph
+  once there is more than one (a bulb and a 3); one of a thing is the glyph alone. The figure is
+  the label colour (an alert's stays red), tabular, so a 2 becoming a 3 moves nothing.
+- **Overflow is decided, never clipped.** `fitGlyphs` prices every pill (18 tall; 18 wide alone,
+  24 + 7 a figure with a count) against the width the tile is actually drawn at
+  (`tileWidthFor` in `layout.ts`, the stylesheet's own grid rule over the measured card, the
+  narrowest tile before a measurement), keeps glyphs from the front and folds the rest into a
+  grey "+N". The row is a fixed height that wraps rather than shrinks, so a mispriced pill drops
+  whole out of sight rather than half.
+- **Height.** The row adds 22 to every tile in the card (`tileMetrics`' `glyphRow`), not only to
+  the rooms, as `state_lines` does: a tile's height is the grid's. Tiles without glyphs keep an
+  empty row so names still line up, and it is decided by the config (any room row set to
+  `icons`), not by what a room has to say this minute, so a room going quiet never shrinks the
+  grid. A vertical tile is 110; one glass line is still two sections rows. A horizontal tile
+  draws the row under its text, 78 tall.
+- **Not buttons.** The glyphs are inside a pressable tile, so they are not pressable themselves.
+  The row is `aria-hidden`; the tile's label carries each glyph's words ("Den, 21°, Occupied, 2
+  Lights On"), and a tile that is not a button carries them in a visually hidden line.
+- **Readings are not rounded for you.** The temperature and humidity parts round to a whole
+  number. A `value` template is printed as it renders, so a template reading `68.198 °F` should
+  round itself (`| round(0)`), or use `temperature_entity` instead.
+
 ## 7. Degradation
 
 - **Entity missing from `hass.states`**: the tile still draws, dimmed, from its configured
@@ -333,23 +462,26 @@ tiles:
 
 ## 8. Still open
 
-- **The list editor is a third copy.** `tile-list-editor.ts` is a sortable list of
-  `ha-expansion-panel`s with a drag handle, a duplicate and a delete button, and it is the
-  battery card's editor and then the chips card's with a different row shape. Extracting a
-  shared sortable panel list is right in principle and a large refactor of two shipped editors
-  in practice. It was deferred rather than done, and is the next thing to do before a fourth
-  card wants one.
-- **Tiles borrow chips' helpers.** `tiles/model.ts` imports the row-reading, template, action-form
-  and container helpers from `chips/model.ts`; a future `core/rows.ts` would remove that
-  dependency.
+- **The list editor is shared.** `tile-list-editor.ts` is a sortable list of
+  `ha-expansion-panel`s with a drag handle, a duplicate and a delete button. It used to be the
+  third hand-adapted copy of the battery and chips editors; it is now a subclass of
+  `SortablePanelList` in `core/panel-list.ts`, which the chips, live-activity and complication
+  lists share, and supplies only what a tile row is: its fields, its form translation, its
+  header. The battery card's `device-list-editor.ts` is still its own older copy.
+- **Tiles borrow chips' row-reading.** `tiles/model.ts` still reads its rows through
+  `chips/model.ts` (`chipConfigs`, `chipTemplates`, `chipWatchedIds`), because a tile row is a
+  chip row. The generic helpers it used to borrow from there now live in `core/`: row keys and
+  write-back in `core/rows.ts`, the template request in `core/templates.ts`, the action form in
+  `core/action-form.ts`, the colour dropdown in `core/color-form.ts`, and the default container
+  in `core/container.ts`.
 - **A `scene` tile's state line is its raw last-activated timestamp.** That formatting is
   `core/entity-view.ts`'s, which every card reads, so fixing it for tiles means fixing it
   for all of them.
 - **Domains neither tint table knows fall back to `accent`**, the theme's primary: `switch`,
   `script`, `automation`, `button`. Under the default theme that is a light blue. A `color`
   on the tile or the card is the answer today.
-- **Some action keys stay in YAML**, as on chips: a service call's `data` and `target`, the
-  `entity` override, `confirmation`, and the whole of `hold_action` and `double_tap_action`.
+- **No action key is YAML-only any more**, as on chips: a service call's Target and Data, the
+  Entity override, Assist's options and Ask before doing it all have fields, on every gesture.
 - **The spec's three flags are otherwise settled.** The size was settled by the render (§2),
   and `tintFor`'s tables by the render too: they suit tiles once a scene is overridden (§3).
   The third, the list editor, is the first item here.

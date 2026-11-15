@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DOUBLE_TAP_MS, Gestures, HOLD_MS } from './gestures'
+import type { ActionConfig } from './actions'
+import {
+  activationKey,
+  DOUBLE_TAP_MS,
+  Gestures,
+  HOLD_MS,
+  pressesAnything,
+  pressHandlers,
+} from './gestures'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -110,5 +118,100 @@ describe('Gestures', () => {
     gestures.click(b, r.tap, r.double)
     vi.advanceTimersByTime(DOUBLE_TAP_MS)
     expect(r.seen).toEqual(['tap', 'tap'])
+  })
+})
+
+describe('pressHandlers', () => {
+  const element = {}
+  const event = () => ({ currentTarget: element, preventDefault: vi.fn() }) as unknown as Event
+  const key = (name: string) =>
+    ({ key: name, currentTarget: element, preventDefault: vi.fn() }) as unknown as KeyboardEvent
+  const tap: ActionConfig = { action: 'toggle' }
+  const hold: ActionConfig = { action: 'navigate', navigation_path: '/h' }
+  const double: ActionConfig = { action: 'url', url_path: 'https://d' }
+
+  it('runs the tap on the click, at once, for a row without a double tap', () => {
+    const ran: (ActionConfig | undefined)[] = []
+    pressHandlers(new Gestures(), { action: tap }, action => ran.push(action)).click(event())
+    expect(ran).toEqual([tap])
+  })
+
+  it('runs the hold after HOLD_MS and swallows the click its release raises', () => {
+    const ran: (ActionConfig | undefined)[] = []
+    const press = pressHandlers(new Gestures(), { action: tap, holdAction: hold }, action =>
+      ran.push(action),
+    )
+    press.down(event())
+    vi.advanceTimersByTime(HOLD_MS)
+    press.cancel(event())
+    press.click(event())
+    expect(ran).toEqual([hold])
+  })
+
+  it('tells a double tap from two taps', () => {
+    const ran: (ActionConfig | undefined)[] = []
+    const press = pressHandlers(new Gestures(), { action: tap, doubleTapAction: double }, action =>
+      ran.push(action),
+    )
+    press.click(event())
+    press.click(event())
+    vi.advanceTimersByTime(DOUBLE_TAP_MS)
+    expect(ran).toEqual([double])
+  })
+
+  it('runs the default (undefined) tap, as more-info', () => {
+    const ran: (ActionConfig | undefined)[] = []
+    pressHandlers(new Gestures(), {}, action => ran.push(action)).click(event())
+    expect(ran).toEqual([undefined])
+  })
+
+  it('never runs a `none`', () => {
+    const ran: (ActionConfig | undefined)[] = []
+    const press = pressHandlers(new Gestures(), { action: { action: 'none' } }, action =>
+      ran.push(action),
+    )
+    press.click(event())
+    const enter = key('Enter')
+    press.key(enter)
+    expect(ran).toEqual([])
+    expect(enter.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('taps on Enter and Space, and claims the key', () => {
+    const ran: (ActionConfig | undefined)[] = []
+    const press = pressHandlers(new Gestures(), { action: tap }, action => ran.push(action))
+    const space = key(' ')
+    press.key(space)
+    press.key(key('a'))
+    expect(ran).toEqual([tap])
+    expect(space.preventDefault).toHaveBeenCalled()
+  })
+
+  it('keeps the context menu only for a row without a hold', () => {
+    const menu = event()
+    pressHandlers(new Gestures(), { action: tap }, () => {}).menu(menu)
+    expect(menu.preventDefault).not.toHaveBeenCalled()
+    pressHandlers(new Gestures(), { action: tap, holdAction: hold }, () => {}).menu(menu)
+    expect(menu.preventDefault).toHaveBeenCalled()
+  })
+})
+
+describe('pressesAnything', () => {
+  it('is a button when any gesture does something', () => {
+    expect(pressesAnything({})).toBe(true)
+    expect(pressesAnything({ action: { action: 'none' } })).toBe(false)
+    expect(pressesAnything({ action: { action: 'none' }, holdAction: { action: 'toggle' } })).toBe(
+      true,
+    )
+  })
+})
+
+describe('activationKey', () => {
+  it('runs on Enter and Space only', () => {
+    const run = vi.fn()
+    const handler = activationKey(run)
+    handler({ key: 'Enter', preventDefault: () => {} } as KeyboardEvent)
+    handler({ key: 'Tab', preventDefault: () => {} } as KeyboardEvent)
+    expect(run).toHaveBeenCalledTimes(1)
   })
 })

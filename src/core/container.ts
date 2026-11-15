@@ -1,4 +1,5 @@
 import type { HaFormSchema } from './types/ha'
+import { oneOf } from './one-of'
 
 /**
  * Whether a card paints its theme's opaque surface or a translucent glass one.
@@ -34,7 +35,7 @@ export const CARD_CONTAINERS: readonly CardContainer[] = ['glass', 'card']
  * anything else, and a hand-written near miss reading as the default is the quieter failure.
  */
 export const containerFor = (raw: unknown, fallback: CardContainer): CardContainer =>
-  (CARD_CONTAINERS as readonly unknown[]).includes(raw) ? (raw as CardContainer) : fallback
+  oneOf(CARD_CONTAINERS, raw, fallback)
 
 /**
  * The panel cards' **Background** row, shared by the four editors so they cannot drift.
@@ -56,6 +57,34 @@ export const PANEL_CONTAINER_FIELD: HaFormSchema = {
     },
   },
 }
+
+/**
+ * The floating cards' **Background** row (chips, tiles, room, live activity): the chip or tile
+ * is the glass, so the choice is between nothing behind it and the theme's card. Shared, with
+ * its helper, so the editors cannot drift.
+ */
+export const FLOATING_CONTAINER_FIELD: HaFormSchema = {
+  name: 'container',
+  selector: {
+    select: {
+      mode: 'dropdown',
+      options: [
+        { value: 'glass', label: 'Glass — floats on the dashboard' },
+        { value: 'card', label: 'Card — draws its own surface' },
+      ],
+    },
+  },
+}
+
+/** The helper under `FLOATING_CONTAINER_FIELD`. */
+export const FLOATING_CONTAINER_HELPER =
+  'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.'
+
+/**
+ * The floating cards' default (chips, tiles, room, live activity): glass, the Lock Screen
+ * reading they were designed for.
+ */
+export const FLOATING_DEFAULT_CONTAINER: CardContainer = 'glass'
 
 /** The four panel cards' default: glass, the chips' and tiles' own, so every card matches. */
 export const PANEL_DEFAULT_CONTAINER: CardContainer = 'glass'

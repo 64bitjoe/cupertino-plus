@@ -40,7 +40,7 @@ Then install **Cupertino Plus** and reload your browser.
 
 ## The cards
 
-Six of them. Each one is in the card picker; none of them needs YAML.
+Eight of them, and a badge. Each one is in the card picker; none of them needs YAML.
 
 ### The calendar
 
@@ -68,8 +68,27 @@ is a range worth drawing an arc against.
        alt="A medium complication card: four cells — a temperature showing an icon and 21.4°C with no ring, then humidity, water tank and phone battery as coloured rings">
 </p>
 
-Five styles: **circular** (a ring gauge), **rectangular**, **rectangular with header**,
-**rectangular full-bleed**, and **inline** (a single strip that stacks into a list).
+Nine faces: **circular** (a ring gauge), **gauge** (an open arc, like the Lock Screen's),
+**bezel** (the name curved around the rim), **corner** (a curved gauge in each corner of the
+card, like the Watch's Infograph face), **rectangular**, **rectangular with header**,
+**rectangular full-bleed**, **rectangular graph** (name, reading, the high and low, and the
+history filling the block — side by side when the card is small), and **inline** (a single strip
+that stacks into a list).
+
+**Layout: Bento** gives each entity a rounded cell of its own instead of one panel, packed like
+the feature grids in Apple's keynotes: the first entity large, the rest small, unless a row picks
+its own **Size** (small, wide, tall or large) and **Face**. The grid follows the card's footprint
+— two columns at the small size, four at medium — and a cell that cannot fit shrinks before it
+is left out, so nothing is ever drawn cut off.
+
+Open any entity in the editor to give it its own name, icon, colour, range, and what a tap, a
+hold and a double tap do; turn on **Use templates** and the name, icon, reading and a supporting
+line can each be a template (a reading that answers a number moves the gauge too). **Show recent
+history** draws a Stocks-style line of the last 1 to 48 hours beside each numeric reading.
+**Count down to times** turns a timer, a timestamp sensor, a date/time helper or a calendar's
+next event into the time left, with a ring that drains like the Watch's Timer complication.
+Both have a per-entity **Recent history** and **Count down** choice too — same as the card, on,
+or off — and an entity can keep its own history window.
 
 Two things it does that are worth knowing before you use it. The ring is simply not drawn
 when the entity has no honest range to measure — a room's temperature has no ceiling, and an
@@ -177,6 +196,24 @@ not reporting). Name, icon, colour, state and
 visibility can each be a template. A press opens more-info by default on a tile with an
 entity (one without defaults to no action), and takes every action and gesture a chip does.
 
+A tile with an `area` (**Room** in the editor) is a room tile, the line under a room in the Home
+app: its name and icon come from the area, and its state line says what the room is doing,
+"Door Open · Occupied · 72° · 2 Lights On", with each fact shown only while it has something to
+say. Tick which facts it shows; the temperature comes from a sensor you choose, on the tile or in
+the area's own settings, never a guess. `summary_style: icons` (**Show them as: Icons**) keeps
+only the temperature, humidity and Reading as words, and draws the rest as a row of small tinted
+status icons under them, as the Home app's tiles do: a bulb and a 3, an open door, a red leak
+first. What does not fit a narrow tile folds into a "+2" rather than being cut off, and a screen
+reader hears every icon's meaning in the tile's label.
+
+Every room (a room tile, a room row of chips, the room card) can be customised from its panel:
+drag the facts under **Show** into your own order (alerts always stay first), **Leave out**
+things in the room that should never count (`exclude`, the garage door that is always open),
+**Also count** things from other rooms (`include`, the hall lock for the entrance), and add
+**Your own icons** (`extras`): an entity, an icon and a colour, shown in a state you pick or
+while a template is true, with words for VoiceOver and a few characters beside the icon if you
+like.
+
 For a column of status rows rather than a grid of shortcuts, `orientation: horizontal` puts the
 glyph beside the name and draws each tile one grid row tall, and `state_lines: 2` (or 3) lets a
 long status wrap instead of ellipsizing. `selected`, usually a template, fills one tile with its
@@ -185,6 +222,60 @@ that shows which one is set.
 
 The rules, including why tiles carry a colour where chips refuse one, are in
 [`docs/tiles-widget-rules.md`](docs/tiles-widget-rules.md).
+
+### The room
+
+The top of a room in the Home app: the room's name, and under it a pill for each thing the room
+has to say, in the Home app's order and colours. Something needing attention first, in red
+(a leak, smoke, a jammed lock), then what is open or unlocked, who is there, the temperature,
+the lights, and what is playing. Pick the room and it does the rest; pressing a pill opens what
+it is about, and pressing the name can take you to the room's own view. A quiet room shows only
+its name.
+
+```yaml
+type: custom:cupertino-plus-room
+area: kitchen
+tap_action: { action: navigate, navigation_path: /home-os/kitchen }
+```
+
+The temperature comes from a sensor you choose, on the card or in the area's own settings in
+Home Assistant; it is never guessed from the room's sensors, which in a real kitchen include the
+freezer. The same pills can sit in a chips card too: a chip with an `area` and no entity is a
+room row.
+
+### The live activities
+
+Apple's Live Activities, for the appliances and jobs that run a while: a glass panel per running
+job with what it is doing ("Rinsing", "Printing · Layer 120 of 300"), a progress bar, and the time
+left, set large like the Lock Screen's, or one slim pill each like the Dynamic Island. When a job
+ends it says Done, in green, for ten minutes (a failed print says so in red), and then goes away;
+when nothing is running the card hides itself, or says "Nothing running", or shows everything
+dimmed: your choice.
+
+```yaml
+type: custom:cupertino-plus-live-activity
+activities:
+  - entity: sensor.front_load_washer_current_status
+    remaining_entity: sensor.front_load_washer_remaining_time_2
+    total_entity: sensor.front_load_washer_total_time
+  - entity: sensor.p1s_01p00c5b1502493_print_status
+    phase_entity: sensor.p1s_01p00c5b1502493_current_stage
+    progress_entity: sensor.p1s_01p00c5b1502493_print_progress
+    remaining_entity: sensor.p1s_01p00c5b1502493_remaining_time
+    step_entity: sensor.p1s_01p00c5b1502493_current_layer
+    step_total_entity: sensor.p1s_01p00c5b1502493_total_layer_count
+    step_label: Layer
+```
+
+The time left can be minutes, hours, `1:05:00`, or the time it finishes (LG ThinQ reports that);
+progress comes from a percentage sensor, or from the time left against the whole job. Off, idle,
+standby and power off already count as idle; a device with its own codes (a Litter-Robot) can
+name the states that mean running instead, all from the editor. In the last hour the countdown
+turns to `23:05` and ticks each second, like the Timer, but only while the card is on screen
+(`seconds: never` or `ten_minutes` to change that). A job that finished before you opened the
+dashboard still says Done, checked against the recorder, so a Home Assistant restart never
+claims every appliance has just finished. The name, icon, phase line, supporting text, time
+left and whether an activity shows at all can each be a template.
 
 ### The badge
 
@@ -219,17 +310,19 @@ footprint**, and the card re-lays itself out for whatever box you drag it into. 
 tiles cards are the exception that proves it: they default to Auto height, so their footprint is
 their content until you drag one.
 
-The seven types, if you do want to paste config:
+The nine types, if you do want to paste config:
 
-| Card         | Type                                 | Asks for                                    |
-| ------------ | ------------------------------------ | ------------------------------------------- |
-| Calendar     | `custom:cupertino-plus-calendar`     | nothing — it finds your calendars           |
-| Complication | `custom:cupertino-plus-complication` | entities, and a style                       |
-| Battery      | `custom:cupertino-plus-battery`      | which battery sensors                       |
-| Weather      | `custom:cupertino-plus-weather`      | one weather entity                          |
-| Chips        | `custom:cupertino-plus-chips`        | entities, and what a press on each one does |
-| Tiles        | `custom:cupertino-plus-tiles`        | which shortcuts, and what each one opens    |
-| Badge        | `custom:cupertino-plus-badge`        | an entity or a template, as a view badge    |
+| Card          | Type                                  | Asks for                                      |
+| ------------- | ------------------------------------- | --------------------------------------------- |
+| Calendar      | `custom:cupertino-plus-calendar`      | nothing — it finds your calendars             |
+| Complication  | `custom:cupertino-plus-complication`  | entities, and a style                         |
+| Battery       | `custom:cupertino-plus-battery`       | which battery sensors                         |
+| Weather       | `custom:cupertino-plus-weather`       | one weather entity                            |
+| Chips         | `custom:cupertino-plus-chips`         | entities, and what a press on each one does   |
+| Tiles         | `custom:cupertino-plus-tiles`         | which shortcuts, and what each one opens      |
+| Room          | `custom:cupertino-plus-room`          | which room                                    |
+| Live Activity | `custom:cupertino-plus-live-activity` | which appliances, and their time-left sensors |
+| Badge         | `custom:cupertino-plus-badge`         | an entity or a template, as a view badge      |
 
 Every card also takes `scale`, a percentage of the size it was designed at, for dashboards
 being read from across a room.

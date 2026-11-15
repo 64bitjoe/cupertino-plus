@@ -36,7 +36,8 @@
  */
 
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
-import { dayNumber, timePreferences } from '../calendar/datetime'
+import { dayNumber } from '../calendar/datetime'
+import { timePreferences } from '../../core/time-preferences'
 import { itemTime, type FormatContext, type TimeToken } from '../calendar/format'
 import { conditionIcon, conditionLabel } from './condition'
 import type { ForecastItem } from './source'

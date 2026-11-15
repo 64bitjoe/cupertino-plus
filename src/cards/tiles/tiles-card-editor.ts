@@ -1,11 +1,15 @@
 import { html, nothing, type TemplateResult } from 'lit'
 
 import { CupertinoCardEditor } from '../../core/card-editor'
+import {
+  FLOATING_CONTAINER_FIELD,
+  FLOATING_CONTAINER_HELPER,
+  FLOATING_DEFAULT_CONTAINER,
+} from '../../core/container'
 import { defineElement } from '../../core/register'
-import { isTint } from '../../core/tint'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { TilesCardConfig } from './tiles-card'
-import { COLOR_CUSTOM, COLOR_SELECTOR, DEFAULT_CONTAINER } from '../chips/model'
+import { COLOR_CUSTOM, COLOR_SELECTOR, foldColor, splitColor } from '../../core/color-form'
 // Imported for the side effect as well as the type: the list element has to be defined by the
 // time this editor renders it, and this is the only thing that reaches it.
 import './tile-list-editor'
@@ -22,11 +26,6 @@ import {
 } from './model'
 
 export const TILES_EDITOR_TAG = 'cupertino-plus-tiles-editor'
-
-const CONTAINER_LABELS: Record<string, string> = {
-  glass: 'Glass — floats on the dashboard',
-  card: 'Card — draws its own surface',
-}
 
 const FLOW_LABELS: Record<string, string> = {
   wrap: 'Wrap onto more lines',
@@ -53,18 +52,7 @@ const fields = (data: Record<string, unknown>): readonly HaFormSchema[] => {
   if (data.color === COLOR_CUSTOM) {
     rows.push({ name: 'color_custom', selector: { text: { placeholder: '#ff8800' } } })
   }
-  rows.push({
-    name: 'container',
-    selector: {
-      select: {
-        mode: 'dropdown',
-        options: ['glass', 'card'].map(value => ({
-          value,
-          label: CONTAINER_LABELS[value] ?? value,
-        })),
-      },
-    },
-  })
+  rows.push(FLOATING_CONTAINER_FIELD)
   // Directly under Background, because the two are one question in practice: how much a tile
   // paints behind its content.
   rows.push({
@@ -120,8 +108,7 @@ const LABELS: Record<string, string> = {
 const HELPERS: Record<string, string> = {
   color: 'Tints every tile in the card. A tile can say otherwise in its own panel above.',
   color_custom: 'Any CSS colour: a hex value, an rgb(), or a var() from your theme.',
-  container:
-    'Glass has no card behind it, so a wallpaper shows through. Card is safer on a busy background.',
+  container: FLOATING_CONTAINER_HELPER,
   wash: 'When a tile fills with its colour. Its glyph always carries the colour either way.',
   orientation:
     'Beside the name is a shorter, wider tile: one grid row tall, for a column of status rows.',
@@ -168,7 +155,7 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
    */
   protected override defaults(): Partial<TilesCardConfig> {
     return {
-      container: DEFAULT_CONTAINER,
+      container: FLOATING_DEFAULT_CONTAINER,
       wash: DEFAULT_WASH,
       orientation: DEFAULT_ORIENTATION,
       state_lines: 1,
@@ -188,25 +175,11 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
    * The dropdown holds a palette name, `''`, or the `COLOR_CUSTOM` sentinel; `color_custom`
    * holds the literal when it does. Split here rather than have `fromForm` guess: this is the
    * one place that knows both the config's `color` and the sentinel at once.
-   *
-   * A config naming a real palette colour clears `_colorCustom` before it is read, however
-   * that config arrived — including a YAML edit, which reaches this editor only through
-   * `setConfig` and never through `fromForm`. Left unclear, a card switched to `Custom…` and
-   * back to a plain `color: red` in YAML would still show "Custom…" here with "red" pre-filled
-   * into the text box: a valid palette name misrepresented as a custom one. So a genuine tint
-   * always wins and clears the flag; only then does the flag get to speak for an otherwise
-   * empty colour, which is what lets picking "Custom…" and typing nothing yet still show the
-   * text box.
+   * `splitColor` has why a genuine tint clears the remembered flag.
    */
   protected override toForm(config: TilesCardConfig): Record<string, unknown> {
     const data: Record<string, unknown> = { ...config }
-    const configured = typeof config.color === 'string' ? config.color : ''
-    if (configured && isTint(configured)) {
-      this._colorCustom = false
-    } else if (this._colorCustom || configured) {
-      data.color = COLOR_CUSTOM
-      data.color_custom = configured
-    }
+    this._colorCustom = splitColor(data, this._colorCustom)
     return data
   }
 
@@ -224,9 +197,7 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
     // Remembered the same way `toForm` reads it back, and for the same reason: this is the
     // only moment the editor learns the dropdown wants the text box, and nothing about a still
     // empty `color_custom` belongs in the config.
-    this._colorCustom = folded.color === COLOR_CUSTOM
-    if (folded.color === COLOR_CUSTOM) folded.color = folded.color_custom
-    delete folded.color_custom
+    this._colorCustom = foldColor(folded)
     return super.fromForm(config, folded, formFields)
   }
 
@@ -246,7 +217,7 @@ class CupertinoTilesCardEditor extends CupertinoCardEditor<TilesCardConfig> {
     return html`
       <cupertino-plus-tiles-list
         .hass=${this.hass}
-        .tiles=${tileConfigs(this._config.tiles)}
+        .rows=${tileConfigs(this._config.tiles)}
         @tiles-changed=${this._tilesChanged}
       ></cupertino-plus-tiles-list>
     `

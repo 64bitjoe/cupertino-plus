@@ -361,9 +361,7 @@ Assistant's service schemas coerce, so `brightness_pct: "{{ 40 }}"` works.
 **`hold_action` and `double_tap_action`** take the same shape. The panel draws each as a
 dropdown under the tap's (When held, When double-tapped), defaulting to Nothing, with the one
 argument row its action takes; the field names carry an `on_hold_` or `on_double_tap_` prefix so
-they never collide with the config keys they stand for. Their `data`, `target` and
-`confirmation` stay YAML, carried through an edit like the tap's, and one set back to Nothing
-writes no key.
+they never collide with the config keys they stand for. One set back to Nothing writes no key.
 `core/gestures.ts` tells the three apart on Home Assistant's timings, a hold at 500ms and a second
 tap within 250ms. A tap is still the browser's click, so a chip with neither runs no timer and
 taps exactly as before; only a chip with a double tap waits the 250ms to know a tap was single.
@@ -431,6 +429,43 @@ row's chips so the first and last touch its edges. A `fill` spacer still takes e
 it can, so in a row with one, `alignment` changes nothing. The floor does not read it: where the
 chips sit along a line does not change how many lines there are.
 
+## 7b. Room rows: `area`
+
+A row with an `area` and no entity draws one chip per fact `core/area-summary.ts` finds in the
+room, the facts and rules the tiles card's room tiles use (§6c of its rules has the table):
+"Leak", "Window Open", "Occupied", "72°", "2 Lights On", "Playing". Each is tinted the Home
+app's way (an alert red, open and unlocked orange, lights yellow, climate orange, media indigo),
+a row `color` replaces all but the red, and pressing one opens more-info for the device behind
+it. A quiet room draws no chips, and a card whose rows are all quiet or hidden draws nothing
+rather than its "No Entities" prompt, which is only for a card with no rows at all.
+
+The room card (`custom:cupertino-plus-room`) is this card with one room row and a Title 1
+heading over it, so its pills are these, sized and pressed exactly as here.
+
+A room row takes the room tile's customising keys too (§6c of the tiles rules): `summary` in
+the order it is dragged into (alerts still first), `exclude` for what never counts, `include` for
+what counts from another room, and `extras`, the user's own chips, after the built-in ones, each
+an entity, icon, colour and the state or template it shows in. An extra keeps its own colour over
+the row's, and a press opens its entity.
+
+The row's own chip keys apply to the row as a whole, as a chip's apply to the chip. `show`
+hides every one of its chips while it answers false, and until it answers at all (§7's "hidden
+until it answers"). A press opens the fact's own device unless the row sets a `tap_action`, which
+then runs for every fact; `hold_action` and `double_tap_action` are the row's, each acting on the
+fact's first entity, so a hold set to Toggle on "2 Lights On" toggles a light in that room.
+`break` starts the row's first chip on a new line and `fill` stretches its last one, pushing
+whatever follows the room to the far edge. `color` may be a template. `name`, `icon` and `value`
+are not drawn, since every chip is a fact with its own words and glyph, and the panel does not
+offer them on a room row.
+
+**What repaints a room row**: any state in the room, and an edit to the area, device or entity
+registry (an entity moved room, hidden, or given a config or diagnostic category). Only the room
+cards (chips, tiles, room) repaint on a registry edit; `watchesRegistries` in `base-card.ts`.
+The room's entities are read from one map of every area, built in a single pass over the entity
+registry and kept until a registry is replaced (`areaMapFor` in `core/area-summary.ts`), and the
+card's watched list and the rows its last update read are kept the same way, so a state push or
+the sections grid asking `getGridOptions()` again does not walk the registry once per room.
+
 ## 8. Degradation
 
 An entity that publishes an `entity_picture` — a person, a media player, a camera — draws that
@@ -468,14 +503,16 @@ Decided rather than known, each one edit away from being decided differently.
   conditional `text` field, all of them selectors `docs/ha-api-notes.md` records as checked.
   Swapping `ui_action` in later touches that one file: the config shape is Home Assistant's
   either way.
-- **Three tap-action keys stay in YAML**, on purpose rather than pending: a `call-service`'s
-  `data` and `target`, and the `entity` override (§7). They are structured values a text field
-  cannot honestly ask for, and each is rare enough that a form row for it would cost every user
-  a field to skip. `chipFromForm` carries all three through untouched, so a chip that has them
-  can still have its name edited in the dialog without losing them.
+- **Every action key has a field now**, on the tap and on both gestures (`core/action-form.ts`):
+  a service call's **Target** (Home Assistant's target picker) and **Data** (its YAML box), an
+  **Entity** override beside more-info and toggle, the **Assistant** and **Start listening** for
+  Assist, and **Ask before doing it** with an optional **Question** for any action that does
+  something. Each appears only beside the action that reads it, so a plain tap still shows one
+  dropdown. A confirmation's title, button words and exemptions have no fields; a Question
+  edited in the panel keeps them, and so does any edit that leaves the question alone.
 - **A config may name the same entity twice**, and the card draws both chips. The editor
   renders both and refuses to _add_ a duplicate: its rows are keyed by entity id, so the second
-  occurrence is keyed positionally (`chipKeys`) and a drag past its twin closes both panels.
+  occurrence is keyed positionally (`rowKeys`, `core/rows.ts`) and a drag past its twin closes both panels.
   The second chip is writable in YAML and fully editable once it is there. The same positional
   keying now also covers a chip with no entity at all (§1a).
 - **Per-chip colour is implemented** — a palette name or any CSS colour, tinting the glyph only

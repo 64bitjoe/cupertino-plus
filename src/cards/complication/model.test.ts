@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
-import { entityConfigs, readComplications, watchedIds } from './model'
+import {
+  COLOR_AUTOMATIC,
+  complicationFromForm,
+  complicationRows,
+  complicationTemplates,
+  complicationToForm,
+  entityConfigs,
+  historyFor,
+  OVERRIDE_CARD,
+  readComplications,
+  rowHasTemplates,
+  watchedIds,
+  type ComplicationEntityConfig,
+} from './model'
 
 const state = (
   entity_id: string,
@@ -250,5 +263,286 @@ describe('readComplications', () => {
       {},
     )
     expect(missing.tint).toBe('accent')
+  })
+})
+
+describe('templates', () => {
+  const hass = hassWith(
+    state('sensor.phone', '72', {
+      friendly_name: 'Phone',
+      device_class: 'battery',
+      unit_of_measurement: '%',
+    }),
+  )
+
+  it('registers one request per templated slot and action, with the row entity as variables', () => {
+    const requests = complicationTemplates(
+      [
+        'sensor.plain',
+        {
+          entity: 'sensor.phone',
+          name: '{{ "Mine" }}',
+          value: '{{ states(entity) }}',
+          supporting: 'Literal, not a template',
+          hold_action: { action: 'navigate', navigation_path: '{{ "/lovelace/1" }}' },
+        },
+      ],
+      'Ada',
+    )
+    expect(requests.map(r => r.template)).toEqual([
+      '{{ "Mine" }}',
+      '{{ states(entity) }}',
+      '{{ "/lovelace/1" }}',
+    ])
+    expect(requests[0]?.variables).toEqual({
+      config: { entity: 'sensor.phone' },
+      entity: 'sensor.phone',
+      user: 'Ada',
+    })
+  })
+
+  it('reads each slot from its template once it has answered', () => {
+    const answers: Record<string, string> = {
+      '{{ n }}': 'Pocket',
+      '{{ i }}': 'mdi:cellphone',
+      '{{ v }}': 'Nearly full',
+      '{{ s }}': 'Charging',
+    }
+    const [phone] = readComplications(
+      hass,
+      [
+        {
+          entity: 'sensor.phone',
+          name: '{{ n }}',
+          icon: '{{ i }}',
+          value: '{{ v }}',
+          supporting: '{{ s }}',
+        },
+      ],
+      {},
+      { resolve: template => answers[template] },
+    )
+    expect(phone?.name).toBe('Pocket')
+    expect(phone?.icon).toBe('mdi:cellphone')
+    expect(phone?.value).toBe('Nearly full')
+    expect(phone?.supporting).toBe('Charging')
+    // A word is no number, so the gauge has nothing to place.
+    expect(phone?.fraction).toBeNull()
+  })
+
+  it('falls back to what it would derive while a template has not answered', () => {
+    const [phone] = readComplications(
+      hass,
+      [{ entity: 'sensor.phone', name: '{{ n }}', value: '{{ v }}' }],
+      {},
+      { resolve: () => undefined },
+    )
+    expect(phone?.name).toBe('Phone')
+    expect(phone?.value).toBe('72%')
+    expect(phone?.fraction).toBe(0.72)
+  })
+
+  it('lets a template that answers a bare number drive the gauge', () => {
+    const [phone] = readComplications(
+      hass,
+      [{ entity: 'sensor.phone', value: '{{ 25 }}' }],
+      {},
+      { resolve: () => '25' },
+    )
+    expect(phone?.value).toBe('25')
+    expect(phone?.fraction).toBe(0.25)
+  })
+
+  it('prints a literal reading as written, and treats a blank answer as no answer', () => {
+    const [literal] = readComplications(hass, [{ entity: 'sensor.phone', value: 'Fine' }], {})
+    expect(literal?.value).toBe('Fine')
+    const [blank] = readComplications(
+      hass,
+      [{ entity: 'sensor.phone', value: '{{ x }}' }],
+      {},
+      { resolve: () => '  ' },
+    )
+    expect(blank?.value).toBe('72%')
+  })
+
+  it('still dashes an unavailable entity, whatever the reading template says', () => {
+    const [off] = readComplications(
+      hassWith(state('sensor.off', 'unavailable')),
+      [{ entity: 'sensor.off', value: '{{ x }}' }],
+      {},
+      { resolve: () => '12' },
+    )
+    expect(off?.value).toBe('—')
+    expect(off?.numeric).toBeNull()
+  })
+})
+
+describe('actions', () => {
+  const hass = hassWith(state('light.desk', 'on', { friendly_name: 'Desk' }))
+
+  it('taps to more-info and runs no hold or double tap by default', () => {
+    const [desk] = readComplications(hass, ['light.desk'], {})
+    expect(desk?.action).toEqual({ action: 'more-info' })
+    expect(desk && 'holdAction' in desk).toBe(false)
+    expect(desk && 'doubleTapAction' in desk).toBe(false)
+  })
+
+  it('carries the configured gestures, and drops one set to nothing', () => {
+    const [desk] = readComplications(
+      hass,
+      [
+        {
+          entity: 'light.desk',
+          tap_action: { action: 'toggle' },
+          hold_action: { action: 'more-info' },
+          double_tap_action: { action: 'none' },
+        },
+      ],
+      {},
+    )
+    expect(desk?.action).toEqual({ action: 'toggle' })
+    expect(desk?.holdAction).toEqual({ action: 'more-info' })
+    expect(desk && 'doubleTapAction' in desk).toBe(false)
+  })
+
+  it('resolves a template inside an action', () => {
+    const [desk] = readComplications(
+      hass,
+      [{ entity: 'light.desk', tap_action: { action: 'navigate', navigation_path: '{{ p }}' } }],
+      {},
+      { resolve: () => '/lovelace/lights' },
+    )
+    expect(desk?.action).toEqual({ action: 'navigate', navigation_path: '/lovelace/lights' })
+  })
+
+  it('gives a missing entity the same presses as a present one', () => {
+    const [gone] = readComplications(
+      hassWith(),
+      [{ entity: 'sensor.gone', tap_action: { action: 'none' } }],
+      {},
+    )
+    expect(gone?.unavailable).toBe(true)
+    expect(gone?.action).toEqual({ action: 'none' })
+  })
+})
+
+describe('the row panel', () => {
+  it('shows Automatic for no colour and the default tap for no action', () => {
+    const data = complicationToForm({ entity: 'sensor.a' })
+    expect(data.color).toBe(COLOR_AUTOMATIC)
+    expect(data.action).toBe('more-info')
+    expect(data.on_hold_action).toBe('none')
+  })
+
+  it('writes nothing back for a panel opened and left alone', () => {
+    const row = { entity: 'sensor.a' }
+    expect(complicationFromForm(row, complicationToForm(row))).toEqual(row)
+    expect(complicationRows([complicationFromForm(row, complicationToForm(row))])).toEqual([
+      'sensor.a',
+    ])
+  })
+
+  it('round-trips every field it draws', () => {
+    const row: ComplicationEntityConfig = {
+      entity: 'sensor.a',
+      name: 'A',
+      icon: 'mdi:eye',
+      color: 'teal',
+      min: 0,
+      max: 10,
+      value: '{{ 1 }}',
+      supporting: 'Hi',
+      tap_action: { action: 'navigate', navigation_path: '/x' },
+      hold_action: { action: 'toggle' },
+      double_tap_action: { action: 'url', url_path: 'https://example.com' },
+    }
+    expect(complicationFromForm(row, complicationToForm(row))).toEqual(row)
+  })
+
+  it('keeps the YAML-only parts of an action across an unrelated edit', () => {
+    const row: ComplicationEntityConfig = {
+      entity: 'sensor.a',
+      tap_action: { action: 'call-service', service: 'script.x', data: { a: 1 } },
+    }
+    const next = complicationFromForm(row, { ...complicationToForm(row), name: 'Renamed' })
+    expect(next.tap_action).toEqual({ action: 'call-service', service: 'script.x', data: { a: 1 } })
+    expect(next.name).toBe('Renamed')
+  })
+
+  it('refuses a colour outside the palette and keeps the entity when the picker is cleared', () => {
+    const next = complicationFromForm(
+      { entity: 'sensor.a' },
+      { ...complicationToForm({ entity: 'sensor.a' }), color: 'burgundy', entity: '' },
+    )
+    expect(next).toEqual({ entity: 'sensor.a' })
+  })
+
+  it('knows when a row should open in template mode', () => {
+    expect(rowHasTemplates({ entity: 'a' })).toBe(false)
+    expect(rowHasTemplates({ entity: 'a', supporting: '{{ x }}' })).toBe(true)
+    expect(
+      rowHasTemplates({ entity: 'a', tap_action: { action: 'url', url_path: '{{ u }}' } }),
+    ).toBe(true)
+  })
+})
+
+describe('historyFor', () => {
+  const card = { enabled: false, hours: 24, style: 'rectangular' as const }
+
+  it('follows the card unless the row says otherwise, with the row’s own hours first', () => {
+    expect(historyFor({}, card)).toBeNull()
+    expect(historyFor({}, { ...card, enabled: true })).toBe(24)
+    expect(historyFor({ sparkline: true }, card)).toBe(24)
+    expect(historyFor({ sparkline: false }, { ...card, enabled: true })).toBeNull()
+    expect(historyFor({ sparkline: true, sparkline_hours: 6 }, card)).toBe(6)
+    expect(historyFor({ sparkline: true, sparkline_hours: 99 }, card)).toBe(48)
+  })
+
+  it('never draws on a circular face, and always on the graph face unless the row says no', () => {
+    expect(historyFor({ sparkline: true }, { ...card, style: 'circular' })).toBeNull()
+    expect(historyFor({}, { ...card, style: 'rectangular-graph' })).toBe(24)
+    expect(historyFor({ sparkline: false }, { ...card, style: 'rectangular-graph' })).toBeNull()
+  })
+
+  it('is nothing without a card context, and nothing for a reading that is not a number', () => {
+    expect(historyFor({ sparkline: true }, undefined)).toBeNull()
+    const hass = hassWith(state('sensor.word', 'Running'))
+    const [word] = readComplications(
+      hass,
+      [{ entity: 'sensor.word', sparkline: true }],
+      {},
+      {
+        sparkline: card,
+      },
+    )
+    expect(word?.history).toBeNull()
+  })
+})
+
+describe('the row panel’s overrides', () => {
+  it('shows Same as the card for a row that says nothing, and writes nothing back for it', () => {
+    const data = complicationToForm({ entity: 'sensor.a' })
+    expect(data.sparkline).toBe(OVERRIDE_CARD)
+    expect(data.countdown).toBe(OVERRIDE_CARD)
+    expect(complicationFromForm({ entity: 'sensor.a' }, data)).toEqual({ entity: 'sensor.a' })
+  })
+
+  it('writes On and Off as true and false, and clamps the hours', () => {
+    const next = complicationFromForm(
+      { entity: 'sensor.a' },
+      { entity: 'sensor.a', sparkline: 'off', countdown: 'on', sparkline_hours: 72 },
+    )
+    expect(next).toMatchObject({ sparkline: false, countdown: true, sparkline_hours: 48 })
+  })
+
+  it('round-trips the overrides, and keeps them when the form did not draw their rows', () => {
+    const row: ComplicationEntityConfig = {
+      entity: 'sensor.a',
+      sparkline: true,
+      sparkline_hours: 6,
+      countdown: false,
+    }
+    expect(complicationFromForm(row, complicationToForm(row))).toEqual(row)
+    expect(complicationFromForm(row, { entity: 'sensor.a' })).toEqual(row)
   })
 })

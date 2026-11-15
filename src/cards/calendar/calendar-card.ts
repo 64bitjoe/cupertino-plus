@@ -15,7 +15,7 @@ import { cwNavigate } from '../../core/navigate'
 import { registerCard } from '../../core/register'
 import type { HomeAssistant, LovelaceCardEditor } from '../../core/types/ha'
 import { CALENDAR_EDITOR_TAG } from './calendar-card-editor'
-import { timePreferences, type TimeFormatOption } from './datetime'
+import { timePreferences, type TimeFormatOption } from '../../core/time-preferences'
 import { demoItems } from './demo-data'
 import { LOOKAHEAD_DAYS, buildFlow } from './flow'
 import { TIME_DASH, itemTime, moreLabel, widgetDate } from './format'
@@ -47,7 +47,7 @@ export interface CalendarCardConfig extends CupertinoCardConfig {
    * The clock this card prints times in, over the top of the Home Assistant profile.
    *
    * Absent or `system` means the profile decides, which is what the card has always done.
-   * See `TIME_FORMAT_OPTIONS` in `datetime.ts` for why the two explicit values are worth
+   * See `TIME_FORMAT_OPTIONS` in `core/time-preferences.ts` for why the two explicit values are worth
    * having at all.
    */
   time_format?: TimeFormatOption

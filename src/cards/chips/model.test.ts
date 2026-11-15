@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
+import { actionFromForm, actionToForm } from '../../core/action-form'
+import { rowKeys as chipKeys, configRows as chipRows } from '../../core/rows'
+import { templateRequest, truthy } from '../../core/templates'
 import {
   alignmentFor,
   chipConfigs,
   chipFromForm,
-  chipKeys,
-  chipRows,
+  chipsCardWatchedIds,
   chipTemplates,
   chipToForm,
   chipWatchedIds,
@@ -14,8 +16,6 @@ import {
   inheritedName,
   readChip,
   readChips,
-  templateRequest,
-  truthy,
   type ChipConfig,
 } from './model'
 import type { HassEntity, HomeAssistant } from '../../core/types/ha'
@@ -957,5 +957,188 @@ describe('alignmentFor', () => {
     expect(alignmentFor('justify')).toBe('justify')
     expect(alignmentFor('middle')).toBe('start')
     expect(alignmentFor(undefined)).toBe('start')
+  })
+})
+
+describe('room rows', () => {
+  const room = (list: HassEntity[]): HomeAssistant =>
+    ({
+      ...hassWith(...list),
+      entities: Object.fromEntries(
+        list.map(one => [one.entity_id, { entity_id: one.entity_id, area_id: 'den' }]),
+      ),
+      areas: { den: { area_id: 'den', name: 'Den', icon: 'mdi:television' } },
+    }) as unknown as HomeAssistant
+
+  const house = room([
+    entity({ entity_id: 'light.a', state: 'on' }),
+    entity({
+      entity_id: 'binary_sensor.leak',
+      state: 'on',
+      attributes: { device_class: 'moisture' },
+    }),
+  ])
+
+  it('draws one chip per fact, each opening the device behind it', () => {
+    const chips = readChips(house, ['sensor.hall', { area: 'den' }], {})
+    expect(chips.map(chip => chip.value)).toEqual(['—', 'Leak', 'Light On'])
+    expect(chips[2]?.action).toEqual({ action: 'more-info', entity: 'light.a' })
+  })
+
+  it("keeps an alert red under the row's own colour", () => {
+    const [leak, light] = readChips(house, [{ area: 'den', color: 'blue' }], {})
+    expect(leak?.color).toContain('red')
+    expect(light?.color).toContain('blue')
+  })
+
+  it('draws nothing for a quiet room, and watches the whole room', () => {
+    expect(readChips(room([]), [{ area: 'den' }], {})).toEqual([])
+    expect(chipsCardWatchedIds([{ area: 'den' }], house).sort()).toEqual([
+      'binary_sensor.leak',
+      'light.a',
+    ])
+  })
+
+  it("hides every chip while the row's show answers false, and until it answers", () => {
+    const show = "{{ is_state('input_boolean.away', 'off') }}"
+    const answer = (value: string | undefined) => () => value
+    const all = (value: string | undefined) =>
+      readChips(house, [{ area: 'den', show }], {}, answer(value)).map(chip => chip.visible)
+    expect(all('True')).toEqual([true, true])
+    expect(all('False')).toEqual([false, false])
+    expect(all(undefined)).toEqual([false, false])
+    expect(chipTemplates([{ area: 'den', show }], {})).toContainEqual({ template: show })
+  })
+
+  it("runs the row's own gestures, the fact's first entity as theirs", () => {
+    const [leak, light] = readChips(
+      house,
+      [
+        {
+          area: 'den',
+          hold_action: { action: 'toggle' },
+          double_tap_action: { action: 'navigate', navigation_path: '/den' },
+        },
+      ],
+      {},
+    )
+    // The tap is still the fact's own more-info; the row's hold and double tap are added.
+    expect(light?.action).toEqual({ action: 'more-info', entity: 'light.a' })
+    expect(light?.entityId).toBe('light.a')
+    expect(light?.holdAction).toEqual({ action: 'toggle' })
+    expect(leak?.doubleTapAction).toEqual({ action: 'navigate', navigation_path: '/den' })
+  })
+
+  it('lets a tap_action replace every fact’s more-info, templates resolved', () => {
+    const chips = readChips(
+      house,
+      [{ area: 'den', tap_action: { action: 'navigate', navigation_path: '{{ "/den" }}' } }],
+      {},
+      () => '/den',
+    )
+    expect(chips.map(chip => chip.action)).toEqual([
+      { action: 'navigate', navigation_path: '/den' },
+      { action: 'navigate', navigation_path: '/den' },
+    ])
+  })
+
+  it('stretches the last chip under fill, and starts the first under break', () => {
+    const chips = readChips(house, [{ area: 'den', fill: true, break: true }], {})
+    expect(chips.map(chip => chip.fill)).toEqual([false, true])
+    expect(chips.map(chip => chip.break)).toEqual([true, false])
+  })
+
+  it('resolves a templated row colour, an alert still red', () => {
+    const [leak, light] = readChips(
+      house,
+      [{ area: 'den', color: '{{ "teal" }}' }],
+      {},
+      () => 'teal',
+    )
+    expect(leak?.color).toContain('red')
+    expect(light?.color).toContain('teal')
+  })
+
+  it('round-trips through the panel, writing no summary while it is the default', () => {
+    const prior: ChipConfig = { area: 'den' }
+    expect(chipFromForm(prior, chipToForm(prior))).toEqual(prior)
+  })
+})
+
+describe('action panel fields', () => {
+  const roundTrip = (action: Parameters<typeof actionToForm>[0], edit = {}) =>
+    actionFromForm(action, { ...actionToForm(action, 'light.a'), ...edit }, 'more-info')
+
+  it('edits a service call’s target and data, and keeps them across an unrelated edit', () => {
+    const call = {
+      action: 'call-service' as const,
+      service: 'light.turn_on',
+      target: { area_id: 'kitchen' },
+      data: { brightness_pct: 40 },
+    }
+    expect(roundTrip(call)).toEqual(call)
+    expect(roundTrip(call, { action_data: { brightness_pct: 80 } })).toEqual({
+      ...call,
+      data: { brightness_pct: 80 },
+    })
+    expect(roundTrip(call, { action_target: {} })).toEqual({
+      action: 'call-service',
+      service: 'light.turn_on',
+      data: { brightness_pct: 40 },
+    })
+  })
+
+  it('keeps service_data when a config has data as well', () => {
+    const both = {
+      action: 'call-service' as const,
+      service: 'x.y',
+      data: { a: 1 },
+      service_data: { b: 2 },
+    }
+    expect(roundTrip(both)).toEqual(both)
+  })
+
+  it('writes data back under service_data when that is the name it came in with', () => {
+    const old = { action: 'call-service' as const, service: 'x.y', service_data: { a: 1 } }
+    expect(roundTrip(old, { action_data: { a: 2 } })).toEqual({ ...old, service_data: { a: 2 } })
+  })
+
+  it('asks first: true for the default wording, a question keeping the rest of the dialog', () => {
+    const toggle = { action: 'toggle' as const }
+    expect(roundTrip(toggle, { confirm: true })).toEqual({ action: 'toggle', confirmation: true })
+    const dialog = { action: 'toggle' as const, confirmation: { title: 'Sure?', text: 'Old' } }
+    expect(actionToForm(dialog, 'light.a')).toMatchObject({ confirm: true, confirm_text: 'Old' })
+    expect(roundTrip(dialog, { confirm_text: 'Turn it off?' })).toEqual({
+      action: 'toggle',
+      confirmation: { title: 'Sure?', text: 'Turn it off?' },
+    })
+    expect(roundTrip(dialog, { confirm: false })).toEqual({ action: 'toggle' })
+  })
+
+  it('picks another entity for more-info and toggle, and keeps one it cannot show', () => {
+    expect(roundTrip({ action: 'toggle' }, { action_entity: 'light.b' })).toEqual({
+      action: 'toggle',
+      entity: 'light.b',
+    })
+    const nav = { action: 'navigate' as const, navigation_path: '/x', entity: 'light.b' }
+    expect(roundTrip(nav)).toEqual(nav)
+  })
+
+  it('sets the assistant and whether it starts listening', () => {
+    expect(roundTrip({ action: 'assist' }, { pipeline_id: 'p1', start_listening: true })).toEqual({
+      action: 'assist',
+      pipeline_id: 'p1',
+      start_listening: true,
+    })
+  })
+
+  it('works the same on a gesture’s prefixed fields', () => {
+    const hold = { action: 'call-service' as const, service: 'x.y', data: { a: 1 } }
+    const form = actionToForm(hold, 'light.a', 'on_hold_')
+    expect(form).toMatchObject({ on_hold_action_data: { a: 1 } })
+    expect(actionFromForm(hold, { ...form, on_hold_confirm: true }, 'none', 'on_hold_')).toEqual({
+      ...hold,
+      confirmation: true,
+    })
   })
 })

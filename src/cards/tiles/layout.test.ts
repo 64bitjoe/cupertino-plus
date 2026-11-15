@@ -8,6 +8,7 @@ import {
   TILE_MIN_WIDTH,
   TILE_ROW_MIN_WIDTH,
   tileMetrics,
+  tileWidthFor,
 } from './layout'
 
 const tiles = (n: number, at?: number) =>
@@ -200,5 +201,38 @@ describe('floorsFor, horizontal', () => {
     const two = floorsFor([{}], 425, 0, 'wrap', tileMetrics('horizontal', 2))
     expect(one.min_rows).toBe(1)
     expect(two.min_rows).toBe(2)
+  })
+})
+
+describe('glyph row', () => {
+  it('adds its 22 to every tile in the card, in either orientation', () => {
+    expect(tileMetrics('vertical', 1, true).height).toBe(TILE_HEIGHT + 22)
+    expect(tileMetrics('horizontal', 2, true).height).toBe(56 + STATE_LINE_HEIGHT + 22)
+  })
+
+  it('still fits one glass line of room tiles in two sections rows', () => {
+    expect(floorsFor([{}, {}, {}], 425, 0, 'wrap', tileMetrics('vertical', 1, true)).min_rows).toBe(
+      2,
+    )
+  })
+})
+
+describe('tileWidthFor', () => {
+  it('is the narrowest tile before the card is measured', () => {
+    expect(tileWidthFor(undefined, 4)).toBe(96)
+    expect(tileWidthFor(undefined, 4, 'row')).toBe(64)
+  })
+
+  it('shares the line as the stylesheet does under wrap', () => {
+    // Four across the user's 425 glass column: (425 - 3 x 8) / 4.
+    expect(tileWidthFor(425, 4)).toBeCloseTo(100.25)
+    // Three in a 500 line are capped at three columns, so a third each.
+    expect(tileWidthFor(500, 3)).toBeCloseTo((500 - 16) / 3)
+    // Six cannot fit 96 each in 425: four columns, wrapping.
+    expect(tileWidthFor(425, 6)).toBeCloseTo(100.25)
+  })
+
+  it('narrows to the longest row under row', () => {
+    expect(tileWidthFor(300, 4, 'row')).toBeCloseTo((300 - 24) / 4)
   })
 })

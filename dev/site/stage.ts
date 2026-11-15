@@ -36,6 +36,8 @@ export interface Footprint {
  */
 export const SMALL: Footprint = { columns: 6, rows: 4 }
 export const MEDIUM: Footprint = { columns: 12, rows: 4 }
+/** Apple's large widget, for the cards that are about holding many things at once. */
+export const LARGE: Footprint = { columns: 12, rows: 8 }
 
 /**
  * Everything between the two, and the edges of what may be dragged to at all.

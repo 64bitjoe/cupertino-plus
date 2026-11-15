@@ -10,9 +10,39 @@
 
 import {
   mdiAccount,
+  mdiTumbleDryer,
+  mdiPrinter3d,
+  mdiPrinter3dNozzle,
+  mdiRobotVacuum,
+  mdiMicrowave,
+  mdiStove,
+  mdiCoffeeMaker,
+  mdiKettle,
+  mdiEvStation,
+  mdiSprinkler,
+  mdiCheckCircleOutline,
+  mdiCheckCircle,
+  mdiCloseCircle,
+  mdiFire,
+  mdiAlarm,
+  mdiCalendar,
+  mdiCalendarClock,
+  mdiClockOutline,
+  mdiDishwasher,
+  mdiTimerOutline,
   mdiBattery,
   mdiBatteryUnknown,
+  mdiBedOutline,
+  mdiLightbulbOn,
+  mdiPlay,
+  mdiWindowOpenVariant,
+  mdiDoorOpen,
+  mdiWaterAlert,
+  mdiTrashCan,
+  mdiShower,
   mdiCat,
+  mdiFridgeOutline,
+  mdiTelevision,
   mdiCellphone,
   mdiDoorbellVideo,
   mdiEye,
@@ -24,6 +54,9 @@ import {
   mdiLaptop,
   mdiLightbulb,
   mdiLock,
+  mdiLockOpenVariant,
+  mdiMotionSensor,
+  mdiFan,
   mdiPartyPopper,
   mdiRayVertex,
   mdiSnowflake,
@@ -220,10 +253,36 @@ const ICONS: Record<string, string> = {
   'mdi:ray-vertex': mdiRayVertex,
   'mdi:eye': mdiEye,
   'mdi:flash': mdiFlash,
+  // The complication card's countdown fixtures, each naming its own glyph, and a calendar's.
+  'mdi:timer-outline': mdiTimerOutline,
+  'mdi:dishwasher': mdiDishwasher,
+  'mdi:alarm': mdiAlarm,
+  'mdi:calendar': mdiCalendar,
+  'mdi:calendar-clock': mdiCalendarClock,
+  'mdi:clock-outline': mdiClockOutline,
+  // The live activity card's appliance glyphs (`live-activity/model.ts`'s name table), its
+  // finished and failed marks, and the check its "Nothing running" line draws.
+  'mdi:tumble-dryer': mdiTumbleDryer,
+  'mdi:printer-3d': mdiPrinter3d,
+  'mdi:printer-3d-nozzle': mdiPrinter3dNozzle,
+  'mdi:robot-vacuum': mdiRobotVacuum,
+  'mdi:microwave': mdiMicrowave,
+  'mdi:stove': mdiStove,
+  'mdi:coffee-maker': mdiCoffeeMaker,
+  'mdi:kettle': mdiKettle,
+  'mdi:ev-station': mdiEvStation,
+  'mdi:sprinkler': mdiSprinkler,
+  'mdi:check-circle-outline': mdiCheckCircleOutline,
+  'mdi:check-circle': mdiCheckCircle,
+  'mdi:close-circle': mdiCloseCircle,
+  'mdi:fire': mdiFire,
   // The chips card's mock entities, resolved off the domain by `core/entity-view.ts`'s own
   // `iconFor`: a lock, a light and a person. Its temperature and battery chips share the
   // two entries above.
   'mdi:lock': mdiLock,
+  'mdi:lock-open-variant': mdiLockOpenVariant,
+  'mdi:motion-sensor': mdiMotionSensor,
+  'mdi:fan': mdiFan,
   'mdi:lightbulb': mdiLightbulb,
   'mdi:account': mdiAccount,
   // The tiles card's shortcuts set, each named in its config rather than resolved: the four
@@ -232,6 +291,18 @@ const ICONS: Record<string, string> = {
   'mdi:snowflake': mdiSnowflake,
   'mdi:party-popper': mdiPartyPopper,
   'mdi:cat': mdiCat,
+  'mdi:fridge-outline': mdiFridgeOutline,
+  'mdi:television': mdiTelevision,
+  'mdi:bed-outline': mdiBedOutline,
+  // The room summary's own glyphs (core/area-summary.ts), for the rooms set and the room card.
+  'mdi:lightbulb-on': mdiLightbulbOn,
+  'mdi:play': mdiPlay,
+  'mdi:window-open-variant': mdiWindowOpenVariant,
+  'mdi:door-open': mdiDoorOpen,
+  'mdi:water-alert': mdiWaterAlert,
+  // A room's own icons in the tile fixtures (`extras`): the bins going out.
+  'mdi:trash-can': mdiTrashCan,
+  'mdi:shower': mdiShower,
 }
 
 /**
@@ -867,7 +938,9 @@ class HaFormStub extends HTMLElement {
     row.append(legend)
 
     if ('select' in node.selector) {
-      row.append(this._renderSelect(node, node.selector.select.options))
+      row.append(
+        this._renderSelect(node, node.selector.select.options, node.selector.select.multiple),
+      )
     } else if ('number' in node.selector) {
       row.append(this._renderNumber(node.name, value, node.selector.number))
     } else if ('icon' in node.selector) {
@@ -881,6 +954,15 @@ class HaFormStub extends HTMLElement {
       // `ha-entity-picker`/`ha-icon-picker`: a text box is the honest fallback, since the
       // value it reports (a plain string path) is identical either way.
       row.append(this._renderText(node.name, value, '/lovelace/0'))
+    } else if ('area' in node.selector) {
+      // The same honest fallback for `ha-area-picker`: it reports a plain area id.
+      row.append(this._renderText(node.name, value, 'kitchen'))
+    } else if ('assist_pipeline' in node.selector) {
+      row.append(this._renderText(node.name, value, 'Home Assistant'))
+    } else if ('target' in node.selector || 'object' in node.selector) {
+      // JSON in a text box where Home Assistant draws a target picker or a YAML editor: what
+      // matters here is that both report an object, never a string.
+      row.append(this._renderJson(node.name, value))
     } else if (node.selector.entity.multiple) {
       row.append(this._renderEntities(node, node.selector.entity))
     } else {
@@ -898,22 +980,39 @@ class HaFormStub extends HTMLElement {
     return row
   }
 
-  private _renderSelect(node: HaFormSchema, options: readonly SelectOption[]): HTMLElement {
+  private _renderSelect(
+    node: HaFormSchema,
+    options: readonly SelectOption[],
+    multiple = false,
+  ): HTMLElement {
     const list = document.createElement('div')
     list.className = 'options'
+    const current = this._data[node.name]
+    const chosen = Array.isArray(current) ? current.map(String) : []
 
     for (const option of options) {
       const id = `${node.name}-${option.value}`
       const label = document.createElement('label')
       label.className = 'option'
 
+      // A multiple select is a checkbox list, and reports an array in the order things were
+      // ticked, as the real one does: an editor has to put that order right itself.
       const radio = document.createElement('input')
-      radio.type = 'radio'
+      radio.type = multiple ? 'checkbox' : 'radio'
       radio.id = id
       radio.name = node.name
       radio.value = option.value
-      radio.checked = this._data[node.name] === option.value
-      radio.addEventListener('change', () => this._emit(node.name, option.value))
+      radio.checked = multiple ? chosen.includes(option.value) : current === option.value
+      radio.addEventListener('change', () =>
+        this._emit(
+          node.name,
+          multiple
+            ? radio.checked
+              ? [...chosen, option.value]
+              : chosen.filter(value => value !== option.value)
+            : option.value,
+        ),
+      )
 
       const text = document.createElement('span')
       text.append(option.label)
@@ -987,6 +1086,23 @@ class HaFormStub extends HTMLElement {
     return input
   }
 
+  private _renderJson(name: string, value: unknown): HTMLElement {
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'text'
+    input.id = name
+    input.value = value === undefined ? '' : JSON.stringify(value)
+    input.placeholder = '{"entity_id": "light.kitchen"}'
+    input.addEventListener('change', () => {
+      try {
+        this._emit(name, input.value ? (JSON.parse(input.value) as unknown) : undefined)
+      } catch {
+        // Half-typed JSON reports nothing, as Home Assistant's YAML box does with bad YAML.
+      }
+    })
+    return input
+  }
+
   /**
    * A checkbox where Home Assistant draws a switch, and the one thing worth copying is what
    * it reports: `target.checked`, so a **boolean** and never `undefined`. An editor that
@@ -1002,7 +1118,11 @@ class HaFormStub extends HTMLElement {
   }
 
   private _candidates(selector: EntitySelector['entity']): string[] {
-    return matchingEntities(this._hass, asArray(selector.filter), selector.exclude_entities)
+    // `include_entities` narrows the list to those ids, as the real picker's `includeEntities`.
+    const only = selector.include_entities
+    return matchingEntities(this._hass, asArray(selector.filter), selector.exclude_entities).filter(
+      id => only === undefined || only.includes(id),
+    )
   }
 
   private _name(entityId: string): string {

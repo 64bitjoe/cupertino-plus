@@ -44,6 +44,47 @@ export const WASHING_MACHINE = 'sensor.demo_washing_machine'
 export const LONG_NAME = 'sensor.demo_extremely_long_entity_name'
 export const OFFLINE = 'sensor.demo_offline'
 export const EV_CHARGER = 'sensor.demo_ev_charger_power'
+export const TEA_TIMER = 'timer.demo_tea'
+export const DISHWASHER_END = 'sensor.demo_dishwasher_end'
+export const ALARM = 'input_datetime.demo_alarm'
+export const NEXT_EVENT = 'calendar.demo_dentist'
+
+/**
+ * The countdown fixtures are relative to the moment the page loaded, unlike every other
+ * fixture here, because a countdown to a fixed date is either finished or days away by the time
+ * anybody looks at it. So the screenshots of these show a ring part-way down, every run.
+ */
+const LOADED = Date.now()
+const at = (offsetMinutes: number): string =>
+  new Date(LOADED + offsetMinutes * 60_000).toISOString()
+/**
+ * A naive date-time as Home Assistant writes one: a wall clock in the SERVER's zone, which is
+ * the mock's `config.time_zone` (`mock-hass.ts`), not the browser's — the card reads it there.
+ */
+const SERVER_ZONE = 'Europe/Warsaw'
+const localAt = (offsetMinutes: number): string => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SERVER_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(LOADED + offsetMinutes * 60_000)
+  const part = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}:00`
+}
+const changed = (
+  entityId: string,
+  state: string,
+  attributes: Record<string, unknown>,
+  minutesAgo: number,
+): HassEntity => ({
+  ...entity(entityId, state, attributes),
+  last_changed: at(-minutesAgo),
+  last_updated: at(-minutesAgo),
+})
 
 /**
  * The mock installation's entities, one per branch `range.ts`, `tint.ts` and `model.ts` can
@@ -109,6 +150,42 @@ export const COMPLICATION_STATES: readonly HassEntity[] = [
     device_class: 'power',
     unit_of_measurement: 'W',
   }),
+  // The four kinds of moment `countdown.ts` counts down to, one each.
+  changed(
+    TEA_TIMER,
+    'active',
+    {
+      friendly_name: 'Tea',
+      icon: 'mdi:timer-outline',
+      duration: '0:05:00',
+      remaining: '0:05:00',
+      finishes_at: at(3.4),
+    },
+    1.6,
+  ),
+  changed(
+    DISHWASHER_END,
+    at(80),
+    { friendly_name: 'Dishwasher', icon: 'mdi:dishwasher', device_class: 'timestamp' },
+    40,
+  ),
+  changed(
+    ALARM,
+    '07:00:00',
+    { friendly_name: 'Alarm', icon: 'mdi:alarm', has_date: false, has_time: true },
+    600,
+  ),
+  changed(
+    NEXT_EVENT,
+    'off',
+    {
+      friendly_name: 'Personal',
+      message: 'Dentist',
+      start_time: localAt(135),
+      end_time: localAt(180),
+    },
+    120,
+  ),
 ]
 
 /**
@@ -142,6 +219,19 @@ export const ENTITY_SETS = {
   'long-name': [LONG_NAME],
   unavailable: [OFFLINE],
   yellow: [EV_CHARGER],
+  countdowns: [TEA_TIMER, DISHWASHER_END, ALARM, NEXT_EVENT],
+  bento: [
+    LOUNGE_TEMPERATURE,
+    TEA_TIMER,
+    PHONE_BATTERY,
+    LOUNGE_HUMIDITY,
+    OUTSIDE_TEMPERATURE,
+    WATER_TANK,
+    EV_CHARGER,
+    DISHWASHER_END,
+    PRESSURE,
+    NEXT_EVENT,
+  ],
 } as const
 
 export type EntitySetName = keyof typeof ENTITY_SETS
@@ -150,3 +240,72 @@ export const DEFAULT_ENTITY_SET: EntitySetName = 'four'
 
 export const entitySet = (name: string): readonly string[] =>
   ENTITY_SETS[name as EntitySetName] ?? ENTITY_SETS[DEFAULT_ENTITY_SET]
+
+/**
+ * A made-up history for any numeric fixture, in the compressed shape
+ * `history/history_during_period` answers with under `minimal_response` (`s` and `lu`, in
+ * seconds), so the sparkline has something to draw in the showcase.
+ *
+ * Deterministic rather than random, so a screenshot is the same on every run: two slow waves
+ * per entity, phased by its id, every ten minutes across the window, ending on the entity's
+ * live state so the line meets the dot. A temperature drifts by a couple of degrees, a
+ * percentage by a few points, a big number by a few per cent of itself.
+ */
+export const fixtureHistory = (
+  states: Record<string, HassEntity>,
+  entityIds: readonly string[],
+  start: number,
+  end: number,
+): Record<string, { s: string; lu: number }[]> => {
+  const out: Record<string, { s: string; lu: number }[]> = {}
+  const step = 10 * 60_000
+  for (const id of entityIds) {
+    const live = Number(states[id]?.state)
+    if (!Number.isFinite(live)) continue
+    const seed = [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    const swing = Math.max(1.5, Math.abs(live) * 0.06)
+    const rows: { s: string; lu: number }[] = []
+    for (let t = start; t <= end; t += step) {
+      const p = (t - start) / Math.max(1, end - start)
+      const wave =
+        Math.sin(p * Math.PI * 2 + seed) * 0.7 + Math.sin(p * Math.PI * 5 + seed / 3) * 0.3
+      // Fades to zero at the end, so the last point is the live reading.
+      const value = live + wave * swing * (1 - p)
+      rows.push({ s: value.toFixed(1), lu: t / 1000 })
+    }
+    out[id] = rows
+  }
+  return out
+}
+
+/**
+ * The same made-up history as `recorder/statistics_during_period` answers it: one row per
+ * period, its `start` and `end` in epoch milliseconds (a current core's shape) and the mean of
+ * the readings inside it. Only entities with a `state_class` have statistics, as in Home
+ * Assistant, so the others get nothing and the card falls back to the raw history.
+ */
+export const fixtureStatistics = (
+  states: Record<string, HassEntity>,
+  entityIds: readonly string[],
+  start: number,
+  end: number,
+  period: string,
+): Record<string, { start: number; end: number; mean: number }[]> => {
+  const width = period === 'hour' ? 3_600_000 : 5 * 60_000
+  const withClass = entityIds.filter(id => typeof states[id]?.attributes.state_class === 'string')
+  const history = fixtureHistory(states, withClass, start, end)
+  const out: Record<string, { start: number; end: number; mean: number }[]> = {}
+  for (const [id, rows] of Object.entries(history)) {
+    const buckets = new Map<number, number[]>()
+    for (const row of rows) {
+      const from = Math.floor((row.lu * 1000) / width) * width
+      buckets.set(from, [...(buckets.get(from) ?? []), Number(row.s)])
+    }
+    out[id] = [...buckets].map(([from, values]) => ({
+      start: from,
+      end: from + width,
+      mean: values.reduce((sum, v) => sum + v, 0) / values.length,
+    }))
+  }
+  return out
+}

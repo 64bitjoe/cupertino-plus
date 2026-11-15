@@ -3,7 +3,7 @@ import { PANEL_CONTAINER_FIELD, PANEL_DEFAULT_CONTAINER } from '../../core/conta
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { CalendarCardConfig } from './calendar-card'
-import { TIME_FORMAT_OPTIONS } from './datetime'
+import { TIME_FORMAT_OPTIONS } from '../../core/time-preferences'
 import { remindersEnabled } from './todo-source'
 
 export const CALENDAR_EDITOR_TAG = 'cupertino-plus-calendar-editor'

@@ -11,6 +11,7 @@
 
 import { columnsFor, gridColumnsToPx, rowsFor, type Floors } from '../../core/floors'
 import { groupRows, linesFor, INSET } from '../../core/wrapping'
+import { GLYPH_ROW_HEIGHT } from './glyphs'
 import type { TileFlow, TileOrientation } from './model'
 
 export { groupRows, INSET }
@@ -101,12 +102,20 @@ export interface TileMetrics {
  * The footprint for an orientation and a state-line count. The stylesheet is handed the same
  * numbers as custom properties (`tiles-card.ts`), so the one table here is the only place they
  * are written, and the floor and the grid cannot disagree about where a tile wraps.
+ *
+ * `glyphRow` is whether any tile in the card draws a room's status glyphs
+ * (`summary_style: icons`, `glyphs.ts`). It adds the row's 22 to every tile in the card, not
+ * only to the rooms: a tile's height is the grid's, as `state_lines` is, and a row whose tiles
+ * disagreed about their height would stop being a row. The tiles without glyphs keep an empty
+ * row of the same height, so every name in a line still sits at the same height.
  */
 export const tileMetrics = (
   orientation: TileOrientation = 'vertical',
   stateLines = 1,
+  glyphRow = false,
 ): TileMetrics => {
-  const extra = (Math.max(1, stateLines) - 1) * STATE_LINE_HEIGHT
+  const extra =
+    (Math.max(1, stateLines) - 1) * STATE_LINE_HEIGHT + (glyphRow ? GLYPH_ROW_HEIGHT : 0)
   return orientation === 'horizontal'
     ? {
         minWidth: HORIZONTAL_TILE_MIN_WIDTH,
@@ -118,6 +127,29 @@ export const tileMetrics = (
 
 /** The gap between tiles, across and down. Must match `--cw-space-2`. */
 export const GAP = 8
+
+/**
+ * How wide one tile is drawn in a line `usable` wide, by the stylesheet's own rule (`.row` in
+ * `tiles-card.ts`): under `wrap`, as many columns as fit at the larger of the minimum and an Nth
+ * of the line, N being the longest row, stretched to share the line; under `row`, exactly N.
+ *
+ * What the glyph row is fitted to. Without a measurement the caller passes nothing and gets the
+ * narrowest tile the grid can draw, so a tile folds a glyph it did not need to rather than
+ * clipping one it could not hold.
+ */
+export const tileWidthFor = (
+  usable: number | undefined,
+  columns: number,
+  flow: TileFlow = 'wrap',
+  metrics: TileMetrics = tileMetrics(),
+): number => {
+  const across = Math.max(1, columns)
+  if (usable === undefined) return flow === 'row' ? metrics.rowMinWidth : metrics.minWidth
+  if (flow === 'row') return Math.max(0, (usable - (across - 1) * GAP) / across)
+  const track = Math.max(metrics.minWidth, (usable - (across - 1) * GAP) / across)
+  const count = Math.max(1, Math.floor((usable + GAP) / (track + GAP)))
+  return Math.max(metrics.minWidth, (usable - (count - 1) * GAP) / count)
+}
 
 /**
  * The fewest tiles the floor pretends fit across, so a multi-tile card cannot be dragged into a

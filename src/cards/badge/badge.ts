@@ -9,21 +9,15 @@ import {
 } from 'lit'
 import { property, state } from 'lit/decorators.js'
 
-import { isPressable, runAction, type ActionConfig } from '../../core/actions'
-import { Gestures } from '../../core/gestures'
+import { runAction } from '../../core/actions'
+import { Gestures, pressesAnything, pressHandlers, type PressHandlers } from '../../core/gestures'
 import { defineElement } from '../../core/register'
 import { scaleFactor } from '../../core/scale'
-import { requestKey, TemplatePool } from '../../core/templates'
+import { TemplatePool } from '../../core/templates'
 import type { HomeAssistant, LovelaceCardEditor } from '../../core/types/ha'
 import { baseStyles } from '../../theme/base-styles'
 import { tokens } from '../../theme/tokens'
-import {
-  chipTemplates,
-  readChip,
-  templateRequest,
-  type ChipConfig,
-  type ChipView,
-} from '../chips/model'
+import { chipTemplates, readChip, type ChipConfig, type ChipView } from '../chips/model'
 import { BADGE_EDITOR_TAG } from './badge-editor'
 
 export const BADGE_TAG = 'cupertino-plus-badge'
@@ -234,6 +228,15 @@ class CupertinoBadge extends LitElement {
     this.style.setProperty('--cw-scale', String(scaleFactor(config.scale)))
   }
 
+  /**
+   * Reopens the template subscriptions on the way back in: `willUpdate` is the only thing that
+   * opens them, and a badge re-attached on a view switch would otherwise wait for its entity.
+   */
+  public override connectedCallback(): void {
+    super.connectedCallback()
+    this.requestUpdate()
+  }
+
   public override disconnectedCallback(): void {
     this._templates.disconnect()
     super.disconnectedCallback()
@@ -261,10 +264,7 @@ class CupertinoBadge extends LitElement {
 
   private get _chip(): ChipView | undefined {
     if (!this.hass || !this._config) return undefined
-    const user = this._user
-    return readChip(this.hass, this._config, {}, (template, entity) =>
-      this._templates.read(requestKey(templateRequest(template, entity, user))),
-    )
+    return readChip(this.hass, this._config, {}, this._templates.resolver(this._user))
   }
 
   /** Hidden, and the wrapper told, only when the answer changes: see the class note. */
@@ -282,21 +282,19 @@ class CupertinoBadge extends LitElement {
     )
   }
 
-  private _run(chip: ChipView, action: ActionConfig | undefined) {
-    return (): void => {
-      if (!this.hass || !isPressable(action)) return
-      runAction(this.hass, this, action, chip.entityId)
-    }
+  /** The badge's press listeners: `pressHandlers`, firing against its entity. */
+  private _press(chip: ChipView): PressHandlers {
+    return pressHandlers(this._gestures, chip, action => {
+      if (this.hass) runAction(this.hass, this, action, chip.entityId)
+    })
   }
 
   protected override render(): TemplateResult | typeof nothing {
     const chip = this._chip
     if (!chip || (!chip.visible && !this.preview)) return nothing
 
-    const pressable =
-      isPressable(chip.action) ||
-      chip.holdAction !== undefined ||
-      chip.doubleTapAction !== undefined
+    const pressable = pressesAnything(chip)
+    const press = this._press(chip)
     const readable = chip.unavailable ? 'unavailable' : chip.value
     const label = [chip.name, readable].filter(part => part !== '').join(', ') || 'Badge'
 
@@ -310,9 +308,6 @@ class CupertinoBadge extends LitElement {
           ? value
           : nothing
 
-    const hold = chip.holdAction
-    const double = chip.doubleTapAction
-
     return html`
       <div
         class="badge ${chip.content} ${chip.color ? 'tinted' : ''} ${
@@ -323,29 +318,13 @@ class CupertinoBadge extends LitElement {
         tabindex=${pressable ? 0 : nothing}
         aria-label=${label}
         title=${chip.name}
-        @click=${(event: Event) =>
-          this._gestures.click(
-            event.currentTarget as object,
-            this._run(chip, chip.action),
-            double ? this._run(chip, double) : undefined,
-          )}
-        @pointerdown=${(event: Event) =>
-          this._gestures.down(
-            event.currentTarget as object,
-            hold ? this._run(chip, hold) : undefined,
-          )}
-        @pointerup=${(event: Event) => this._gestures.cancel(event.currentTarget as object)}
-        @pointerleave=${(event: Event) => this._gestures.cancel(event.currentTarget as object)}
-        @pointercancel=${(event: Event) => this._gestures.cancel(event.currentTarget as object)}
-        @contextmenu=${(event: Event) => {
-          if (hold) event.preventDefault()
-        }}
-        @keydown=${(event: KeyboardEvent) => {
-          if (!isPressable(chip.action)) return
-          if (event.key !== 'Enter' && event.key !== ' ') return
-          event.preventDefault()
-          this._run(chip, chip.action)()
-        }}
+        @click=${press.click}
+        @pointerdown=${press.down}
+        @pointerup=${press.cancel}
+        @pointerleave=${press.cancel}
+        @pointercancel=${press.cancel}
+        @contextmenu=${press.menu}
+        @keydown=${press.key}
       >
         ${
           chip.picture

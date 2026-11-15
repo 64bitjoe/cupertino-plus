@@ -1,53 +1,33 @@
+import { html, nothing, type TemplateResult } from 'lit'
+
 import { CupertinoCardEditor } from '../../core/card-editor'
-import { PANEL_CONTAINER_FIELD, PANEL_DEFAULT_CONTAINER } from '../../core/container'
+import { PANEL_DEFAULT_CONTAINER } from '../../core/container'
 import { defineElement } from '../../core/register'
 import type { HaFormSchema } from '../../core/types/ha'
 import type { ComplicationCardConfig } from './complication-card'
-import { mergeEntities } from '../../core/entities-form'
-import type { ComplicationEntityConfig } from './model'
-import { watchedIds } from './model'
-import { COMPLICATION_STYLES, DEFAULT_STYLE, STYLE_LABELS } from './style'
-import { TINTS } from './tint'
+// Imported for the side effect as well as the type: the list element has to be defined by the
+// time this editor renders it.
+import './complication-list-editor'
+import type { ComplicationsChangedDetail } from './complication-list-editor'
+import { entityConfigs } from './model'
+import { complicationFields } from './fields'
+import { DEFAULT_SPARKLINE_HOURS, sparklineHoursFor } from './history'
+import { DEFAULT_STYLE } from './style'
+import { DEFAULT_LAYOUT, layoutFor } from './bento'
 
 export const COMPLICATION_EDITOR_TAG = 'cupertino-plus-complication-editor'
 
-const capitalise = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1)
-
-/**
- * Five rows, three of which say "Automatic".
- *
- * That ratio is the card's whole premise: everything derivable is derived, and the fields
- * exist for the cases where the derivation cannot know what somebody meant. A card with
- * only `entities` filled in is already a working card.
- */
-const FIELDS: readonly HaFormSchema[] = [
-  { name: 'entities', selector: { entity: { multiple: true, reorder: true } }, required: true },
-  {
-    name: 'style',
-    selector: {
-      select: {
-        mode: 'dropdown',
-        options: COMPLICATION_STYLES.map(style => ({ value: style, label: STYLE_LABELS[style] })),
-      },
-    },
-  },
-  { name: 'min', selector: { number: { mode: 'box' } } },
-  { name: 'max', selector: { number: { mode: 'box' } } },
-  {
-    name: 'color',
-    selector: {
-      select: {
-        mode: 'dropdown',
-        options: TINTS.map(tint => ({ value: tint, label: capitalise(tint) })),
-      },
-    },
-  },
-  PANEL_CONTAINER_FIELD,
-]
+/** The card's on/off rows, which write nothing when off. */
+const SWITCHES = ['sparkline', 'countdown'] as const
 
 const LABELS: Record<string, string> = {
   entities: 'Entities',
   style: 'Style',
+  layout: 'Layout',
+  sparkline: 'Show recent history',
+  sparkline_hours: 'History to show',
+  countdown: 'Count down to times',
+  countdown_hours: 'Drain the ring over',
   min: 'Minimum',
   max: 'Maximum',
   color: 'Colour',
@@ -55,7 +35,17 @@ const LABELS: Record<string, string> = {
 }
 
 const HELPERS: Record<string, string> = {
-  entities: 'One or several. The card lays out however many you give it.',
+  layout:
+    'Bento gives each entity a rounded cell of its own: the first large, the rest small, unless you choose a size in its row above.',
+  style:
+    'Circular faces tile like watch complications; rectangular ones stack full width, and inline is one line each. In bento, this is the face small cells wear.',
+  sparkline:
+    'A small line of how each reading has moved, beside it, like the Stocks widget. Only for readings that are numbers.',
+  sparkline_hours: 'How far back the line reaches, in hours.',
+  countdown:
+    'Timers, timestamp sensors, date-and-time helpers and calendars show the time left, with a ring that drains like the Timer complication. Other entities are unchanged.',
+  countdown_hours:
+    'Leave blank to drain from when the time was set. A timer always drains over its own duration.',
   min: 'Leave blank and the range comes from the entity. Fill both in to gauge something with no natural range, like room temperature.',
   max: 'Leave blank and the range comes from the entity. Fill both in to gauge something with no natural range, like room temperature.',
   color: 'From what the entity measures. Set one only to overrule it.',
@@ -64,29 +54,19 @@ const HELPERS: Record<string, string> = {
 /**
  * The complication card's visual editor.
  *
- * Five rows of the card's own — which entities, which of the five faces, an optional
- * range override and an optional colour override — plus the library-wide **Scale** the
- * base class appends. There is deliberately no `size` row: the Layout tab already sets
- * any footprint by dragging, with the card redrawing as you go and `getGridOptions()`
- * setting the floor beneath it, which is the same reasoning the calendar card's editor
- * gives at length for dropping its own preset.
- *
- * `min`/`max`/`color` are card-level overrides beneath a row's own — see
- * `ComplicationEntityConfig` and `range.ts`/`tint.ts` — and read as "Automatic" the
- * moment they are left blank, which is what `helper` says rather than what a bare label
- * would only imply.
- *
- * A per-row override is also this editor's one shape that cannot pass straight through
- * `ha-form`: the `entities` picker can only show and report a bare `string[]`, where a row
- * may be `{ entity, name, icon, min, max, color }`. `toForm`/`fromForm` below are the pair
- * `CupertinoCardEditor` sets aside for exactly this, and `entities-form.ts` carries the
- * pure merge, so a config someone hand-wrote with per-row overrides survives a trip through
- * this editor — an add, a remove, a reorder — rather than losing them the moment the
- * picker's own report overwrites the config wholesale.
+ * Above the form, the entity list (`complication-list-editor.ts`): one panel per entity with its
+ * name, icon, colour and range overrides, what a tap, a hold and a double tap do, and — behind
+ * **Use templates** — Jinja templates for the name, icon, reading and supporting line. Below it,
+ * the card's own rows (`fields.ts`): the face, the history sparkline and its hours, counting down
+ * and its span, a card-wide range and colour, the background, and the library-wide **Scale**.
+ * A row appears only where it does something, so the sparkline's hours show only once a line
+ * will actually be drawn. There is deliberately no `size` row: the Layout tab sets the footprint
+ * by dragging, with `getGridOptions()` setting the floor beneath it.
  */
 class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCardConfig> {
+  /** Read off the config `render` is about to hand `ha-form`, so schema and data agree. */
   protected override fields(): readonly HaFormSchema[] {
-    return FIELDS
+    return complicationFields(this._config ?? {})
   }
 
   /**
@@ -94,7 +74,14 @@ class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCa
    * default. The first edit writes it through, which is what HA's own editors do.
    */
   protected override defaults(): Partial<ComplicationCardConfig> {
-    return { style: DEFAULT_STYLE, container: PANEL_DEFAULT_CONTAINER }
+    return {
+      layout: DEFAULT_LAYOUT,
+      style: DEFAULT_STYLE,
+      container: PANEL_DEFAULT_CONTAINER,
+      sparkline: false,
+      countdown: false,
+      sparkline_hours: DEFAULT_SPARKLINE_HOURS,
+    }
   }
 
   protected override label(schema: HaFormSchema): string {
@@ -106,26 +93,8 @@ class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCa
   }
 
   /**
-   * `entities`, flattened to the bare ids `ha-entities-picker` can render.
-   *
-   * A row here may be an object carrying a `name`/`icon`/`min`/`max`/`color` override —
-   * see `ComplicationEntityConfig` — but the multiple entity selector can only ever show
-   * and report a `string[]`. `fromForm` below is what puts the overrides back; this half
-   * only has to throw them away for the render, not lose them.
-   */
-  protected override toForm(config: ComplicationCardConfig): Record<string, unknown> {
-    return { ...config, entities: watchedIds(config.entities) }
-  }
-
-  /**
-   * The reported ids, folded back into `entities` with each surviving row's overrides
-   * restored rather than flattened.
-   *
-   * `super.fromForm` (`applyFormData`) is still what handles `style`/`min`/`max`/`color`/
-   * `scale` and what drops `entities` entirely when the picker is emptied; `mergeEntities`
-   * only rebuilds the one field `toForm` flattened, matching the ids the form reported
-   * against `config`'s own prior rows by entity id — see its own comment for exactly what
-   * "matched" means, including the duplicate-id case.
+   * The form's answer, with a switch left off written as no key: `sparkline: false` says what
+   * its absence says, and a config should not grow keys because somebody opened the dialog.
    */
   protected override fromForm(
     config: ComplicationCardConfig,
@@ -133,16 +102,43 @@ class CupertinoComplicationCardEditor extends CupertinoCardEditor<ComplicationCa
     fields: readonly string[],
   ): ComplicationCardConfig {
     const next = super.fromForm(config, data, fields)
-    const merged = mergeEntities<ComplicationEntityConfig>(
-      config.entities,
-      watchedIds(next.entities),
-    )
+    for (const key of SWITCHES) if (next[key] === false) delete next[key]
+    // One panel is what a config without the key already draws.
+    if (next.layout === DEFAULT_LAYOUT) delete next.layout
+    return next
+  }
 
-    const withEntities: ComplicationCardConfig = { ...next }
-    if (merged.length === 0) delete withEntities.entities
-    else withEntities.entities = merged
+  /**
+   * The entity list, drawn above the form as a control of its own: each row is a small config
+   * (name, icon, colour, range, templates and three gestures) that `ha-entities-picker` could
+   * only ever report as a bare id. The same answer the tiles and battery editors reach.
+   */
+  protected override beforeForm(): TemplateResult | typeof nothing {
+    if (!this.hass || !this._config) return nothing
+    return html`
+      <cupertino-plus-complication-list
+        .hass=${this.hass}
+        .rows=${entityConfigs(this._config.entities)}
+        .card=${{
+          layout: layoutFor(this._config.layout),
+          style: this._config.style ?? DEFAULT_STYLE,
+          sparkline: this._config.sparkline === true,
+          sparklineHours: sparklineHoursFor(this._config.sparkline_hours),
+          countdown: this._config.countdown === true,
+        }}
+        @complications-changed=${this._entitiesChanged}
+      ></cupertino-plus-complication-list>
+    `
+  }
 
-    return withEntities
+  /** The list reported. An empty one drops the key rather than writing `entities: []`. */
+  private readonly _entitiesChanged = (event: CustomEvent<ComplicationsChangedDetail>): void => {
+    event.stopPropagation()
+    if (!this._config) return
+    const next: ComplicationCardConfig = { ...this._config }
+    if (event.detail.entities.length === 0) delete next.entities
+    else next.entities = event.detail.entities
+    this.emitConfig(next)
   }
 }
 

@@ -41,6 +41,16 @@ export interface CupertinoCardConfig extends LovelaceCardConfig {
 }
 
 /**
+ * Whether any registry a room reads was replaced: an area edited, a device or an entity moved
+ * room, hidden, or given an `entity_category`. Home Assistant replaces each object on a change
+ * and keeps it on a state push, so identity is the whole test.
+ */
+export const registriesChanged = (previous: HomeAssistant, next: HomeAssistant): boolean =>
+  previous.areas !== next.areas ||
+  previous.devices !== next.devices ||
+  previous.entities !== next.entities
+
+/**
  * Shared behaviour for every card in the library:
  *
  *  - the `hass` / `setConfig` contract Home Assistant expects
@@ -302,6 +312,14 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
     return []
   }
 
+  /**
+   * Whether the card reads Home Assistant's registries (areas, devices, entities): a card of
+   * rooms, whose summaries change when an entity moves room, is hidden or gains an
+   * `entity_category`, without any watched state changing. Off for every other card, so an
+   * area edit does not repaint a calendar.
+   */
+  protected readonly watchesRegistries: boolean = false
+
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false
     // Anything other than a plain `hass` swap is a real change.
@@ -311,6 +329,9 @@ export abstract class CupertinoCard<C extends CupertinoCardConfig = CupertinoCar
     if (!previous || !this.hass) return true
     if (previous.themes?.darkMode !== this.hass.themes?.darkMode) return true
     if (previous.locale !== this.hass.locale) return true
+    // The registries: replaced only when a device or entity moves room or one is added, which is
+    // rare, and which changes what a room summary counts without any watched state changing.
+    if (this.watchesRegistries && registriesChanged(previous, this.hass)) return true
 
     return this.watchedEntities().some(id => previous.states[id] !== this.hass?.states[id])
   }

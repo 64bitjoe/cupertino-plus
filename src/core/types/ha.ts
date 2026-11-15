@@ -41,6 +41,30 @@ export interface HassEntityRegistryDisplayEntry {
    * Absent means "however the integration reports it", which is what the raw state says.
    */
   display_precision?: number
+  /** The entity's own area, when it overrides its device's. */
+  area_id?: string | null
+  device_id?: string | null
+}
+
+/** A device, as `hass.devices` carries it. Only the key a room summary reads is modelled. */
+export interface HassDeviceRegistryEntry {
+  id: string
+  area_id?: string | null
+}
+
+/**
+ * An area, as `hass.areas` carries it. `temperature_entity_id` and `humidity_entity_id` are the
+ * sensors the user chose for the room in its area settings (Home Assistant 2025.5 and later);
+ * a room summary reads them before averaging anything itself.
+ */
+export interface HassAreaRegistryEntry {
+  area_id: string
+  name: string
+  icon?: string | null
+  picture?: string | null
+  floor_id?: string | null
+  temperature_entity_id?: string | null
+  humidity_entity_id?: string | null
 }
 
 /**
@@ -108,6 +132,12 @@ export interface PanelInfo {
 export interface HomeAssistant {
   states: Record<string, HassEntity>
   entities: Record<string, HassEntityRegistryDisplayEntry>
+  /**
+   * The device and area registries. Optional because the stand-in `hass` the showcase and the
+   * tests build may have neither, and every card but a room summary renders without them.
+   */
+  devices?: Record<string, HassDeviceRegistryEntry>
+  areas?: Record<string, HassAreaRegistryEntry>
   /** Every page in the sidebar, keyed by `url_path`. See `PanelInfo`. */
   panels: Record<string, PanelInfo>
   config: HassConfig
@@ -118,7 +148,7 @@ export interface HomeAssistant {
   /**
    * Who is looking at the dashboard. Optional because the stand-in `hass` the showcase and the
    * editor tests build has no user, and a card has to render without one. Read for the `user`
-   * a template is handed (`chips/model.ts`'s `templateRequest`).
+   * a template is handed (`core/templates.ts`'s `templateRequest`).
    */
   user?: { id: string; name: string; is_admin?: boolean }
   localize(key: string, ...args: unknown[]): string
@@ -184,6 +214,12 @@ export interface EntitySelector {
      */
     exclude_entities?: string[]
     /**
+     * The only ids the list offers, the mirror of `exclude_entities`; `ha-selector-entity`
+     * forwards it to the picker's `includeEntities`. A room's Leave out field offers the room's
+     * own entities this way, since nothing outside it could be left out of it.
+     */
+    include_entities?: string[]
+    /**
      * Turns the picker into a list of pickers. The value it reports is then a
      * `string[]`, and once the user removes the last entity, it is an empty array rather
      * than `undefined`. See `applyFormData` in `core/card-editor.ts`.
@@ -212,6 +248,14 @@ export interface SelectSelector {
     /** `box` mode only. */
     box_max_columns?: number
     multiple?: boolean
+    /**
+     * With `multiple`: the chosen values drawn as chips with drag handles, in the order the
+     * value holds them, and an Add button for the rest (`ha-selector-select`, which skips the
+     * checkbox list whenever this is set). The only multi-select that can say an order.
+     */
+    reorder?: boolean
+    /** Lets a value be typed that is not an option: a CSS colour beside the palette names. */
+    custom_value?: boolean
   }
 }
 
@@ -279,11 +323,59 @@ export interface NavigationSelector {
 }
 
 /**
+ * Home Assistant's area picker, `ha-selector-area`: a combo box over the installation's areas
+ * that reports the chosen `area_id` as a plain string. Modelled with no config, since the room
+ * tile wants every area.
+ */
+export interface AreaSelector {
+  area: Record<string, never>
+}
+
+/**
+ * `ha-selector-target`: the entities, devices, areas, floors and labels an action is aimed at,
+ * reported as `{ entity_id, device_id, area_id, … }`, the shape an action's `target` takes.
+ */
+export interface TargetSelector {
+  target: Record<string, never>
+}
+
+/** `ha-selector-assist_pipeline`: a dropdown of the voice assistants, reporting a pipeline id. */
+export interface AssistPipelineSelector {
+  assist_pipeline: Record<string, never>
+}
+
+/** One field of an object selector's form: a selector, and the words beside it. */
+export interface ObjectSelectorField {
+  selector: Selector
+  label?: string
+  /** The field's helper line. */
+  description?: string
+  required?: boolean
+}
+
+/**
+ * A list of small records, each edited in a dialog: `ha-selector-object` with `fields`, checked
+ * against `home-assistant/frontend`'s own source. With `multiple` it draws one line per item
+ * (its `label_field`, formatted by that field's selector, over its `description_field`) with
+ * a drag handle, an edit button that opens the fields as a form dialog, and a delete button,
+ * then an Add button; it reports the whole array.
+ */
+export interface ObjectSelector {
+  object: {
+    /** Without fields it is a YAML box instead, for an object with no fixed shape (action data). */
+    fields?: Record<string, ObjectSelectorField>
+    multiple?: boolean
+    label_field?: string
+    description_field?: string
+  }
+}
+
+/**
  * A selector, as `ha-selector` reads it.
  *
  * It dispatches on `Object.keys(selector)[0]`, so exactly one key is meaningful;
  * hence a union rather than a bag of optional keys. The shipped build knows 57 of
- * these; these are the seven our editors ask for.
+ * these; these are the ones our editors ask for.
  */
 export type Selector =
   | EntitySelector
@@ -293,6 +385,10 @@ export type Selector =
   | TextSelector
   | BooleanSelector
   | NavigationSelector
+  | AreaSelector
+  | ObjectSelector
+  | TargetSelector
+  | AssistPipelineSelector
 
 /**
  * One row of an `ha-form`.

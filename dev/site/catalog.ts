@@ -19,6 +19,8 @@ import {
   mdiFormatListChecks,
   mdiGaugeLow,
   mdiRhombusOutline,
+  mdiSofaOutline,
+  mdiTimerOutline,
   mdiViewGridOutline,
   mdiWeatherPartlyCloudy,
 } from '@mdi/js'
@@ -26,7 +28,6 @@ import {
 import { DEMO_SCENARIOS, DEFAULT_DEMO_SCENARIO } from '../../src/cards/calendar/demo-data'
 import {
   CHIP_CONTENTS,
-  DEFAULT_CONTAINER,
   DEFAULT_CONTENT,
   type ChipContent,
   type ChipsContainer,
@@ -37,8 +38,20 @@ import {
   STYLE_LABELS,
   type ComplicationStyle,
 } from '../../src/cards/complication/style'
-import { DEFAULT_FLOW, DEFAULT_WASH, flowFor, washFor } from '../../src/cards/tiles/model'
-import { PANEL_DEFAULT_CONTAINER, type CardContainer } from '../../src/core/container'
+import {
+  DEFAULT_FLOW,
+  DEFAULT_ORIENTATION,
+  DEFAULT_WASH,
+  flowFor,
+  orientationFor,
+  washFor,
+} from '../../src/cards/tiles/model'
+import { DEFAULT_SUMMARY_STYLE, summaryStyleFor } from '../../src/cards/tiles/glyphs'
+import {
+  PANEL_DEFAULT_CONTAINER,
+  type CardContainer,
+  FLOATING_DEFAULT_CONTAINER,
+} from '../../src/core/container'
 import {
   BATTERY_CARD_TAG,
   CALENDAR_CARD_TAG,
@@ -49,8 +62,28 @@ import {
 } from '../../src/index'
 import { DEFAULT_DEVICE_SET, DEVICE_SETS, deviceSet } from '../battery-devices'
 import { CHIP_SETS, DEFAULT_CHIP_SET, chipSet } from '../chip-fixtures'
-import { DEFAULT_ENTITY_SET, ENTITY_SETS, entitySet } from '../complication-entities'
-import { DEFAULT_TILE_SET, TILE_SETS, tileSet } from '../tile-fixtures'
+import {
+  DEFAULT_ENTITY_SET,
+  DISHWASHER_END,
+  ENTITY_SETS,
+  NEXT_EVENT,
+  OUTSIDE_TEMPERATURE,
+  entitySet,
+} from '../complication-entities'
+import { DEFAULT_TILE_SET, FIXTURE_AREAS, TILE_SETS, tileSet } from '../tile-fixtures'
+import { ROOM_CARD_TAG } from '../../src/cards/room/room-card'
+import { LIVE_ACTIVITY_CARD_TAG } from '../../src/cards/live-activity/live-activity-card'
+import {
+  DEFAULT_STYLE as DEFAULT_ACTIVITY_STYLE,
+  DEFAULT_TIME as DEFAULT_ACTIVITY_TIME,
+  DEFAULT_SECONDS,
+  DEFAULT_WHEN_IDLE,
+  secondsFor,
+  styleFor as activityStyleFor,
+  timeFor as activityTimeFor,
+  whenIdleFor,
+} from '../../src/cards/live-activity/model'
+import { ACTIVITY_SETS, DEFAULT_ACTIVITY_SET, activitySet } from '../live-activity-fixtures'
 import { DEFAULT_WEATHER_SET, WEATHER_SETS, weatherEntity } from '../weather-fixtures'
 import {
   DEFAULT_SCALE,
@@ -152,6 +185,8 @@ export interface Widget {
    * draws whatever data the inspector is pointing at. Empty when the preview is live.
    */
   toFixture(args: Args): Partial<LovelaceCardConfig>
+  /** Also preview it at Apple's large footprint, 12 × 8, for a card made to hold many things. */
+  large?: boolean
 }
 
 /**
@@ -330,6 +365,8 @@ const ENTITY_LABELS: Record<string, string> = {
   'long-name': 'One entity: a name too long to caption',
   unavailable: 'One entity: not reporting',
   yellow: 'One entity: the worst-case tint contrast',
+  countdowns: 'Countdowns: a timer, a finish time, an alarm, an event',
+  bento: 'Bento: a hero graph, a wide one, timers and rings',
 }
 
 const complication: Widget = {
@@ -344,7 +381,7 @@ const complication: Widget = {
       kind: 'select',
       name: 'style',
       label: 'Style',
-      description: 'Which of the five faces to draw.',
+      description: 'Which face to draw (in bento, the face small cells wear).',
       group: 'card',
       options: COMPLICATION_STYLES.map(value => ({ value, label: STYLE_LABELS[value] })),
       initial: DEFAULT_STYLE,
@@ -360,6 +397,43 @@ const complication: Widget = {
         label: ENTITY_LABELS[value] ?? titleCase(value),
       })),
       initial: DEFAULT_ENTITY_SET,
+    },
+    {
+      kind: 'select',
+      name: 'sparkline',
+      label: 'History',
+      description: 'A sparkline of recent history, on the faces that draw one.',
+      group: 'card',
+      options: [
+        { value: 'off', label: 'Off' },
+        { value: '6', label: 'Last 6 hours' },
+        { value: '24', label: 'Last 24 hours' },
+      ],
+      initial: 'off',
+    },
+    {
+      kind: 'select',
+      name: 'countdown',
+      label: 'Countdown',
+      description: 'Count down to the times timers, timestamps and calendars hold.',
+      group: 'card',
+      options: [
+        { value: 'off', label: 'Off' },
+        { value: 'on', label: 'On' },
+      ],
+      initial: 'off',
+    },
+    {
+      kind: 'select',
+      name: 'layout',
+      label: 'Layout',
+      description: 'One panel, or bento: a rounded cell each, in sizes of their own.',
+      group: 'card',
+      options: [
+        { value: 'panel', label: 'One panel' },
+        { value: 'bento', label: 'Bento' },
+      ],
+      initial: 'panel',
     },
     PANEL_CONTAINER,
   ],
@@ -378,7 +452,26 @@ const complication: Widget = {
   toConfig(args) {
     const rows = entitySet(readString(args, 'entities', DEFAULT_ENTITY_SET))
     const style = readString(args, 'style', DEFAULT_STYLE) as ComplicationStyle
-    return { entities: [...rows], style, ...panelContainer(args) }
+    const history = readString(args, 'sparkline', 'off')
+    const countdown = readString(args, 'countdown', 'off') === 'on'
+    const bento = readString(args, 'layout', 'panel') === 'bento'
+    return {
+      // The timer in the bento set counts down on its own row, whatever the card's switch says:
+      // the per-entity override, shown in the Config pane where a visitor can see it.
+      entities: rows.map(id => {
+        if (!bento) return id
+        if (id.startsWith('timer.')) return { entity: id, countdown: true }
+        // A second shape beside the automatic large one, so the grid is not all squares.
+        if (id === OUTSIDE_TEMPERATURE) return { entity: id, size: 'wide' }
+        if (id === DISHWASHER_END || id === NEXT_EVENT) return { entity: id, countdown: true }
+        return id
+      }),
+      style,
+      ...(bento ? { layout: 'bento' } : {}),
+      ...(history !== 'off' ? { sparkline: true, sparkline_hours: Number(history) } : {}),
+      ...(countdown ? { countdown: true } : {}),
+      ...panelContainer(args),
+    }
   },
 
   toFixture() {
@@ -491,7 +584,7 @@ const chips: Widget = {
         { value: 'glass', label: 'Glass' },
         { value: 'card', label: 'Card' },
       ],
-      initial: DEFAULT_CONTAINER,
+      initial: FLOATING_DEFAULT_CONTAINER,
     },
   ],
 
@@ -499,7 +592,7 @@ const chips: Widget = {
    * In the **Card** group and printed in the Config pane, the same reasoning as the three
    * cards above: this card has no fixtures either, so the YAML above the control is the config
    * that produced what is on screen — including the `actions` set's per-chip `tap_action`
-   * rows, which are YAML-only in this release and have nowhere else to be seen.
+   * rows, which the editor's panels also show, one chip at a time.
    *
    * `content` and `container` are written whether or not they sit at their defaults, the rule
    * `cardOptions` states for `scale`: a key that appears and disappears as a select moves
@@ -510,7 +603,7 @@ const chips: Widget = {
     return {
       entities: [...chipSet(readString(args, 'set', DEFAULT_CHIP_SET))],
       content: readString(args, 'content', DEFAULT_CONTENT) as ChipContent,
-      container: readString(args, 'container', DEFAULT_CONTAINER) as ChipsContainer,
+      container: readString(args, 'container', FLOATING_DEFAULT_CONTAINER) as ChipsContainer,
     }
   },
 
@@ -524,6 +617,7 @@ const TILE_SET_LABELS: Record<string, string> = {
   shortcuts: 'Shortcuts: the four cards this replaces',
   entities: 'Entities: every tint automatic',
   unavailable: 'Not reporting',
+  rooms: 'Rooms: summarised from their areas',
 }
 
 const tiles: Widget = {
@@ -561,7 +655,7 @@ const tiles: Widget = {
         { value: 'glass', label: 'Glass' },
         { value: 'card', label: 'Card' },
       ],
-      initial: DEFAULT_CONTAINER,
+      initial: FLOATING_DEFAULT_CONTAINER,
     },
     {
       kind: 'select',
@@ -589,6 +683,31 @@ const tiles: Widget = {
       ],
       initial: DEFAULT_FLOW,
     },
+    {
+      kind: 'select',
+      name: 'orientation',
+      label: 'Tile shape',
+      description: 'The glyph above the name, or beside it.',
+      group: 'card',
+      options: [
+        { value: 'vertical', label: 'Square' },
+        { value: 'horizontal', label: 'Wide' },
+      ],
+      initial: DEFAULT_ORIENTATION,
+    },
+    {
+      kind: 'select',
+      name: 'summary_style',
+      label: 'Room summary',
+      description:
+        'For the Rooms set: one line of words, or a row of status icons under the name with the temperature left as words.',
+      group: 'card',
+      options: [
+        { value: 'words', label: 'Words' },
+        { value: 'icons', label: 'Icons' },
+      ],
+      initial: DEFAULT_SUMMARY_STYLE,
+    },
   ],
 
   /**
@@ -599,10 +718,19 @@ const tiles: Widget = {
    */
   toConfig(args) {
     return {
-      tiles: [...tileSet(readString(args, 'set', DEFAULT_TILE_SET))],
-      container: readString(args, 'container', DEFAULT_CONTAINER) as ChipsContainer,
+      // A room row takes the style only when it is not the default, as the editor writes it.
+      tiles: tileSet(readString(args, 'set', DEFAULT_TILE_SET)).map(row =>
+        summaryStyleFor(readString(args, 'summary_style', DEFAULT_SUMMARY_STYLE)) === 'icons' &&
+        typeof row === 'object' &&
+        row !== null &&
+        'area' in row
+          ? { ...row, summary_style: 'icons' }
+          : row,
+      ),
+      container: readString(args, 'container', FLOATING_DEFAULT_CONTAINER) as ChipsContainer,
       wash: washFor(readString(args, 'wash', DEFAULT_WASH)),
       flow: flowFor(readString(args, 'flow', DEFAULT_FLOW)),
+      orientation: orientationFor(readString(args, 'orientation', DEFAULT_ORIENTATION)),
     }
   },
 
@@ -611,7 +739,251 @@ const tiles: Widget = {
   },
 }
 
-export const WIDGETS: readonly Widget[] = [calendar, battery, complication, weather, chips, tiles]
+/**
+ * The room card against the tile fixtures' three rooms: the Den has the most to say, which is
+ * why it is the default.
+ */
+const room: Widget = {
+  id: 'room',
+  name: 'Room',
+  tagline: "A room's name over what it is doing.",
+  icon: mdiSofaOutline,
+  tag: ROOM_CARD_TAG,
+
+  props: [
+    {
+      kind: 'select',
+      name: 'area',
+      label: 'Room',
+      description: 'One of the mock rooms the tiles card summarises too.',
+      group: 'card',
+      options: Object.values(FIXTURE_AREAS).map(area => ({
+        value: area.area_id,
+        label: area.name,
+      })),
+      initial: 'den',
+    },
+    {
+      kind: 'select',
+      name: 'container',
+      label: 'Background',
+      description: 'Glass floats on the dashboard; card draws its own surface.',
+      group: 'card',
+      options: [
+        { value: 'glass', label: 'Glass' },
+        { value: 'card', label: 'Card' },
+      ],
+      initial: FLOATING_DEFAULT_CONTAINER,
+    },
+  ],
+
+  toConfig(args) {
+    return {
+      area: readString(args, 'area', 'den'),
+      summary: ['alerts', 'open', 'locks', 'occupancy', 'temperature', 'lights', 'media'],
+      container: readString(args, 'container', FLOATING_DEFAULT_CONTAINER) as ChipsContainer,
+    }
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+/** Readable names for the activity sets, by the same rule as `TILE_SET_LABELS`. */
+const ACTIVITY_SET_LABELS: Record<string, string> = {
+  running: 'Running: a wash and a print',
+  finished: 'Finished: Done, and a failed print',
+  idle: 'Idle: nothing on',
+  templates: 'Templates: a delayed start, forced into view',
+}
+
+/**
+ * The Live Activity card against the user's own appliances, mocked: a wash and a print running,
+ * a dryer just done, and a quiet house. No fixtures, as for the tiles: the YAML is the config.
+ */
+const liveActivity: Widget = {
+  id: 'live-activity',
+  name: 'Live Activity',
+  tagline: 'Appliances while they run, and for a moment after.',
+  icon: mdiTimerOutline,
+  tag: LIVE_ACTIVITY_CARD_TAG,
+
+  props: [
+    {
+      kind: 'select',
+      name: 'set',
+      label: 'Activities',
+      description: 'A mock household: things running, things just finished, or nothing on.',
+      group: 'card',
+      options: Object.keys(ACTIVITY_SETS).map(value => ({
+        value,
+        label: ACTIVITY_SET_LABELS[value] ?? titleCase(value),
+      })),
+      initial: DEFAULT_ACTIVITY_SET,
+    },
+    {
+      kind: 'select',
+      name: 'style',
+      label: 'Style',
+      description: 'A Lock Screen panel per job, or a Dynamic Island pill.',
+      group: 'card',
+      options: [
+        { value: 'expanded', label: 'Lock Screen' },
+        { value: 'compact', label: 'Dynamic Island' },
+      ],
+      initial: DEFAULT_ACTIVITY_STYLE,
+    },
+    {
+      kind: 'select',
+      name: 'time',
+      label: 'Show',
+      description: 'The time left, the time it finishes, or both.',
+      group: 'card',
+      options: [
+        { value: 'remaining', label: 'Time left' },
+        { value: 'finish', label: 'Time it finishes' },
+        { value: 'both', label: 'Both' },
+      ],
+      initial: DEFAULT_ACTIVITY_TIME,
+    },
+    {
+      kind: 'select',
+      name: 'seconds',
+      label: 'Show seconds',
+      description: 'When the countdown turns to m:ss and ticks each second, like the Timer.',
+      group: 'card',
+      options: [
+        { value: 'never', label: 'Never' },
+        { value: 'hour', label: 'In the last hour' },
+        { value: 'ten_minutes', label: 'In the last 10 minutes' },
+      ],
+      initial: DEFAULT_SECONDS,
+    },
+    {
+      kind: 'select',
+      name: 'when_idle',
+      label: 'When nothing is running',
+      description: 'Hide the card, say so, or show every activity dimmed. Try it on the Idle set.',
+      group: 'card',
+      options: [
+        { value: 'hide', label: 'Hide the card' },
+        { value: 'message', label: 'Say nothing is running' },
+        { value: 'show', label: 'Show every activity, dimmed' },
+      ],
+      initial: DEFAULT_WHEN_IDLE,
+    },
+    {
+      kind: 'select',
+      name: 'container',
+      label: 'Background',
+      description: 'Glass floats on the dashboard; card draws its own surface.',
+      group: 'card',
+      options: [
+        { value: 'glass', label: 'Glass' },
+        { value: 'card', label: 'Card' },
+      ],
+      initial: FLOATING_DEFAULT_CONTAINER,
+    },
+  ],
+
+  toConfig(args) {
+    return {
+      activities: [...activitySet(readString(args, 'set', DEFAULT_ACTIVITY_SET))],
+      style: activityStyleFor(readString(args, 'style', DEFAULT_ACTIVITY_STYLE)),
+      time: activityTimeFor(readString(args, 'time', DEFAULT_ACTIVITY_TIME)),
+      seconds: secondsFor(readString(args, 'seconds', DEFAULT_SECONDS)),
+      when_idle: whenIdleFor(readString(args, 'when_idle', DEFAULT_WHEN_IDLE)),
+      container: readString(args, 'container', FLOATING_DEFAULT_CONTAINER) as ChipsContainer,
+    }
+  },
+
+  toFixture() {
+    return {}
+  },
+}
+
+/**
+ * A widget again under its own name, with some of its controls starting elsewhere: a new
+ * feature that sits behind a select is invisible to somebody who doesn't know to move it, so the
+ * sidebar gets an entry that opens on it. Every control still moves.
+ */
+const preset = (
+  base: Widget,
+  id: string,
+  name: string,
+  tagline: string,
+  initials: Record<string, string>,
+): Widget => ({
+  ...base,
+  id,
+  name,
+  tagline,
+  props: base.props.map(control =>
+    control.name in initials
+      ? ({ ...control, initial: initials[control.name] } as Control)
+      : control,
+  ),
+})
+
+const roomTiles = preset(
+  tiles,
+  'room-tiles',
+  'Room tiles',
+  'A tile per room, with a row of status icons under its name.',
+  { set: 'rooms', summary_style: 'icons' },
+)
+
+const bento: Widget = {
+  ...preset(
+    complication,
+    'bento',
+    'Bento',
+    'Complications as a bento grid: a cell each, in sizes of their own.',
+    { entities: 'bento', layout: 'bento' },
+  ),
+  large: true,
+}
+
+const countdowns = preset(
+  complication,
+  'countdowns',
+  'Countdowns',
+  'Timers, finish times and the next event, with a ring that drains.',
+  { entities: 'countdowns', countdown: 'on', style: 'gauge' },
+)
+
+const corners = preset(
+  complication,
+  'corners',
+  'Corners',
+  'Four readings, one in each corner, like the Infograph face.',
+  { entities: 'four', style: 'corner' },
+)
+
+const history = preset(
+  complication,
+  'history',
+  'History graph',
+  'A reading with its recent history filling the block.',
+  { entities: 'four', style: 'rectangular-graph', sparkline: '24' },
+)
+
+export const WIDGETS: readonly Widget[] = [
+  calendar,
+  battery,
+  complication,
+  bento,
+  corners,
+  history,
+  countdowns,
+  weather,
+  chips,
+  tiles,
+  roomTiles,
+  room,
+  liveActivity,
+]
 
 export const widgetById = (id: string): Widget | undefined => WIDGETS.find(w => w.id === id)
 

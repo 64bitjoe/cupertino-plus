@@ -10,10 +10,13 @@ import {
   stateLinesFor,
   tileConfigs,
   tileFromForm,
+  tileHasTemplates,
   tileKeys,
   tileRows,
   tileTemplates,
   tileToForm,
+  tileLabel,
+  tilesHaveGlyphs,
   tileWatchedIds,
   washFor,
   type TileConfig,
@@ -423,5 +426,140 @@ describe('orientationFor and stateLinesFor', () => {
     expect(stateLinesFor(0)).toBe(1)
     expect(stateLinesFor(undefined)).toBe(1)
     expect(stateLinesFor('many')).toBe(1)
+  })
+})
+
+describe('room tiles', () => {
+  const LAMP = entity({ entity_id: 'light.lamp', state: 'on' })
+  const DOOR = entity({
+    entity_id: 'binary_sensor.door',
+    state: 'on',
+    attributes: { device_class: 'door' },
+  })
+  const house = {
+    ...hassWith(LAMP, DOOR),
+    entities: {
+      'light.lamp': { entity_id: 'light.lamp', area_id: 'den' },
+      'binary_sensor.door': { entity_id: 'binary_sensor.door', area_id: 'den' },
+    },
+    areas: { den: { area_id: 'den', name: 'Den', icon: 'mdi:television' } },
+  } as unknown as HomeAssistant
+
+  it('takes its name, icon and state line from the area, and adds the reading after', () => {
+    expect(readTile(house, { area: 'den' })).toMatchObject({
+      name: 'Den',
+      icon: 'mdi:television',
+      value: 'Door Open · Light On',
+    })
+    expect(readTile(house, { area: 'den', value: '👨🏻‍💻' }).value).toBe('Door Open · Light On · 👨🏻‍💻')
+    expect(readTile(house, { area: 'den', summary: ['lights'] }).value).toBe('Light On')
+  })
+
+  it('watches everything in the room', () => {
+    expect(tileWatchedIds([{ area: 'den' }], house).sort()).toEqual([
+      'binary_sensor.door',
+      'light.lamp',
+    ])
+  })
+
+  it('shows the default parts ticked, and writes no summary key until they change', () => {
+    const prior: TileConfig = { area: 'den' }
+    const form = tileToForm(prior)
+    expect(form.summary).toContain('lights')
+    expect(tileFromForm(prior, form)).toEqual({ area: 'den' })
+    // Kept in the order the panel reports, which is the order the user dragged them into.
+    expect(tileFromForm(prior, { ...form, summary: ['lights', 'alerts'] })).toEqual({
+      area: 'den',
+      summary: ['lights', 'alerts'],
+    })
+  })
+  describe('summary_style: icons', () => {
+    const SENSOR = entity({ entity_id: 'sensor.den_t', state: '20.6' })
+    const LAMP_2 = entity({ entity_id: 'light.lamp_2', state: 'on' })
+    const room = {
+      ...house,
+      states: { ...house.states, [SENSOR.entity_id]: SENSOR, [LAMP_2.entity_id]: LAMP_2 },
+      entities: {
+        ...house.entities,
+        'light.lamp_2': { entity_id: 'light.lamp_2', area_id: 'den' },
+      },
+    } as unknown as HomeAssistant
+    const config: TileConfig = {
+      area: 'den',
+      summary_style: 'icons',
+      temperature_entity: 'sensor.den_t',
+      summary: ['open', 'temperature', 'lights'],
+    }
+
+    it('leaves the readings on the line and moves the statuses to glyphs', () => {
+      const tile = readTile(room, { ...config, value: 'Joe' })
+      expect(tile.value).toBe('21° · Joe')
+      expect(tile.glyphs.map(glyph => [glyph.part, glyph.count])).toEqual([
+        ['open', undefined],
+        ['lights', 2],
+      ])
+    })
+
+    it('says what every glyph means in the label', () => {
+      expect(tileLabel(readTile(room, config))).toBe('Den, 21°, Door Open, 2 Lights On')
+    })
+
+    it('draws no glyphs in words, or on a tile that is not a room', () => {
+      expect(readTile(room, { ...config, summary_style: 'words' }).glyphs).toEqual([])
+      expect(readTile(room, { ...config, summary_style: 'words' }).value).toBe(
+        'Door Open · 21° · 2 Lights On',
+      )
+      expect(readTile(room, { entity: 'light.lamp', summary_style: 'icons' }).glyphs).toEqual([])
+    })
+
+    it('reserves the row card-wide when any room draws one', () => {
+      expect(tilesHaveGlyphs([config, 'light.lamp'])).toBe(true)
+      expect(tilesHaveGlyphs([{ area: 'den' }, 'light.lamp'])).toBe(false)
+      expect(tilesHaveGlyphs([{ entity: 'light.lamp', area: 'den', summary_style: 'icons' }])).toBe(
+        false,
+      )
+    })
+
+    it('shows words in the panel by default and writes the key only when it is icons', () => {
+      expect(tileToForm({ area: 'den' }).summary_style).toBe('words')
+      expect(tileToForm({ entity: 'light.lamp' }).summary_style).toBeUndefined()
+      const form = tileToForm({ area: 'den' })
+      expect(tileFromForm({ area: 'den' }, form)).toEqual({ area: 'den' })
+      expect(tileFromForm({ area: 'den' }, { ...form, summary_style: 'icons' })).toEqual({
+        area: 'den',
+        summary_style: 'icons',
+      })
+      expect(tileFromForm(config, { ...tileToForm(config), area: '' })).not.toHaveProperty(
+        'summary_style',
+      )
+    })
+  })
+})
+
+describe('tileHasTemplates', () => {
+  it('reads a template in any templated field', () => {
+    expect(tileHasTemplates({ entity: 'light.a', selected: '{{ true }}' })).toBe(true)
+    expect(tileHasTemplates({ entity: 'light.a', name: 'Plain' })).toBe(false)
+  })
+
+  it('counts a template inside any of the three actions', () => {
+    expect(
+      tileHasTemplates({
+        entity: 'light.a',
+        tap_action: { action: 'navigate', navigation_path: '/{{ states("input_text.view") }}' },
+      }),
+    ).toBe(true)
+    expect(
+      tileHasTemplates({
+        hold_action: {
+          action: 'call-service',
+          service: 'light.turn_on',
+          data: { brightness_pct: '{{ 40 }}' },
+        },
+      }),
+    ).toBe(true)
+    expect(
+      tileHasTemplates({ double_tap_action: { action: 'navigate', navigation_path: '/x' } }),
+    ).toBe(false)
   })
 })

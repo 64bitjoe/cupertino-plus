@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "magic-string": "0.30.21",
     "playwright": "^1.62.0",
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",

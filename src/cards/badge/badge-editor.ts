@@ -63,7 +63,8 @@ const HELPERS: Record<string, string> = {
     'A palette name (red, orange, yellow, green, teal, blue, indigo, purple, pink, grey, accent), any CSS colour, or a template.',
   value: "Replaces the entity's reading. A template, usually.",
   show: 'The badge is shown only while this is true. Hidden until it answers.',
-  service: 'As domain.service. Its data and target stay in YAML, and either may be a template.',
+  service:
+    'As domain.service. Its target and data have their own rows below; either may be a template.',
 }
 
 /** The keys a badge's row may carry, which `fromForm` replaces wholesale from the panel's answer. */

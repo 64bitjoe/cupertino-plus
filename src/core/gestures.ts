@@ -24,6 +24,8 @@
  * 250ms before it can know a single tap was single, so only such rows pay it.
  */
 
+import { isPressable, type ActionConfig } from './actions'
+
 export const HOLD_MS = 500
 export const DOUBLE_TAP_MS = 250
 
@@ -127,5 +129,90 @@ export class Gestures {
     if (state.hold === undefined) return
     this._timers.clear(state.hold)
     delete state.hold
+  }
+}
+
+/** The three gestures a drawn row may answer, each present only when configured. */
+export interface PressActions {
+  action?: ActionConfig | undefined
+  holdAction?: ActionConfig | undefined
+  doubleTapAction?: ActionConfig | undefined
+}
+
+/**
+ * Whether any gesture does something, which decides whether the row is drawn as a button at all:
+ * a row whose tap is `none` but which holds or double-taps still is one, since a pointer can
+ * press it.
+ */
+export const pressesAnything = (row: PressActions): boolean =>
+  isPressable(row.action) || row.holdAction !== undefined || row.doubleTapAction !== undefined
+
+/** One pressable element's listeners, for `@click`, `@pointerdown` and the rest. */
+export interface PressHandlers {
+  click(event: Event): void
+  down(event: Event): void
+  /** For `@pointerup`, `@pointerleave` and `@pointercancel` alike. */
+  cancel(event: Event): void
+  menu(event: Event): void
+  key(event: KeyboardEvent): void
+}
+
+/**
+ * Enter and Space on a focused element are a tap, which is what makes `role="button"` honest. A
+ * keyboard has no hold, and its double press is two taps. Space scrolls the dashboard otherwise,
+ * and Enter would submit a form the card may be sitting inside, hence the `preventDefault`.
+ */
+export const activationKey =
+  (run: () => void) =>
+  (event: KeyboardEvent): void => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    run()
+  }
+
+/**
+ * The listeners every card with tap, hold and double tap binds on a pressable element, so the
+ * chips, tiles, complication, live-activity and badge cards cannot drift apart on them.
+ *
+ * `run` is the card's: it fires one action against the row's entity (`undefined` being the
+ * default, more-info), and is only ever handed an action `isPressable` accepts. The handlers are bound unconditionally and guard inside, rather
+ * than being bound only for a pressable row: a conditional `@click=${cond ? handler : nothing}`
+ * is a different code path in lit-html from a function, and guarding inside cannot be got
+ * subtly wrong.
+ *
+ * The click is the tap; `Gestures` holds it back only for a row with a double tap to wait for,
+ * and swallows it when it was the release of a hold. A row with neither taps on the click
+ * itself. A long press on a touch screen opens the context menu, unless a hold has claimed it.
+ */
+export const pressHandlers = (
+  gestures: Gestures,
+  row: PressActions,
+  run: (action: ActionConfig | undefined) => void,
+): PressHandlers => {
+  const runner = (action: ActionConfig | undefined) => (): void => {
+    if (isPressable(action)) run(action)
+  }
+  const tap = activationKey(runner(row.action))
+  return {
+    click: event => {
+      const double = row.doubleTapAction
+      gestures.click(
+        event.currentTarget as object,
+        runner(row.action),
+        double ? runner(double) : undefined,
+      )
+    },
+    down: event => {
+      const hold = row.holdAction
+      gestures.down(event.currentTarget as object, hold ? runner(hold) : undefined)
+    },
+    cancel: event => gestures.cancel(event.currentTarget as object),
+    menu: event => {
+      if (row.holdAction) event.preventDefault()
+    },
+    key: event => {
+      if (!isPressable(row.action)) return
+      tap(event)
+    },
   }
 }

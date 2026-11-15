@@ -11,6 +11,7 @@
  */
 
 import type { HassEntity } from './types/ha'
+import { isOneOf } from './one-of'
 
 /**
  * The closed palette a card's `color:` may name. Eleven because that is what `tokens.ts` carries
@@ -39,6 +40,16 @@ export const TINTS = [
 
 export type TintName = (typeof TINTS)[number]
 
+export const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
+
+/** `accent` reads as a word rather than a colour, so it is spelt out rather than capitalised. */
+export const TINT_LABELS: Record<string, string> = {
+  accent: 'Accent — your theme’s own',
+}
+
+/** A palette name as every colour dropdown lists it. */
+export const tintLabel = (value: string): string => TINT_LABELS[value] ?? titleCase(value)
+
 /**
  * The tint as a `--cw-*` reference, never a literal.
  *
@@ -49,8 +60,7 @@ export type TintName = (typeof TINTS)[number]
  */
 export const tintVar = (tint: TintName): string => `var(--cw-${tint})`
 
-export const isTint = (value: string): value is TintName =>
-  (TINTS as readonly string[]).includes(value)
+export const isTint = (value: string): value is TintName => isOneOf(TINTS, value)
 
 /**
  * Other cards' colour names, mapped onto this palette.

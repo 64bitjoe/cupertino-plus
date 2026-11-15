@@ -18,6 +18,9 @@ importers:
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
+      magic-string:
+        specifier: 0.30.21
+        version: 0.30.21
       playwright:
         specifier: ^1.62.0
         version: 1.62.0

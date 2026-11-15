@@ -11,14 +11,15 @@
  * action, and the decision to draw an entity that is not there.
  */
 
+import { DEFAULT_ACTION, type ActionConfig, type ActionName } from '../../core/actions'
+import { NO_TARGET_ACTION, readAction, readGestures } from '../../core/action-config'
 import {
-  ACTION_NAMES,
-  DEFAULT_ACTION,
-  serviceOf,
-  type ActionConfig,
-  type ActionName,
-} from '../../core/actions'
-import { DOUBLE_TAP_PREFIX, HOLD_PREFIX } from '../../core/action-form'
+  actionFromForm,
+  actionToForm,
+  gesturesFromForm,
+  gesturesToForm,
+} from '../../core/action-form'
+import { roomFromForm, roomToForm } from '../../core/area-form'
 import {
   formatValue,
   iconFor,
@@ -27,10 +28,28 @@ import {
   pictureFor,
   VALUE_DASH,
 } from '../../core/entity-view'
-import { isTemplate, type TemplateRequest } from '../../core/templates'
-import { colorValue, TINTS } from '../../core/tint'
+import { text } from '../../core/rows'
+import {
+  ACTION_KEYS,
+  actionTemplates,
+  isTemplate,
+  templateRequest,
+  truthy,
+  type TemplateRequest,
+  type TemplateResolver,
+} from '../../core/templates'
+import { colorValue, tintVar, type TintName } from '../../core/tint'
+import {
+  areaSummary,
+  roomSummaryOptions,
+  roomTemplates,
+  roomWatchedIds,
+  type RoomKeys,
+  type SummaryItemPart,
+} from '../../core/area-summary'
 import type { CardContainer } from '../../core/container'
 import type { HomeAssistant } from '../../core/types/ha'
+import { isOneOf, oneOf } from '../../core/one-of'
 
 /**
  * Whether the card paints a surface at all.
@@ -39,18 +58,11 @@ import type { HomeAssistant } from '../../core/types/ha'
  * its own translucent scrim so the dashboard shows through. `card` is the escape hatch for a
  * busy wallpaper, and the answer to the contrast limitation the rules document records.
  *
- * Declared here rather than beside the element that reads it, because the editor needs the
- * default as a *value* and the element imports the editor's tag — putting it in `chips-card.ts`
- * would close a runtime import cycle. `complication/style.ts` holds its card's style constants
- * for the same reason.
- *
- * The type itself is `core/container.ts`'s now, re-exported under this name so nothing that
- * already says `ChipsContainer` has to change; the default stays here, because it is this
- * card's and the panel cards default the other way.
+ * The type is `core/container.ts`'s, re-exported under this name so nothing that already says
+ * `ChipsContainer` has to change; the default is `FLOATING_DEFAULT_CONTAINER`, shared with every
+ * floating card (tiles, room, live activity).
  */
 export type ChipsContainer = CardContainer
-
-export const DEFAULT_CONTAINER: ChipsContainer = 'glass'
 
 /**
  * Where a row's chips sit along it when they do not fill it: at its start (every chips card up
@@ -68,9 +80,7 @@ export const DEFAULT_ALIGNMENT: ChipAlignment = 'start'
 
 /** The card's `alignment`, or the default for anything else; silent, as `container` is. */
 export const alignmentFor = (value: unknown): ChipAlignment =>
-  (CHIP_ALIGNMENTS as readonly unknown[]).includes(value)
-    ? (value as ChipAlignment)
-    : DEFAULT_ALIGNMENT
+  oneOf(CHIP_ALIGNMENTS, value, DEFAULT_ALIGNMENT)
 
 /**
  * How much of a chip is drawn. `icon` is the glyph alone; `value` adds the reading; `labeled`
@@ -92,7 +102,7 @@ export const DEFAULT_CONTENT: ChipContent = 'value'
  * (almost always templated, since there is no entity for a literal to describe) is a chip in
  * its own right. `readChip`'s own note has the full distinction.
  */
-export interface ChipConfig {
+export interface ChipConfig extends RoomKeys {
   /** Optional. See the interface's own note, and `readChip`'s. */
   entity?: string
   name?: string
@@ -117,13 +127,16 @@ export interface ChipConfig {
    */
   fill?: boolean
   tap_action?: ActionConfig
-  /** YAML only, as `data` and `target` are: see `core/gestures.ts` for how a hold is told apart. */
+  /** See `core/gestures.ts` for how a hold is told apart from a tap. */
   hold_action?: ActionConfig
   double_tap_action?: ActionConfig
 }
 
 export interface ChipView {
-  /** `undefined` for a chip with no configured entity — a spacer, or a templated chip. */
+  /**
+   * `undefined` for a chip with no configured entity — a spacer, or a templated chip. A room
+   * row's chip carries the first entity behind its fact, which its gestures act on.
+   */
   entityId: string | undefined
   /** The caption in `labeled` mode, and the accessible name in every mode. */
   name: string
@@ -223,75 +236,21 @@ export const chipConfigs = (entities: unknown): ChipConfig[] => {
 export const chipWatchedIds = (entities: unknown): string[] =>
   chipConfigs(entities).flatMap(row => (row.entity !== undefined ? [row.entity] : []))
 
-/**
- * How a template's result reaches the model.
- *
- * A function rather than a pool, so this module stays pure and node-testable: the card owns
- * the subscription and passes its `read` in. `entity` is the row the template belongs to,
- * which has to be part of the lookup for the same reason it is part of `requestKey` — two rows
- * sharing `{{ states(config.entity) }}` have two different answers.
- */
-export type TemplateResolver = (template: string, entity?: string) => string | undefined
+/** The same, with every room row's whole room in it, which only `hass` can say. */
+export const chipsCardWatchedIds = (
+  entities: unknown,
+  hass: HomeAssistant | undefined,
+): string[] => {
+  const rooms = hass
+    ? chipConfigs(entities).flatMap(row =>
+        row.entity === undefined && row.area !== undefined ? roomWatchedIds(hass, row) : [],
+      )
+    : []
+  return [...new Set([...chipWatchedIds(entities), ...rooms])]
+}
 
 /** Every field of a chip that may hold a template, in the order the editor shows them. */
 const TEMPLATED_FIELDS = ['name', 'icon', 'color', 'value', 'show'] as const
-
-/**
- * The one way a template becomes a request, for the model registering it and the card looking
- * its result up again: both call this, so the two keys cannot disagree.
- *
- * The variables are Mushroom's, so a template moved over from one of its cards reads the same
- * names: `config.entity` and `entity` are the row's entity id, and `user` is the name of whoever
- * is looking. `config.entity` came first and stays; `entity` and `user` arrived with the
- * migration, where a template written `{{ is_state(entity, 'on') }}` had nothing to read.
- *
- * Each is present only when it has a value, and with neither the request carries no `variables`
- * key at all. That is what used to be stated as "no entity means no variables" and is the same
- * rule, widened by one: a request is keyed by exactly what it was rendered with, so two ways of
- * writing nothing can never hash to two keys (`chipTemplates`' note has the bug that is about).
- */
-export const templateRequest = (
-  template: string,
-  entity: string | undefined,
-  user: string | undefined,
-): TemplateRequest => {
-  const variables: Record<string, unknown> = {}
-  if (entity !== undefined) {
-    variables.config = { entity }
-    variables.entity = entity
-  }
-  if (user !== undefined) variables.user = user
-  return Object.keys(variables).length > 0 ? { template, variables } : { template }
-}
-
-/** The action fields that are one string, any of which may be a template. */
-const ACTION_TEXT_FIELDS = ['navigation_path', 'url_path', 'service', 'perform_action'] as const
-
-/**
- * The action fields that are a tree, whose string leaves may be templates: a service's data
- * and its target, at any depth (`entity_id: ['{{ … }}', light.hall]` is a leaf in a list).
- */
-const ACTION_TREE_FIELDS = ['data', 'service_data', 'target'] as const
-
-const templatesIn = (value: unknown, out: string[]): void => {
-  if (isTemplate(value)) out.push(value)
-  else if (Array.isArray(value)) for (const item of value) templatesIn(item, out)
-  else if (value && typeof value === 'object') {
-    for (const item of Object.values(value)) templatesIn(item, out)
-  }
-}
-
-/** Every template one action holds, in its text fields and anywhere in its data and target. */
-export const actionTemplates = (action: ActionConfig | undefined): string[] => {
-  const out: string[] = []
-  if (!action) return out
-  for (const key of ACTION_TEXT_FIELDS) templatesIn(action[key], out)
-  for (const key of ACTION_TREE_FIELDS) templatesIn(action[key], out)
-  return out
-}
-
-/** The three gestures a row can configure, in the order `chipTemplates` registers them. */
-const ACTION_KEYS = ['tap_action', 'hold_action', 'double_tap_action'] as const
 
 /**
  * Every template a config asks for, ready for `TemplatePool.sync`.
@@ -332,24 +291,18 @@ export const chipTemplates = (
     }
 
     for (const key of ACTION_KEYS) for (const template of actionTemplates(row[key])) push(template)
+
+    // A room's own icons, each keyed to the entity it is about rather than the row's (a room
+    // row has none), so `{{ states(entity) }}` in one reads that icon's entity.
+    if (row.entity === undefined && row.area !== undefined) {
+      for (const { template, entity } of roomTemplates(row)) {
+        requests.push(templateRequest(template, entity, user))
+      }
+    }
   }
 
   return requests
 }
-
-/**
- * What a rendered `show` means.
- *
- * Home Assistant may hand back a real boolean or Python's `True`/`False` as a string,
- * depending on the template; `String()` in the pool makes both arrive here as text. The falsy
- * set is deliberately generous — a user writing `{{ 'off' }}` means off — and `undefined` is
- * false, which is the "hidden until it answers" rule: a chip that flashes *in* reads as a
- * dashboard loading, a chip that flashes *out* reads as a bug.
- */
-const FALSY = new Set(['', 'false', 'none', 'null', '0', 'off', 'unavailable', 'unknown'])
-
-export const truthy = (result: string | undefined): boolean =>
-  result !== undefined && !FALSY.has(result.trim().toLowerCase())
 
 /**
  * Every configured row, in order, as something drawable.
@@ -366,7 +319,93 @@ export const readChips = (
   entities: unknown,
   defaults: ChipDefaults,
   resolve?: TemplateResolver,
-): ChipView[] => chipConfigs(entities).map(row => readChip(hass, row, defaults, resolve))
+): ChipView[] =>
+  chipConfigs(entities).flatMap(row =>
+    row.entity === undefined && row.area !== undefined
+      ? roomChips(hass, row, defaults, resolve)
+      : [readChip(hass, row, defaults, resolve)],
+  )
+
+/**
+ * The colour of each fact, the Home app's: what needs you in red, what is open or unlocked in
+ * orange, then each kind in the colour its accessories have everywhere else in this library.
+ */
+export const PART_TINTS: Record<SummaryItemPart, TintName> = {
+  alerts: 'red',
+  open: 'orange',
+  locks: 'orange',
+  occupancy: 'blue',
+  climate: 'orange',
+  temperature: 'orange',
+  humidity: 'teal',
+  lights: 'yellow',
+  media: 'indigo',
+  // A user's own icon carries its colour; this is only for one whose entity is missing.
+  custom: 'grey',
+}
+
+/**
+ * A room row, as the chips it draws: one per fact the room has to say, none for a quiet room.
+ * The row's own `color` replaces every fact's but an alert's, which stays red: a leak drawn in
+ * the row's calm blue would be the one chip that must not blend in, blending in.
+ *
+ * The rest of the row's keys apply to the row as a whole, as a chip's apply to the chip:
+ *
+ * - `show` hides every one of its chips while it answers false, and until it answers at all,
+ *   `readChip`'s "hidden until it answers" rule.
+ * - A press opens the fact's own device unless the row says otherwise with a `tap_action`; a
+ *   hold and a double tap are the row's, each taking the fact's first entity as its own, so a
+ *   hold set to toggle on "2 Lights On" toggles a light of that room, not nothing.
+ * - `break` starts the row's first chip on a new line, and `fill` stretches its last one, so
+ *   whatever follows the room is pushed to the far edge, as it would be after a filling chip.
+ *
+ * Its `name`, `icon` and `value` are not drawn: each chip is a fact, with the fact's own words
+ * and glyph, and the editor does not offer them on a room row.
+ */
+export const roomChips = (
+  hass: HomeAssistant | undefined,
+  row: ChipConfig,
+  defaults: ChipDefaults = {},
+  resolve: TemplateResolver = () => undefined,
+): ChipView[] => {
+  if (row.area === undefined) return []
+  // A room row has no entity, so each of its own templates is keyed with none, exactly as
+  // `chipTemplates` registered it.
+  const field = (raw: string | undefined): string | undefined => {
+    if (!isTemplate(raw)) return raw
+    const result = resolve(raw, undefined)
+    return result === undefined || result === '' ? undefined : result
+  }
+  const items = areaSummary(hass, row.area, roomSummaryOptions(row, resolve))
+  const configured = colorValue(field(row.color))
+  const visible = row.show === undefined ? true : truthy(field(row.show))
+  const tap = row.tap_action ? readAction(row.tap_action, field, undefined, undefined) : undefined
+  const gestures = readGestures(row, field)
+  return items.map((item, index) => {
+    const [first] = item.entities
+    return {
+      entityId: first,
+      name: item.text,
+      icon: item.icon,
+      picture: undefined,
+      value: item.text,
+      // Its name and its reading are the same words, so `labeled` would print them twice; it
+      // reads as `value`. Icon-only stays available, the words kept as the accessible name.
+      content: (row.content ?? defaults.content) === 'icon' ? 'icon' : 'value',
+      unavailable: false,
+      // A user's own icon keeps the colour it was given, over the row's.
+      color: item.alert
+        ? tintVar('red')
+        : (item.color ?? configured ?? tintVar(PART_TINTS[item.part])),
+      visible,
+      break: index === 0 && row.break === true,
+      fill: index === items.length - 1 && row.fill === true,
+      spacer: false,
+      action: tap ?? (first ? { action: 'more-info', entity: first } : { action: 'none' }),
+      ...gestures,
+    }
+  })
+}
 
 /**
  * One row, drawn.
@@ -417,10 +456,13 @@ export const readChip = (
   if (row.entity === undefined) {
     const value = field(row.value, row.entity)
     const color = colorValue(field(row.color, row.entity) ?? field(defaults.color, undefined))
+    // A room row's own name and icon are its area's, for the editor's panel header: on the
+    // card it is drawn by `roomChips` instead, as one chip per fact.
+    const area = row.area !== undefined ? hass?.areas?.[row.area] : undefined
     return {
       entityId: undefined,
-      name: name ?? '',
-      icon: icon ?? '',
+      name: name ?? area?.name ?? '',
+      icon: icon ?? area?.icon ?? (row.area !== undefined ? 'mdi:sofa' : ''),
       picture: undefined,
       value: value ?? '',
       content,
@@ -491,100 +533,6 @@ export const readChip = (
   }
 }
 
-/** A chip with nothing to act on defaults to doing nothing, rather than opening a more-info
- *  dialog — or, worse, a service call — against an entity that was never configured. */
-export const NO_TARGET_ACTION: ActionConfig = { action: 'none' }
-
-/**
- * The action, with every template in it resolved.
- *
- * Rebuilt rather than mutated: `row.tap_action` is the user's config object, and a card that
- * wrote a rendered path back into it would persist a template's output as though somebody had
- * typed it.
- *
- * Every string field (the path, the URL, the service under either name) and every string leaf
- * of `data` and `target`, however deep. A leaf whose template has not answered yet is left out
- * rather than sent as written, because a service handed `'{{ states(…) }}'` as a brightness is
- * a failed call where one without the key is the service's default; the same rule a field that
- * is mid-resolution keeps everywhere else in this file. A leaf arrives as text, as every result
- * does (see `TemplatePool`), and Home Assistant's service schemas coerce a number written as
- * text, so `brightness_pct: '{{ 40 }}'` works.
- *
- * `fallback` is what a row with no `tap_action` at all gets: `DEFAULT_ACTION` (more-info) for
- * an entity-bearing chip, exactly as before, and `NO_TARGET_ACTION` (none) for an entity-less
- * one, whose default press would otherwise open a more-info dialog for nothing.
- */
-export function readAction(
-  action: ActionConfig | undefined,
-  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
-  entity: string | undefined,
-  fallback: ActionConfig,
-): ActionConfig
-export function readAction(
-  action: ActionConfig | undefined,
-  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
-  entity: string | undefined,
-  fallback: undefined,
-): ActionConfig | undefined
-export function readAction(
-  action: ActionConfig | undefined,
-  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
-  entity: string | undefined,
-  fallback: ActionConfig | undefined,
-): ActionConfig | undefined {
-  if (!action) return fallback
-  if (actionTemplates(action).length === 0) return action
-
-  const next: ActionConfig = { ...action }
-  for (const key of ACTION_TEXT_FIELDS) {
-    const raw = action[key]
-    if (!isTemplate(raw)) continue
-    const result = field(raw, entity)
-    if (result === undefined) delete next[key]
-    else next[key] = result
-  }
-  for (const key of ACTION_TREE_FIELDS) {
-    const tree = action[key]
-    if (tree !== undefined) next[key] = resolveTree(tree, raw => field(raw, entity)) as typeof tree
-  }
-  return next
-}
-
-/** Left out of an object or a list; see `readAction` on a leaf that has not answered. */
-const UNRESOLVED = Symbol('unresolved')
-
-const resolveTree = (value: unknown, resolve: (raw: string) => string | undefined): unknown => {
-  if (isTemplate(value)) return resolve(value) ?? UNRESOLVED
-  if (Array.isArray(value)) {
-    return value.map(item => resolveTree(item, resolve)).filter(item => item !== UNRESOLVED)
-  }
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [key, item] of Object.entries(value)) {
-      const resolved = resolveTree(item, resolve)
-      if (resolved !== UNRESOLVED) out[key] = resolved
-    }
-    return out
-  }
-  return value
-}
-
-/**
- * A row's hold and double tap, resolved, and present only when configured: a view with no
- * `holdAction` key is a row whose press runs no hold timer at all.
- */
-export const readGestures = (
-  row: { entity?: string; hold_action?: ActionConfig; double_tap_action?: ActionConfig },
-  field: (raw: string | undefined, entity: string | undefined) => string | undefined,
-): { holdAction?: ActionConfig; doubleTapAction?: ActionConfig } => {
-  const hold = readAction(row.hold_action, field, row.entity, undefined)
-  const double = readAction(row.double_tap_action, field, row.entity, undefined)
-  return {
-    ...(hold && hold.action !== 'none' ? { holdAction: hold } : {}),
-    ...(double && double.action !== 'none' ? { doubleTapAction: double } : {}),
-  }
-}
-
 /**
  * The two values the editor greys into a chip's Icon and Name fields.
  *
@@ -616,35 +564,6 @@ export const inheritedIcon = (
 }
 
 /**
- * A whole list on its way back into the config.
- *
- * Here rather than in the editor because it is a rule about the config rather than about a
- * control, and because it is the half of the editor a test can reach without a browser.
- *
- * A row with nothing but an entity in it is written back as a bare string, so a config someone
- * hand-wrote as a plain id list does not sprout objects just because they opened a panel and
- * closed it again — the same rule `mergeEntities` keeps for the cards whose lists still go
- * through a picker.
- *
- * Nothing is ever dropped here any more. Clearing a chip's entity used to be Home Assistant's
- * own reading of "delete this row", the one it gives its own entities card — but that gesture
- * is now how a chip *becomes* a spacer or a templated chip, so a row that came in without a
- * usable entity goes back out the same way, minus the entity key itself: `entity: ''` sitting
- * in a config would mean the same thing as no key at all, just less legibly.
- */
-export const chipRows = (rows: readonly ChipConfig[]): (string | ChipConfig)[] =>
-  rows.map(row => {
-    if (typeof row.entity === 'string' && row.entity !== '') {
-      return Object.keys(row).length === 1 ? row.entity : row
-    }
-    // Destructured away rather than deleted or set to `undefined`, for the same
-    // `exactOptionalPropertyTypes` reason `chipConfigs` gives.
-    const { entity, ...rest } = row
-    void entity
-    return rest as ChipConfig
-  })
-
-/**
  * What a chip's content dropdown says for "whatever the card is set to".
  *
  * A sentinel rather than an empty value, and it never reaches a config. `select` renders
@@ -655,45 +574,6 @@ export const chipRows = (rows: readonly ChipConfig[]): (string | ChipConfig)[] =
  * an option whose value is indistinguishable from no value renders as a blank line.
  */
 export const CONTENT_INHERIT = 'inherit'
-
-/** An empty form field reports as an empty string; this reads it as absent. Shared with the tiles model. */
-export const text = (value: unknown): string | undefined =>
-  typeof value === 'string' && value !== '' ? value : undefined
-
-/**
- * The sentinel the colour dropdown uses for "type a CSS colour instead". Never a config value:
- * `chipFromForm` and `CupertinoChipsCardEditor.fromForm` both fold it away into `color_custom`
- * before a config is ever written.
- *
- * Declared here, alongside `TINT_LABELS`, `titleCase` and `COLOR_SELECTOR` below, rather than
- * inside either editor, because both the chip panel and the card-level form need the same
- * dropdown: one editor's copy and another's would drift the moment a tint was renamed. The same
- * reason `DEFAULT_CONTAINER` lives here rather than in `chips-card.ts`.
- */
-export const COLOR_CUSTOM = 'custom'
-
-/** `accent` reads as a word rather than a colour, so it is spelt out rather than capitalised. */
-export const TINT_LABELS: Record<string, string> = {
-  accent: 'Accent — your theme own',
-}
-
-export const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
-
-/**
- * The Colour dropdown both editors draw: the closed palette, plus "none" and "type your own".
- * `color_custom`, a sibling text row shown only when this reads `COLOR_CUSTOM`, is where the
- * literal actually lives; see the note on `COLOR_CUSTOM` above.
- */
-export const COLOR_SELECTOR = {
-  select: {
-    mode: 'dropdown' as const,
-    options: [
-      { value: '', label: 'None — the row default' },
-      ...TINTS.map(value => ({ value, label: TINT_LABELS[value] ?? titleCase(value) })),
-      { value: COLOR_CUSTOM, label: 'Custom…' },
-    ],
-  },
-}
 
 /**
  * One chip as its panel's `ha-form` wants it: flat.
@@ -724,29 +604,9 @@ export const chipToForm = (config: ChipConfig): Record<string, unknown> => ({
   show: config.show,
   break: config.break === true,
   fill: config.fill === true,
+  ...roomToForm(config),
   ...actionToForm(config.tap_action, config.entity),
   ...gesturesToForm(config),
-})
-
-/**
- * The tap action's three form fields, from the config. Shared with the tiles model.
- *
- * `perform-action` shows as Call a service, the same action under Home Assistant's newer name,
- * with its `perform_action` in the Service field; `actionFromForm` writes it back under the name
- * it came in with, so opening the panel does not rename a key nobody touched.
- */
-export const actionToForm = (
-  action: ActionConfig | undefined,
-  entity: string | undefined,
-  prefix = '',
-): Record<string, unknown> => ({
-  [`${prefix}action`]:
-    action?.action === 'perform-action'
-      ? 'call-service'
-      : (action?.action ?? (entity === undefined ? 'none' : DEFAULT_ACTION.action)),
-  [`${prefix}navigation_path`]: action?.navigation_path,
-  [`${prefix}url_path`]: action?.url_path,
-  [`${prefix}service`]: action ? serviceOf(action) : undefined,
 })
 
 /**
@@ -759,7 +619,7 @@ export const actionToForm = (
  * exists to prevent on the cards whose lists still go through a picker.
  *
  * Never answers `undefined` any more. It used to, for a row whose entity had been cleared —
- * `chipRows` treated that as a delete, matching Home Assistant's own entities-card gesture —
+ * `configRows` treated that as a delete, matching Home Assistant's own entities-card gesture —
  * but clearing the Entity field is now how a chip becomes a spacer or a templated chip instead
  * of a deletion, so the row survives with no `entity` key rather than vanishing. The trash icon
  * in `chip-list-editor.ts` is the only way to remove a row now.
@@ -777,7 +637,7 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
   if (icon !== undefined) next.icon = icon
 
   const content = text(data.content)
-  if (content !== undefined && (CHIP_CONTENTS as readonly string[]).includes(content)) {
+  if (content !== undefined && isOneOf(CHIP_CONTENTS, content)) {
     next.content = content as ChipContent
   }
 
@@ -795,6 +655,8 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
   // in a config says exactly what its absence says.
   if (data.break === true) next.break = true
   if (data.fill === true) next.fill = true
+
+  Object.assign(next, roomFromForm(data))
 
   // `readAction`'s own real default: `none` for a row this edit leaves with no entity, so a
   // chip left at "Nothing" in the dropdown does not sprout an explicit `tap_action` the moment
@@ -816,135 +678,4 @@ export const chipFromForm = (prior: ChipConfig, data: Record<string, unknown>): 
   if (tapAction !== undefined) next.tap_action = tapAction
 
   return { ...next, ...gesturesFromForm(prior, data) }
-}
-
-/**
- * The hold and double tap, as the panel's fields. Both default to Nothing whatever the entity,
- * because that is what an unconfigured gesture does: neither has a more-info fallback.
- */
-export const gesturesToForm = (row: {
-  hold_action?: ActionConfig
-  double_tap_action?: ActionConfig
-}): Record<string, unknown> => ({
-  ...actionToForm(row.hold_action, undefined, HOLD_PREFIX),
-  ...actionToForm(row.double_tap_action, undefined, DOUBLE_TAP_PREFIX),
-})
-
-/**
- * The hold and double tap, folded back. A gesture whose dropdown the form did not draw at all
- * keeps what it had, so a caller passing a partial answer (a test, or an editor without the
- * fields) cannot drop a gesture written in YAML. One left at Nothing writes no key.
- */
-export const gesturesFromForm = (
-  prior: { hold_action?: ActionConfig; double_tap_action?: ActionConfig },
-  data: Record<string, unknown>,
-): { hold_action?: ActionConfig; double_tap_action?: ActionConfig } => {
-  const gesture = (action: ActionConfig | undefined, prefix: string) =>
-    data[`${prefix}action`] === undefined ? action : actionFromForm(action, data, 'none', prefix)
-  const hold = gesture(prior.hold_action, HOLD_PREFIX)
-  const doubleTap = gesture(prior.double_tap_action, DOUBLE_TAP_PREFIX)
-  return {
-    ...(hold !== undefined ? { hold_action: hold } : {}),
-    ...(doubleTap !== undefined ? { double_tap_action: doubleTap } : {}),
-  }
-}
-
-/**
- * The three action fields, gathered back into one `tap_action` — or into nothing at all.
- *
- * Two decisions worth stating. **The argument fields are read only for the action that owns
- * them**: a `navigation_path` left over from a row that used to navigate does not ride along
- * inside a `toggle`, because a config carrying an argument its action cannot use is a config
- * that reads as a bug the next time somebody opens the YAML tab.
- *
- * And **a bare action matching `bareDefault` is written as no `tap_action` at all**, because
- * that is what leaving the row unconfigured already means — `DEFAULT_ACTION` (more-info) for a
- * chip with an entity, `NO_TARGET_ACTION` (none, via `chipFromForm`'s own `bareDefault`) for
- * one without. The alternative — showing that default in the dropdown, as we must, and then
- * writing it through on the first unrelated edit — would put a `tap_action` on every chip in a
- * config the moment its owner touched one name.
- */
-export const actionFromForm = (
-  prior: ActionConfig | undefined,
-  data: Record<string, unknown>,
-  bareDefault: ActionName,
-  prefix = '',
-): ActionConfig | undefined => {
-  const field = (name: string) => text(data[`${prefix}${name}`])
-  const named = field('action')
-  // An action the dropdown does not offer (`fire-dom-event`, or one a later Home Assistant adds)
-  // shows as itself and comes back as itself: the panel cannot edit it, so it must not replace it.
-  if (prior && named === prior.action && !(ACTION_NAMES as readonly string[]).includes(named)) {
-    return prior
-  }
-  const action: ActionName = (ACTION_NAMES as readonly string[]).includes(named ?? '')
-    ? (named as ActionName)
-    : bareDefault
-
-  // Written back under the name it came in with: see `actionToForm`.
-  const renamed = action === 'call-service' && prior?.action === 'perform-action'
-  const next: ActionConfig = { action: renamed ? 'perform-action' : action }
-
-  // Carried through every action, because they are the overrides that apply to all of them.
-  if (prior?.entity !== undefined) next.entity = prior.entity
-  if (prior?.confirmation !== undefined) next.confirmation = prior.confirmation
-
-  if (action === 'navigate') {
-    const path = field('navigation_path')
-    if (path !== undefined) next.navigation_path = path
-  }
-
-  if (action === 'url') {
-    const url = field('url_path')
-    if (url !== undefined) next.url_path = url
-  }
-
-  if (action === 'call-service') {
-    const service = field('service')
-    if (service !== undefined) {
-      if (renamed) next.perform_action = service
-      else next.service = service
-    }
-    if (prior?.data !== undefined) next.data = prior.data
-    if (prior?.service_data !== undefined) next.service_data = prior.service_data
-    if (prior?.target !== undefined) next.target = prior.target
-  }
-
-  if (action === 'assist' && prior?.action === 'assist') {
-    if (prior.pipeline_id !== undefined) next.pipeline_id = prior.pipeline_id
-    if (prior.start_listening !== undefined) next.start_listening = prior.start_listening
-  }
-
-  return action === bareDefault && Object.keys(next).length === 1 ? undefined : next
-}
-
-/**
- * A stable key per row, for a list control's `repeat` and for whatever it remembers per row.
- *
- * The entity id, which is what the battery card's list uses and what makes a dragged row keep
- * its open panel — except that this card's config may legally name the same entity twice.
- * `readChips` draws both, so the editor has to render both, and two rows sharing a key is the
- * one thing `repeat` cannot be handed. Later occurrences get a `#1`, `#2` suffix, so the
- * ordinary config is keyed exactly as it was and the odd one renders instead of throwing.
- *
- * The suffix is positional, so dragging one duplicate past the other renames both keys and
- * closes their panels. That is the whole cost, it falls only on a config that names one entity
- * twice, and the alternative — an identity a chip does not have — would be a worse lie.
- *
- * A row with no entity at all is keyed by its own position, `#<index>`, prefixed so it can
- * never collide with an entity id (`domain.object_id` always contains a `.` and never starts
- * with `#`) or with a `#1`-suffixed duplicate above. It pays the identical cost: dragging a
- * spacer past another entity-less row renames both and closes their panels. Converting a
- * spacer into an entity-bearing chip by typing an entity into it pays the cost the other
- * direction — its key changes from positional to the entity id, so its panel closes on that
- * one edit, which is the same trade-off this function already accepts for a renamed entity.
- */
-export const chipKeys = (rows: readonly ChipConfig[]): string[] => {
-  const seen = new Map<string, number>()
-  return rows.map((row, index) => {
-    if (row.entity === undefined) return `#${index}`
-    const before = seen.get(row.entity) ?? 0
-    seen.set(row.entity, before + 1)
-    return before === 0 ? row.entity : `${row.entity}#${before}`
-  })
 }
